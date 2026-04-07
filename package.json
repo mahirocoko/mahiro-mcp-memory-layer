@@ -1,0 +1,34 @@
+{
+  "name": "mcp-memory-layer",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "bun@1.3.11",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "cursor": "tsx src/cursor.ts",
+    "cursor-worker": "tsx src/cursor-worker.ts",
+    "gemini": "tsx src/gemini.ts",
+    "gemini-worker": "tsx src/gemini-worker.ts",
+    "list-orchestration-traces": "tsx src/list-orchestration-traces.ts",
+    "orchestrate": "tsx src/orchestrate.ts",
+    "eval-retrieval": "tsx src/eval-retrieval.ts",
+    "reindex": "tsx src/index.ts --reindex",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lancedb/lancedb": "^0.22.3",
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "apache-arrow": "^18.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.0",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

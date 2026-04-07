@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+data/log/*.jsonl
+data/cache/*.json
+data/traces/*.jsonl
+data/traces/orchestration-results/*.json
+data/lancedb/*
+.pulselane-refactor/
+!data/cache/.gitkeep
+!data/log/.gitkeep
+!data/traces/.gitkeep
+!data/lancedb/.gitkeep
