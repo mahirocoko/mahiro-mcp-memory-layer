@@ -2,7 +2,7 @@
 
 This document defines the worker-first orchestration loop for `apps/mcp-memory-layer`.
 
-`WORKFLOW.md` is the behavioral protocol. For CLI flags, JSON payload shapes, MCP examples, and trace inspection command reference, use `README.md`.
+`WORKFLOW.md` is the behavioral protocol. For CLI flags, JSON payload shapes, MCP examples, and trace inspection command reference, use `README.md`. For the orchestrator operating doctrine itself, use `ORCHESTRATOR.md`.
 
 ## Core posture
 
