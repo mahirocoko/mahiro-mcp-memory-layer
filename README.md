@@ -27,6 +27,8 @@ The native headless Cursor-family entrypoint in this repo is `agent -p --output-
 
 `bun run cursor` is a repo-local wrapper around that `agent` command. Use it when you want this package's normalized JSON envelope and defaults, but do not confuse it with the native headless command itself.
 
+`AGENTS.md` is the primary entrypoint for AI agents in this repo.
+
 `README.md` is the canonical command/reference document for this package. For worker-selection posture and orchestration behaviors, see `WORKFLOW.md`. For the orchestrator decision loop itself, see `ORCHESTRATOR.md`.
 
 Model selection:

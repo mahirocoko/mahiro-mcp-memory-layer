@@ -23,6 +23,8 @@ Before implementation work:
 3. Read only enough local code to write a good worker prompt.
 4. Delegate before broad local reading when the task is non-trivial.
 
+Grounding-read budget: keep orientation reads to about 50 lines total before delegation.
+
 ## Delegation default
 
 Delegate first when any of these are true:
@@ -37,7 +39,8 @@ Direct edits are fine for:
 - small docs updates
 - config wiring
 - worker-prompt/config changes
-- tiny obvious fixes
+- tiny obvious fixes (<=5 lines, 1 file)
+- emergency hotfixes that are obvious and <=10 lines
 
 ## Worker selection
 
@@ -52,7 +55,8 @@ After a worker returns:
 
 1. Run executable checks first.
 2. Spot-check only the highest-risk claims.
-3. Avoid re-reading large file clusters unless verification truly requires it.
+3. Keep post-worker spot-checks to <=3 locations and <=80 lines total.
+4. Avoid re-reading large file clusters unless verification truly requires it.
 
 Preferred verification order:
 
@@ -76,6 +80,25 @@ Stop when one of these is true:
 - the requested implementation and verification are complete
 - the remaining blocker is external and clearly identified
 - the user redirects the work
+
+## Expected turn shape
+
+A good turn:
+
+1. Read <=50 lines for orientation.
+2. Classify the task.
+3. Delegate.
+4. Run typecheck/test/build.
+5. Spot-check <=3 locations and <=80 lines.
+6. Synthesize the result.
+
+A bad turn:
+
+1. Read several files "to understand context."
+2. Read more files "to be thorough."
+3. Edit multiple implementation files directly.
+4. Run tests.
+5. Never delegate.
 
 ## Escalation rule
 

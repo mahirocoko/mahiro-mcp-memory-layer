@@ -1,6 +1,8 @@
 # MCP Memory Layer Workflow
 
-This document defines the worker-first orchestration loop for `apps/mcp-memory-layer`.
+This document defines the worker-first orchestration loop for this standalone `mcp-memory-layer` repo.
+
+`AGENTS.md` is the primary entrypoint for AI agents in this repo.
 
 `WORKFLOW.md` is the behavioral protocol. For CLI flags, JSON payload shapes, MCP examples, and trace inspection command reference, use `README.md`. For the orchestrator operating doctrine itself, use `ORCHESTRATOR.md`.
 
@@ -10,6 +12,7 @@ This document defines the worker-first orchestration loop for `apps/mcp-memory-l
 - Gemini and the Cursor-family `agent` worker do the heavy lifting first.
 - Local reads stay shallow before delegation and surgical after worker output.
 - Every Gemini and Cursor-family `agent` invocation must declare a model explicitly. No implicit defaults.
+- `ORCHESTRATOR.md` is the source of truth for read budgets, tripwires, and verification budgets.
 
 ## Default loop
 
@@ -146,9 +149,4 @@ Telemetry highlights worth checking during verification:
 
 Worker output is never the final truth.
 
-- verify with `bun run typecheck`
-- verify with `bun run test`
-- verify with `bun run build`
-- spot-check only the files and claims that matter
-
-The orchestrator should not re-read large file clusters after delegation unless verification truly requires it.
+Use `ORCHESTRATOR.md` as the source of truth for verification budgets and turn-shape discipline.
