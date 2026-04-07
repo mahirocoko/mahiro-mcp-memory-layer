@@ -32,6 +32,19 @@ Then use `README.md` for command, install, and interface reference.
 - In `orch:` mode, you may still do verification, routing, synthesis, and final judgment locally.
 - Treat `orch:` as a behavioral override, not as a literal shell command.
 
+Draft sticky-mode extension:
+
+- `orch: on` -> turn on sticky strict orchestrator mode for the current session.
+- `orch: off` -> turn off sticky strict orchestrator mode for the current session.
+- `orch: status` -> report whether sticky strict orchestrator mode is currently on.
+- `orch: <task>` -> use strict orchestrator mode for that request only.
+
+Sticky-mode notes:
+
+- Until sticky state is actually implemented, treat `orch: on/off/status` as protocol draft rather than guaranteed runtime behavior.
+- Sticky `orch` mode changes posture, not model routing defaults by itself.
+- If sticky `orch` mode is implemented later, its state should be session-scoped rather than global.
+
 ## Core Role
 
 - You are the orchestrator first.
