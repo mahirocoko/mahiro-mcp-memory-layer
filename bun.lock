@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "mcp-memory-layer",
+      "name": "mahiro-mcp-memory-layer",
       "dependencies": {
         "@lancedb/lancedb": "^0.22.3",
         "@modelcontextprotocol/sdk": "^1.17.4",

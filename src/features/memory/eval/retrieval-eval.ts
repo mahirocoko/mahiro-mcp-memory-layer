@@ -23,8 +23,8 @@ const EVAL_CREATED_AT = "2026-04-01T12:00:00.000Z";
 
 export const retrievalEvalScope = {
   userId: "mahiro",
-  projectId: "mcp-memory-layer-eval",
-  containerId: "workspace:mcp-memory-layer-eval",
+  projectId: "mahiro-mcp-memory-layer-eval",
+  containerId: "workspace:mahiro-mcp-memory-layer-eval",
   sessionWithNotes: "eval-session-probes",
   sessionSparse: "eval-session-sparse",
 } as const;
@@ -387,7 +387,7 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     query: "requestId reject malformed replay hook hardening",
     mode: "full",
     scope: "project",
-    projectId: "mcp-memory-layer-eval-missing-project",
+    projectId: "mahiro-mcp-memory-layer-eval-missing-project",
     limit: 8,
     expectEmpty: true,
     expectedTop1: "",
@@ -565,7 +565,7 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
       task: "requestId hardening before result-store writes",
       mode: "full",
       userId: retrievalEvalScope.userId,
-      projectId: "mcp-memory-layer-eval-missing-project",
+      projectId: "mahiro-mcp-memory-layer-eval-missing-project",
       containerId: retrievalEvalScope.containerId,
       sessionId: retrievalEvalScope.sessionWithNotes,
       maxItems: 6,

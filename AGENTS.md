@@ -4,11 +4,41 @@
 
 Read this file first.
 
-Then use the docs in this order:
+Then use `README.md` for command, install, and interface reference.
 
-1. `README.md` for command and interface reference
-2. `WORKFLOW.md` for worker usage patterns and orchestration behavior
-3. `ORCHESTRATOR.md` for the orchestrator decision loop and verification discipline
+## Repo Snapshot
+
+- This repo ships a local-first MCP memory layer plus orchestration helpers for Gemini and Cursor-family workers.
+- MCP server entrypoint: `src/index.ts`
+- Memory MCP registration: `src/features/memory/mcp/server.ts`
+- Orchestration MCP tools: `src/features/orchestration/mcp/register-tools.ts`
+- Primary verification commands: `bun run typecheck`, `bun run test`, `bun run build`
+
+## Public Contract
+
+- MCP server name: `mahiro-mcp-memory-layer`
+- Primary memory tools: `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`
+- Orchestration tools: `orchestrate_workflow`, `get_orchestration_result`, `list_orchestration_traces`
+- Default orchestration posture: async
+- Omit `waitForCompletion` to start work in background and get `{ requestId, status: "running", autoAsync: true }`
+- Use `get_orchestration_result` to poll by `requestId`
+- `waitForCompletion: true` is allowed only for a single Gemini job or step with no retries
+
+## Shortcut Protocol
+
+- If the user prefixes a request with `orch:`, switch into strict orchestrator mode for that request.
+- In `orch:` mode, classify first, choose the worker and model explicitly, and delegate before doing any real code work.
+- In `orch:` mode, local implementation is allowed only through the narrow escape hatch below.
+- In `orch:` mode, you may still do verification, routing, synthesis, and final judgment locally.
+- Treat `orch:` as a behavioral override, not as a literal shell command.
+
+## Core Role
+
+- You are the orchestrator first.
+- Your job is to classify work, choose the right worker and model, verify outputs, and make the final judgment.
+- You are not the default implementation worker. For most real code work, another worker should do the execution first.
+- Workers do execution, extraction, review, planning, and synthesis support.
+- Final architectural judgment and completion claims stay with the orchestrator.
 
 ## Golden Rules
 
@@ -18,22 +48,21 @@ Then use the docs in this order:
 - Always preserve history
 - Always present options when a decision would change history or workflow shape materially
 - Always verify before declaring done
-- Use Gemini as a subordinate worker for summarization, fact extraction, and bounded synthesis, not as the final source of engineering judgment
+- Delegate first for code work unless the task clearly fits the narrow escape hatch below.
 - Every Gemini and Cursor-family invocation must set an explicit model
 - Keep direct file reads, local code search, and verified tool output as source of truth, but do not use that as an excuse to skip delegation when the task is non-trivial
 
-## Direct Edit Allowlist
+## Narrow Escape Hatch
 
 Direct inline edits are allowed only for:
 
 - trivial fixes: <=5 lines in 1 file
-- greenfield scaffolding from a known pattern when the work is <=5 files
 - docs and rule updates
 - worker/config wiring
 - synthesis artifacts after workers already did extraction or analysis
 - emergency hotfixes that are obvious and <=10 lines
 
-Everything else should delegate first.
+Everything else must delegate first before you edit locally.
 
 ## Inline-work Tripwires
 
@@ -45,16 +74,17 @@ Stop and delegate if any of these are true:
 - you are mentally summarizing a file instead of asking a worker to summarize it
 - you are planning a multi-step refactor in your head instead of sending it to a planning worker
 
-Exception: these tripwires do not apply to small greenfield scaffolding of <=5 files when the pattern is already clear.
+If a tripwire is hit, stop and delegate unless the work already fits the narrow escape hatch above.
 
 ## Orchestrator Operating Protocol
 
 Before implementation work:
 
 1. Classify the task shape.
-2. If the task needs >3 files or >100 lines of reading, delegate first.
-3. Read <=50 lines for orientation before delegation.
-4. Spawn workers before broad local reading.
+2. If the task is outside the narrow escape hatch, delegate first.
+3. If the task needs >3 files or >100 lines of reading, delegate first.
+4. Read <=50 lines for orientation before delegation.
+5. Spawn workers before broad local reading.
 
 After a worker returns:
 
@@ -82,20 +112,21 @@ If executable checks already reveal the issue, do not keep rereading broadly.
 ## Local Worker Policy
 
 - Primary posture: remain the orchestrator; workers are support, not the final decision-maker.
-- Delegate-first by default for implementation, review, refactor, or multi-file synthesis.
-- Gemini is best for summaries, extraction, timelines, and narrow synthesis.
-- Cursor-family `agent` is best for implementation, refactors, code review, and planning inside the codebase.
-- Final architectural judgment and completion claims stay with the orchestrator.
+- Strict delegate-first posture: implementation, review, refactor, planning, and multi-file analysis should go to a worker first.
+- Local execution is reserved for the narrow escape hatch plus verification, orchestration wiring, and final synthesis.
+- Gemini and Cursor-family workers can both run in parallel when their subtasks are independent.
+- Gemini is the default family for visual-engineering, frontend/artistry work, and alternative reasoning with `gemini-3-flash-preview` or `gemini-3.1-pro-preview`.
+- Cursor-family `agent` is the default family for most codebase execution work with `composer-2`, `claude-4.6-sonnet-medium`, or `claude-4.6-opus-high`.
 
 ## Worker Routing
 
 | Task shape | Primary worker | Default model | Verification | Notes |
 | --- | --- | --- | --- | --- |
-| Summaries, facts, timelines | Gemini | `gemini-3-flash-preview` | spot-check key claims | bounded reduction and extraction |
-| Harder synthesis or tradeoffs | Gemini | `gemini-3.1-pro-preview` | verify tradeoff-driving claims | use sparingly |
-| Implementation, refactor, code review | Cursor-family `agent` | `composer-2` | run typecheck/tests and inspect touched files | default coding worker |
-| Hard review or risky refactor | Cursor-family `agent` | `claude-4.6-sonnet-medium` | targeted diff review plus typecheck/tests | stronger review/refactor tier |
-| Complex planning | Cursor-family `agent` | `claude-4.6-opus-high` with `--mode plan` | verify against repo constraints | use only when a real planning pass is needed |
+| Visual/frontend execution, visual-engineering, artistry | Gemini | `gemini-3.1-pro-preview` | run checks plus visual/behavior spot-checks | default family for design-led work |
+| Lightweight visual passes, extraction, or alternate reasoning | Gemini | `gemini-3-flash-preview` | spot-check key claims | lighter Gemini path |
+| Standard implementation, review, refactor, and execution | Cursor-family `agent` | `composer-2` | run typecheck/tests and inspect touched files | default coding worker |
+| Harder implementation, review, or refactor | Cursor-family `agent` | `claude-4.6-sonnet-medium` | targeted diff review plus typecheck/tests | stronger execution tier |
+| Complex planning, Opus validation, or very hard execution | Cursor-family `agent` | `claude-4.6-opus-high` | verify against repo constraints | planner with the orchestrator, but can execute when difficulty justifies it |
 
 ## Frontend Task Routing
 
@@ -104,8 +135,8 @@ Frontend tasks split into two shapes:
 **Design-led**: visual layout, styling, component scaffolding, and small static UI work.
 
 - Do directly when the scope is small and the pattern is clear.
-- Delegate to Gemini with `gemini-3.1-pro-preview` for larger UI builds and design-led frontend work.
-- Treat Gemini as an executor here, not only as a critic or synthesis worker.
+- Delegate to Gemini when you intentionally want `gemini-3-flash-preview` or `gemini-3.1-pro-preview` for visual/frontend execution.
+- Treat Gemini as an execution worker here, not just a summarizer or critic.
 - Do not over-orchestrate trivial frontend scaffolding.
 
 **Engineering-led**: state management, data fetching, complex logic, or risky UI refactors.
@@ -123,10 +154,76 @@ Frontend tasks split into two shapes:
 
 1. Classify the task shape first.
 2. Choose the worker from the routing table.
-3. Pick the lightest model that is still reliable.
+3. Pick the lightest model that is still reliable, unless the user explicitly requests a model.
 4. Pass the model explicitly.
 5. Verify with executable checks first, then targeted spot-checks.
 6. Escalate only when there is a concrete reason.
+
+If the user explicitly names a model, use that exact model for the delegated step unless it is unavailable or incompatible.
+
+If the user explicitly asks for Opus, planning, or an Opus-level validation pass, use `claude-4.6-opus-high` and do not silently downgrade to `composer-2` or `claude-4.6-sonnet-medium`.
+
+## Worker Usage Patterns
+
+Use Gemini when intentionally selecting `gemini-3-flash-preview` or `gemini-3.1-pro-preview`.
+
+Common reasons to choose Gemini:
+
+- visual/frontend execution
+- visual-engineering and artistry
+- summarize files or docs
+- extract facts or timelines
+- compare options before implementation
+- narrow a large search space before coding
+- get a different reasoning style from the Cursor family
+
+Recommended model ladder:
+
+- `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
+- `gemini-3.1-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+
+Use the Cursor-family `agent` headless path for applied coding work:
+
+- implementation and refactoring
+- code review
+- patch planning inside the codebase
+- edits that benefit from an agent/tool loop
+
+Recommended model ladder:
+
+- `composer-2` -> default doer for standard implementation and review
+- `claude-4.6-sonnet-medium` -> harder doer for more difficult implementation/review/refactor work
+- `claude-4.6-opus-high` -> planner with the orchestrator, and a doer for very hard work when justified
+
+`--mode plan` is not the default posture. Use it only when the task is complex enough that you need an explicit planning pass.
+
+Headless is the default posture for local workers. Prefer `agent -p --output-format json ...` or repo-local worker wrappers over interactive usage.
+
+Parallelize only when worker inputs are fully independent, regardless of whether the workers are Gemini, Cursor, or mixed.
+
+Independent:
+
+- Gemini designs one frontend surface while Cursor reviews an unrelated backend diff
+- Gemini extracts facts from docs while Cursor plans an unrelated refactor
+- Two Gemini workers analyze separate visual/frontend areas in parallel
+- Five Cursor workers review five unrelated modules in parallel, then you compare the results
+
+Dependent and must sequence:
+
+- Gemini extracts facts -> you use those facts to write the Cursor prompt
+- Cursor produces a plan -> you send that plan to Gemini for critique
+
+For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `README.md`.
+
+## MCP Workflow Reminders
+
+- The `orchestrate_workflow` MCP tool accepts the same static workflow spec as the CLI.
+- Prefer `waitForCompletion: false` for long-running workflows.
+- If `waitForCompletion` is omitted, workflows may auto-start in background and return `{ requestId, status: "running", autoAsync: true }`.
+- `waitForCompletion: true` is limited to a single Gemini job with no retries; Cursor or multi-job workflows must use async mode and `get_orchestration_result`.
+- Use `get_orchestration_result` to poll background orchestration runs by `requestId`.
+- Use `list_orchestration_traces` or the CLI trace reader for execution forensics.
+- Worker output is never the final truth.
 
 ## Expected Turn Shape
 
@@ -147,6 +244,16 @@ A bad turn:
 4. Run tests.
 5. Never delegate.
 
+## Stop Rule
+
+Do not stop at analysis if the task is still actionable.
+
+Stop when one of these is true:
+
+- the requested implementation and verification are complete
+- the remaining blocker is external and clearly identified
+- the user redirects the work
+
 ## Escalation Triggers
 
 - required facts or artifacts are still missing after one verification pass
@@ -158,6 +265,12 @@ A bad turn:
 ## Model Rule
 
 Never rely on implicit model defaults.
+
+Do not silently substitute a different model when the user explicitly requested one.
+
+If a requested model cannot be used, say so and choose the nearest justified fallback explicitly.
+
+Planning passes that are explicitly requested as Opus-level planning or validation must use `claude-4.6-opus-high`.
 
 - Gemini examples: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`
 - Cursor examples: `composer-2`, `claude-4.6-sonnet-medium`, `claude-4.6-opus-high`

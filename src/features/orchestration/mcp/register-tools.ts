@@ -26,7 +26,7 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
   return [
     {
       name: "orchestrate_workflow",
-      description: "Run a static parallel or sequential worker workflow.",
+      description: "Run a static parallel or sequential worker workflow. Synchronous wait is limited to a single Gemini job with no retries.",
       inputSchema: orchestrateToolInputSchema.shape,
       execute: async (input) => {
         const parsed = orchestrateToolInputSchema.parse(input);

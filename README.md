@@ -1,4 +1,4 @@
-# MCP Memory Layer
+# Mahiro MCP Memory Layer
 
 Local-first MCP memory layer prototype with:
 
@@ -21,6 +21,20 @@ bun run test
 bun run reindex
 ```
 
+## Operator Shortcut
+
+Use `orch:` at the start of a request when you want strict orchestrator behavior.
+
+- `orch:` means classify first, choose the worker/model explicitly, and delegate before local code work.
+- In `orch:` mode, local implementation is restricted to the narrow escape hatch in `AGENTS.md`.
+- Verification, synthesis, and final judgment still stay with the orchestrator.
+
+Example:
+
+```text
+orch: review this diff with Opus, then verify with tests and build
+```
+
 ## Cursor wrapper
 
 The native headless Cursor-family entrypoint in this repo is `agent -p --output-format json ...`.
@@ -29,14 +43,15 @@ The native headless Cursor-family entrypoint in this repo is `agent -p --output-
 
 `AGENTS.md` is the primary entrypoint for AI agents in this repo.
 
-`README.md` is the canonical command/reference document for this package. For worker-selection posture and orchestration behaviors, see `WORKFLOW.md`. For the orchestrator decision loop itself, see `ORCHESTRATOR.md`.
+`README.md` is the canonical command/reference document for this package. `AGENTS.md` owns worker-selection posture, orchestration behavior, and verification discipline.
 
 Model selection:
 
 - `--model` is required on every invocation
-- recommended standard model -> `composer-2`
-- recommended hard review / refactor -> `claude-4.6-sonnet-medium`
-- recommended hard planning -> `claude-4.6-opus-high`
+- `composer-2` -> default doer for standard implementation and review
+- `claude-4.6-sonnet-medium` -> harder doer for more difficult implementation/review/refactor work
+- `claude-4.6-opus-high` -> planner with the orchestrator, and a doer for very hard work when justified
+- if the caller explicitly requests a model, use that exact model rather than silently downgrading
 - `--mode plan` is optional and should be used only when the task is complex enough that you need an explicit planning pass
 
 ```bash
@@ -91,8 +106,15 @@ Result shape includes:
 Model selection:
 
 - `--model` is required on every invocation
-- recommended standard model -> `gemini-3-flash-preview`
-- recommended hard-work model -> `gemini-3.1-pro-preview`
+- `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
+- `gemini-3.1-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+
+Use Gemini when you intentionally want the Gemini family for:
+
+- visual/frontend execution
+- visual-engineering and artistry
+- extraction, timelines, or summarization
+- alternate reasoning alongside Cursor-family workers
 
 Task routing:
 
@@ -156,15 +178,16 @@ Result shape includes:
 
 Run workers in parallel only when their inputs are fully independent — neither worker's output is needed to form the other's prompt.
 
-This section documents the command shapes. `WORKFLOW.md` defines the orchestration posture for when to parallelize, when to sequence, and how to verify the result.
+This section documents the command shapes. `AGENTS.md` defines the orchestration posture for when to parallelize, when to sequence, and how to verify the result.
 
-- **Safe:** Gemini summarizes one module while Cursor plans an unrelated refactor.
+- **Safe:** Gemini designs one frontend surface while Cursor reviews an unrelated backend diff.
+- **Safe:** Two Gemini jobs analyze separate visual/frontend areas in parallel.
 - **Safe:** Five Cursor jobs review five unrelated files/modules in parallel.
 - **Unsafe:** Gemini extracts facts → you use those facts to write the Cursor prompt.
 
 ```bash
-bun run gemini -- --model gemini-3-flash-preview --cwd /path/to/repo "Summarize the architecture" &
-agent -p --model claude-4.6-sonnet-medium --output-format json "Plan the next improvement" &
+bun run gemini -- --model gemini-3.1-pro-preview --cwd /path/to/repo "Design the new frontend surface" &
+agent -p --model composer-2 --output-format json "Review the unrelated backend diff" &
 wait
 ```
 
@@ -172,7 +195,7 @@ wait
 
 `orchestrate` is the package-level workflow runner for static JSON-defined parallel or sequential job specs.
 
-This section is the canonical reference for CLI flags, workflow JSON fields, async MCP usage, and trace inspection examples. `WORKFLOW.md` covers the higher-level worker protocol.
+This section is the canonical reference for CLI flags, workflow JSON fields, async MCP usage, and trace inspection examples. `AGENTS.md` covers the higher-level worker protocol.
 
 Flags:
 
@@ -331,7 +354,8 @@ MCP tool:
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
 - input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
 - set `waitForCompletion: false` for long-running workflows so the tool returns immediately with `{ requestId, status: "running" }` instead of waiting for the full worker response
-- when `waitForCompletion` is omitted, workflows auto-start in background and return `{ requestId, status: "running", autoAsync: true }`; pass `waitForCompletion: true` only when you intentionally want synchronous waiting
+- when `waitForCompletion` is omitted, workflows auto-start in background and return `{ requestId, status: "running", autoAsync: true }`
+- `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
 - `get_orchestration_result` reads the stored workflow state/result by `requestId`
 - `list_orchestration_traces` lists persisted orchestration trace entries with optional filters like `source`, `mode`, `status`, `requestId`, `taskId`, and `limit` (each entry may include `jobModels` with per-job `requestedModel` / optional `reportedModel` when written by a current package version)
 

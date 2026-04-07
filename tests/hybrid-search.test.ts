@@ -7,8 +7,8 @@ import type { RetrievalRow, ScopeFilter } from "../src/features/memory/types.js"
 const baseFilter: ScopeFilter = {
   scope: "project",
   userId: "mahiro",
-  projectId: "mcp-memory-layer",
-  containerId: "workspace:mcp-memory-layer",
+  projectId: "mahiro-mcp-memory-layer",
+  containerId: "workspace:mahiro-mcp-memory-layer",
 };
 
 function createRow(input: Partial<RetrievalRow> & Pick<RetrievalRow, "id" | "content" | "createdAt">): RetrievalRow {
@@ -20,8 +20,8 @@ function createRow(input: Partial<RetrievalRow> & Pick<RetrievalRow, "id" | "con
     kind: input.kind ?? "fact",
     scope: input.scope ?? "project",
     userId: input.userId ?? "mahiro",
-    projectId: input.projectId ?? "mcp-memory-layer",
-    containerId: input.containerId ?? "workspace:mcp-memory-layer",
+    projectId: input.projectId ?? "mahiro-mcp-memory-layer",
+    containerId: input.containerId ?? "workspace:mahiro-mcp-memory-layer",
     sessionId: input.sessionId ?? "",
     importance: input.importance ?? 0.5,
     createdAt: input.createdAt,
@@ -66,8 +66,8 @@ describe("runHybridSearch", () => {
         mode: "full",
         scope: "project",
         userId: "mahiro",
-        projectId: "mcp-memory-layer",
-        containerId: "workspace:mcp-memory-layer",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
         limit: 5,
       },
       filter: baseFilter,
@@ -120,8 +120,8 @@ describe("runHybridSearch", () => {
         mode: "query",
         scope: "project",
         userId: "mahiro",
-        projectId: "mcp-memory-layer",
-        containerId: "workspace:mcp-memory-layer",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
         limit: 5,
       },
       filter: baseFilter,

@@ -7,7 +7,7 @@ import { getRegisteredMemoryTools } from "./register-tools.js";
 
 export function createMemoryMcpServer(memoryService: MemoryService): McpServer {
   const server = new McpServer({
-    name: "mcp-memory-layer",
+    name: "mahiro-mcp-memory-layer",
     version: "0.0.0",
   });
 

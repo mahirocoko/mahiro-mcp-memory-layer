@@ -12,7 +12,7 @@ export interface AppEnv {
 
 export function getAppEnv(): AppEnv {
   return {
-    appName: "mcp-memory-layer",
+    appName: "mahiro-mcp-memory-layer",
     embeddingDimensions: 128,
     dataPaths: paths,
     geminiCache: {

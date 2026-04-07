@@ -48,6 +48,19 @@ export const orchestrateToolInputSchema = z.object({
   spec: workflowSpecSchema,
   cwd: z.string().trim().min(1).optional(),
   waitForCompletion: z.boolean().optional(),
+}).superRefine((input, ctx) => {
+  if (input.waitForCompletion !== true) {
+    return;
+  }
+
+  if (!isMcpSyncEligibleWorkflowSpec(input.spec)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["waitForCompletion"],
+      message:
+        "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job with no retries. Omit waitForCompletion or set it false and poll get_orchestration_result.",
+    });
+  }
 });
 
 export type WorkflowSpecInput = z.infer<typeof workflowSpecSchema>;
@@ -55,6 +68,18 @@ export type WorkflowSpecInput = z.infer<typeof workflowSpecSchema>;
 export type OrchestrateWorkflowSpec =
   | { readonly mode: "parallel"; readonly maxConcurrency?: number; readonly timeoutMs?: number; readonly jobs: readonly WorkerJob[] }
   | { readonly mode: "sequential"; readonly timeoutMs?: number; readonly steps: readonly SequentialWorkerStep[] };
+
+export function isMcpSyncEligibleWorkflowSpec(spec: WorkflowSpecInput): boolean {
+  const units = spec.mode === "parallel" ? spec.jobs : spec.steps;
+
+  if (units.length !== 1) {
+    return false;
+  }
+
+  const [unit] = units;
+
+  return unit?.kind === "gemini" && (unit.retries ?? 0) === 0;
+}
 
 export function normalizeWorkflowSpec(
   spec: WorkflowSpecInput,

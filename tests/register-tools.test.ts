@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OrchestrationResultRecord } from "../src/features/orchestration/observability/orchestration-result-store.js";
 
 vi.mock("../src/features/orchestration/run-orchestration-workflow.js", () => ({
   runOrchestrationWorkflow: vi.fn(async (spec) => ({
@@ -72,9 +73,9 @@ const orchestrationResultStoreMock = {
     status: "runner_failed",
     error,
     createdAt: "2026-04-05T00:00:00.000Z",
-    updatedAt: "2026-04-05T00:00:00.000Z",
-  })),
-  read: vi.fn(async () => null),
+      updatedAt: "2026-04-05T00:00:00.000Z",
+    })),
+  read: vi.fn<() => Promise<OrchestrationResultRecord | null>>(async () => null),
 };
 
 vi.mock("../src/features/orchestration/observability/orchestration-result-store.js", () => ({
@@ -141,7 +142,11 @@ describe("getRegisteredOrchestrationTools", () => {
         },
       ],
     });
-    expect(forwardedSpec?.jobs[0]?.input.taskId).toMatch(/^gemini_/);
+    expect(forwardedSpec?.mode).toBe("parallel");
+    if (!forwardedSpec || forwardedSpec.mode !== "parallel") {
+      throw new Error("expected parallel workflow spec");
+    }
+    expect(forwardedSpec.jobs[0]?.input.taskId).toMatch(/^gemini_/);
     expect(forwardedOptions).toMatchObject({
       traceSource: "mcp",
       traceRequestId: expect.stringMatching(/^workflow_/),
@@ -164,6 +169,34 @@ describe("getRegisteredOrchestrationTools", () => {
         finishedAt: "2026-04-05T00:00:00.000Z",
         durationMs: 0,
       },
+    });
+  });
+
+  it("allows synchronous execution for a single sequential Gemini step", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "orchestrate_workflow");
+
+    const result = await tool?.execute({
+      spec: {
+        mode: "sequential",
+        steps: [
+          {
+            kind: "gemini",
+            input: {
+              prompt: "Summarize this repo.",
+              model: "gemini-3-flash-preview",
+            },
+          },
+        ],
+      },
+      waitForCompletion: true,
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      requestId: "workflow_mocked",
+      mode: "sequential",
+      status: "completed",
     });
   });
 
@@ -284,31 +317,57 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
   });
 
-  it("still allows explicit synchronous execution for risky workflows", async () => {
+  it("rejects synchronous wait for cursor workflows", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
+    const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
 
-    const result = await tool?.execute({
-      spec: {
-        mode: "parallel",
-        jobs: [
-          {
-            kind: "cursor",
-            input: {
-              prompt: "Review this repo.",
-              model: "composer-2",
+    await expect(
+      tool?.execute({
+        spec: {
+          mode: "parallel",
+          jobs: [
+            {
+              kind: "cursor",
+              input: {
+                prompt: "Review this repo.",
+                model: "composer-2",
+              },
             },
-          },
-        ],
-      },
-      waitForCompletion: true,
-    });
+          ],
+        },
+        waitForCompletion: true,
+      }),
+    ).rejects.toThrowError(/Synchronous wait/);
 
-    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      requestId: "workflow_mocked",
-      status: "completed",
-    });
+    expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects synchronous wait for retried Gemini workflows", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "orchestrate_workflow");
+    const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
+
+    await expect(
+      tool?.execute({
+        spec: {
+          mode: "parallel",
+          jobs: [
+            {
+              kind: "gemini",
+              retries: 1,
+              input: {
+                prompt: "Summarize this repo.",
+                model: "gemini-3-flash-preview",
+              },
+            },
+          ],
+        },
+        waitForCompletion: true,
+      }),
+    ).rejects.toThrowError(/Synchronous wait/);
+
+    expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
   });
 
   it("rejects invalid orchestration tool input before runtime execution", async () => {
@@ -340,10 +399,10 @@ describe("getRegisteredOrchestrationTools", () => {
           mode: "parallel",
           jobs: [
             {
-              kind: "cursor",
+              kind: "gemini",
               input: {
-                prompt: "Review this diff.",
-                model: "composer-2",
+                prompt: "Summarize this diff.",
+                model: "gemini-3-flash-preview",
               },
             },
           ],
