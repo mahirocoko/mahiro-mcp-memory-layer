@@ -39,6 +39,25 @@ Draft sticky-mode extension:
 - `orch: status` -> report whether sticky strict orchestrator mode is currently on.
 - `orch: <task>` -> use strict orchestrator mode for that request only.
 
+When `orch: on` is active, treat every subsequent actionable request as if it had been prefixed with `orch:`.
+
+`orch: on` means:
+
+- classify the task before broad local reading
+- choose the worker family and explicit model before implementation work
+- delegate before doing implementation, refactor, review, planning, or multi-file analysis locally
+- use local execution only for the narrow escape hatch, verification, orchestration wiring, and final synthesis
+- prefer parallel delegation when subtasks are independent
+- do not silently fall back to local implementation just because it feels faster
+- do not silently downgrade a user-requested model
+
+`orch: on` does not mean:
+
+- always use Opus
+- always use Gemini
+- forbid local verification
+- skip typecheck, tests, build, or targeted spot-checks
+
 Sticky-mode notes:
 
 - Until sticky state is actually implemented, treat `orch: on/off/status` as protocol draft rather than guaranteed runtime behavior.
