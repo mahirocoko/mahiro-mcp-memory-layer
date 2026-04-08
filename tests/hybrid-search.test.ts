@@ -153,8 +153,13 @@ describe("runHybridSearch", () => {
 
     const table = {
       queryScopedRows: async (_filter: ScopeFilter, limit?: number) => {
-        expect(limit).toBeUndefined();
-        return [...fillerRows, lexicalHit];
+        expect(limit).toBe(defaultKeywordCandidateLimit);
+        return fillerRows;
+      },
+      queryScopedLexicalCandidates: async (_filter: ScopeFilter, query: string, limit: number) => {
+        expect(query).toBe("retrieval fallback candidate coverage");
+        expect(limit).toBe(defaultKeywordCandidateLimit);
+        return [lexicalHit];
       },
       vectorSearch: async () => [],
     };

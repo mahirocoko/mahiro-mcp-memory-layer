@@ -29,8 +29,58 @@ describe("buildContextFromItems", () => {
     });
 
     expect(result.context).toContain("Key user/project context:");
+    expect(result.context).toContain("Facts:");
     expect(result.context).toContain("Short summary.");
     expect(result.context).not.toContain("Detailed content body.");
+  });
+
+  it("groups profile items by semantic kind", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        baseItem,
+        {
+          ...baseItem,
+          id: "mem-2",
+          kind: "decision",
+          summary: "Use LanceDB for indexed retrieval.",
+          content: "Decision body.",
+        },
+        {
+          ...baseItem,
+          id: "mem-3",
+          kind: "task",
+          summary: "Improve ranking coverage.",
+          content: "Task body.",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 500,
+      degraded: false,
+    });
+
+    expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Decisions:"));
+    expect(result.context.indexOf("Decisions:")).toBeLessThan(result.context.indexOf("Tasks:"));
+    expect(result.context).toContain("Use LanceDB for indexed retrieval.");
+    expect(result.context).toContain("Improve ranking coverage.");
+  });
+
+  it("preserves retrieval order within the same kind in profile mode", () => {
+    const second = { ...baseItem, id: "mem-second", kind: "fact" as const, summary: "Second fact." };
+    const first = { ...baseItem, id: "mem-first", kind: "fact" as const, summary: "First fact." };
+
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [second, first],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.items).toEqual(["mem-second", "mem-first"]);
+    expect(result.context.indexOf("Second fact.")).toBeLessThan(result.context.indexOf("First fact."));
   });
 
   it("includes timestamps in recent mode", () => {

@@ -209,6 +209,7 @@ describe("memory service core", () => {
     });
 
     expect(profileResult.context).toContain("Key user/project context");
+    expect(profileResult.context).toContain("Facts:");
     expect(profileResult.context).toContain("Short profile summary.");
     expect(recentResult.context).toContain("Recent activity");
     expect(recentResult.context).toContain("Raw content for recent context output.");
