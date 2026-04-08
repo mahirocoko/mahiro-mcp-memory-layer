@@ -205,6 +205,95 @@ describe("buildContextFromItems", () => {
     expect(result.items).toEqual(["mem-longer"]);
   });
 
+  it("suppresses older conflicting profile lines that diverge after a shared prefix (newer createdAt wins)", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-old",
+          summary: "The primary database is Postgres for this project.",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          ...baseItem,
+          id: "mem-new",
+          summary: "The primary database is SQLite for this project.",
+          createdAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("SQLite");
+    expect(result.context).not.toContain("Postgres");
+    expect(result.items).toEqual(["mem-new"]);
+  });
+
+  it("on same createdAt and importance, keeps the later conflicting line in retrieval order", () => {
+    const ts = "2026-04-05T12:00:00.000Z";
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-earlier",
+          summary: "The orchestration default is async for workflows.",
+          importance: 0.5,
+          createdAt: ts,
+        },
+        {
+          ...baseItem,
+          id: "mem-later",
+          summary: "The orchestration default is sync for workflows.",
+          importance: 0.5,
+          createdAt: ts,
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("sync");
+    expect(result.context).not.toContain("async");
+    expect(result.items).toEqual(["mem-later"]);
+  });
+
+  it("on same createdAt, keeps higher-importance conflicting stem match", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-low",
+          summary: "The default package manager is npm for CI.",
+          importance: 0.3,
+          createdAt: "2026-04-05T12:00:00.000Z",
+        },
+        {
+          ...baseItem,
+          id: "mem-high",
+          summary: "The default package manager is bun for CI.",
+          importance: 0.9,
+          createdAt: "2026-04-05T12:00:00.000Z",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("bun");
+    expect(result.context).not.toContain("npm");
+    expect(result.items).toEqual(["mem-high"]);
+  });
+
   it("does not dedupe across different kinds in profile mode", () => {
     const line = "Same text in two sections.";
     const result = buildContextFromItems({

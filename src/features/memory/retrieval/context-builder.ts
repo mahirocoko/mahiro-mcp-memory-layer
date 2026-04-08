@@ -141,12 +141,18 @@ function buildProfileContext(input: {
   const runs = splitOrderedIntoKindRuns(ordered);
 
   outer: for (const run of runs) {
-    const kind = run[0].kind;
-    const entries: ProfileDedupEntry[] = run.map((item) => {
+    const firstInRun = run[0];
+
+    if (!firstInRun) {
+      continue;
+    }
+
+    const kind = firstInRun.kind;
+    const entries: ProfileDedupEntry[] = run.map((item, indexInKind) => {
       const line = extractProfileStatement(item);
-      return { item, line, key: profileStatementDedupKey(line) };
+      return { item, line, key: profileStatementDedupKey(line), indexInKind };
     });
-    const deduped = dedupeProfileEntriesForKind(entries);
+    const deduped = resolveProfilePrefixConflicts(dedupeProfileEntriesForKind(entries));
     if (deduped.length === 0) {
       continue;
     }
@@ -155,6 +161,11 @@ function buildProfileContext(input: {
 
     for (let i = 0; i < deduped.length; i++) {
       const d = deduped[i];
+
+      if (!d) {
+        continue;
+      }
+
       const bullet = `- ${d.line}\n`;
       const addition = i === 0 ? header + bullet : bullet;
       if ((context + addition).length > input.maxChars) {
@@ -262,7 +273,159 @@ function profileStatementDedupKey(line: string): string {
   return s;
 }
 
-type ProfileDedupEntry = { readonly item: SearchMemoryItem; readonly line: string; readonly key: string };
+type ProfileDedupEntry = {
+  readonly item: SearchMemoryItem;
+  readonly line: string;
+  readonly key: string;
+  /** Order within this kind run (retrieval order); used for conflict tie-breaks. */
+  readonly indexInKind: number;
+};
+
+/** Minimum shared prefix length (words) before a divergent tail counts as a supersede-style conflict. */
+const PROFILE_CONFLICT_MIN_SHARED_WORDS = 3;
+
+/**
+ * True when two normalized keys agree on a short shared prefix then disagree on the next word
+ * (not one extending the other). Catches "… is Postgres …" vs "… is SQLite …" without indexing changes.
+ */
+function profileKeysConflictAtDivergence(a: string, b: string): boolean {
+  if (a === b) {
+    return false;
+  }
+  const wa = profileKeyWords(a);
+  const wb = profileKeyWords(b);
+  let i = 0;
+  while (i < wa.length && i < wb.length && wa[i] === wb[i]) {
+    i++;
+  }
+  if (i < PROFILE_CONFLICT_MIN_SHARED_WORDS) {
+    return false;
+  }
+  if (i === wa.length || i === wb.length) {
+    return false;
+  }
+  return wa[i] !== wb[i];
+}
+
+/**
+ * Cluster lines that pairwise diverge after a shared prefix; within each cluster, keep the newer /
+ * stronger statement. Ordering: createdAt (newer wins), then importance, then later position within
+ * the kind run (retrieval order).
+ */
+function resolveProfilePrefixConflicts(entries: readonly ProfileDedupEntry[]): ProfileDedupEntry[] {
+  const n = entries.length;
+  if (n < 2) {
+    return [...entries];
+  }
+
+  const parent = Array.from({ length: n }, (_, idx) => idx);
+  function find(x: number): number {
+    const current = parent[x];
+
+    if (current === undefined) {
+      return x;
+    }
+
+    if (current !== x) {
+      parent[x] = find(current);
+    }
+
+    return parent[x] ?? x;
+  }
+  function union(x: number, y: number): void {
+    const rx = find(x);
+    const ry = find(y);
+    if (rx !== ry) {
+      parent[rx] = ry;
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const left = entries[i];
+
+    if (!left) {
+      continue;
+    }
+
+    for (let j = i + 1; j < n; j++) {
+      const right = entries[j];
+
+      if (!right) {
+        continue;
+      }
+
+      if (profileKeysConflictAtDivergence(left.key, right.key)) {
+        union(i, j);
+      }
+    }
+  }
+
+  const rootToIndices = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const list = rootToIndices.get(r);
+    if (list) {
+      list.push(i);
+    } else {
+      rootToIndices.set(r, [i]);
+    }
+  }
+
+  const loserIds = new Set<string>();
+  for (const indices of rootToIndices.values()) {
+    if (indices.length < 2) {
+      continue;
+    }
+    let winnerIdx = indices[0];
+
+    if (winnerIdx === undefined) {
+      continue;
+    }
+
+    for (let k = 1; k < indices.length; k++) {
+      const candidateIndex = indices[k];
+
+      if (candidateIndex === undefined) {
+        continue;
+      }
+
+      const cand = entries[candidateIndex];
+      const win = entries[winnerIdx];
+
+      if (!cand || !win) {
+        continue;
+      }
+
+      if (compareProfileConflictPreference(cand, win) < 0) {
+        winnerIdx = candidateIndex;
+      }
+    }
+    for (const idx of indices) {
+      const entry = entries[idx];
+
+      if (idx !== winnerIdx && entry) {
+        loserIds.add(entry.item.id);
+      }
+    }
+  }
+
+  return entries.filter((e) => !loserIds.has(e.item.id));
+}
+
+/** Negative if `a` should win over `b` (prefer newer / stronger). */
+function compareProfileConflictPreference(a: ProfileDedupEntry, b: ProfileDedupEntry): number {
+  const ta = Date.parse(a.item.createdAt);
+  const tb = Date.parse(b.item.createdAt);
+  const na = Number.isNaN(ta) ? 0 : ta;
+  const nb = Number.isNaN(tb) ? 0 : tb;
+  if (na !== nb) {
+    return nb - na;
+  }
+  if (a.item.importance !== b.item.importance) {
+    return b.item.importance - a.item.importance;
+  }
+  return b.indexInKind - a.indexInKind;
+}
 
 function profileKeyWords(key: string): string[] {
   return key.split(/\s+/).filter(Boolean);
@@ -325,6 +488,11 @@ function dedupeProfileEntriesForKind(entries: readonly ProfileDedupEntry[]): Pro
     const superseded: number[] = [];
     for (let i = 0; i < out.length; i++) {
       const prev = out[i];
+
+      if (!prev) {
+        continue;
+      }
+
       const prefixExtension =
         cur.key.length > prev.key.length &&
         prev.key.length >= PROFILE_DEDUP_PREFIX_MIN_LEN &&
@@ -362,7 +530,13 @@ function splitOrderedIntoKindRuns(ordered: readonly SearchMemoryItem[]): SearchM
     return [];
   }
   const runs: SearchMemoryItem[][] = [];
-  let currentKind = ordered[0].kind;
+  const first = ordered[0];
+
+  if (!first) {
+    return [];
+  }
+
+  let currentKind = first.kind;
   let current: SearchMemoryItem[] = [];
   for (const item of ordered) {
     if (item.kind !== currentKind) {
