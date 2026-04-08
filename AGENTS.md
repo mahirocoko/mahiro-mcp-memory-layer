@@ -24,6 +24,14 @@ Then use `README.md` for command, install, and interface reference.
 - Use `get_orchestration_result` to poll by `requestId`
 - `waitForCompletion: true` is allowed only for a single Gemini job or step with no retries
 
+## Cursor Trust Defaults
+
+- Current workspace paths are trusted by default for Cursor-family runs in this repo.
+- Nested paths under the current workspace are also trusted by default.
+- Unrelated workspaces stay untrusted unless trust is opted in explicitly.
+- Use per-job `trust: true|false`, workflow-level `defaultTrust`, or `CURSOR_TRUSTED_WORKSPACES` when the default workspace rule is not enough.
+- Use `--no-trust` or `trust: false` when a run must stay untrusted even inside the current workspace.
+
 ## Shortcut Protocol
 
 - If the user prefixes a request with `orch:`, switch into strict orchestrator mode for that request.
@@ -148,7 +156,8 @@ If executable checks already reveal the issue, do not keep rereading broadly.
 - Local execution is reserved for the narrow escape hatch plus verification, orchestration wiring, and final synthesis.
 - Gemini and Cursor-family workers can both run in parallel when their subtasks are independent.
 - Gemini is the default family for visual-engineering, frontend/artistry work, and alternative reasoning with `gemini-3-flash-preview` or `gemini-3.1-pro-preview`.
-- Cursor-family `agent` is the default family for most codebase execution work with `composer-2`, `claude-4.6-sonnet-medium`, or `claude-4.6-opus-high`.
+- Cursor-family `agent` is the default family for most codebase execution work, with `composer-2` as the primary default in this repo.
+- Avoid `claude-4.6-sonnet-medium` by default in this repo due budget posture; use it only when the user explicitly asks for it or when `composer-2` already proved insufficient and Opus is not justified.
 
 ## Worker Routing
 
@@ -157,7 +166,7 @@ If executable checks already reveal the issue, do not keep rereading broadly.
 | Visual/frontend execution, visual-engineering, artistry | Gemini | `gemini-3.1-pro-preview` | run checks plus visual/behavior spot-checks | default family for design-led work |
 | Lightweight visual passes, extraction, or alternate reasoning | Gemini | `gemini-3-flash-preview` | spot-check key claims | lighter Gemini path |
 | Standard implementation, review, refactor, and execution | Cursor-family `agent` | `composer-2` | run typecheck/tests and inspect touched files | default coding worker |
-| Harder implementation, review, or refactor | Cursor-family `agent` | `claude-4.6-sonnet-medium` | targeted diff review plus typecheck/tests | stronger execution tier |
+| Harder implementation, review, or refactor | Cursor-family `agent` | `composer-2` | targeted diff review plus typecheck/tests | stay on `composer-2` first; escalate only with a concrete reason |
 | Complex planning, Opus validation, or very hard execution | Cursor-family `agent` | `claude-4.6-opus-high` | verify against repo constraints | planner with the orchestrator, but can execute when difficulty justifies it |
 
 ## Frontend Task Routing
@@ -174,7 +183,7 @@ Frontend tasks split into two shapes:
 **Engineering-led**: state management, data fetching, complex logic, or risky UI refactors.
 
 - Route like any other implementation task through the Worker Routing table.
-- Prefer `claude-4.6-sonnet-medium` when the frontend change is logic-heavy or tightly coupled.
+- Default to `composer-2`; escalate only after a concrete failure, an explicit stronger-model request, or a clearly architecture-level problem.
 
 **Hard boundaries**:
 
@@ -190,6 +199,8 @@ Frontend tasks split into two shapes:
 4. Pass the model explicitly.
 5. Verify with executable checks first, then targeted spot-checks.
 6. Escalate only when there is a concrete reason.
+
+For Cursor-family work in this repo, start with `composer-2` by default. Do not jump to `claude-4.6-sonnet-medium` just because the task looks harder on first glance.
 
 If the user explicitly names a model, use that exact model for the delegated step unless it is unavailable or incompatible.
 
@@ -224,7 +235,7 @@ Use the Cursor-family `agent` headless path for applied coding work:
 Recommended model ladder:
 
 - `composer-2` -> default doer for standard implementation and review
-- `claude-4.6-sonnet-medium` -> harder doer for more difficult implementation/review/refactor work
+- `claude-4.6-sonnet-medium` -> non-default fallback; use only when explicitly requested or when `composer-2` has already failed and Opus would be disproportionate
 - `claude-4.6-opus-high` -> planner with the orchestrator, and a doer for very hard work when justified
 
 `--mode plan` is not the default posture. Use it only when the task is complex enough that you need an explicit planning pass.
@@ -256,6 +267,7 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 - Use `get_orchestration_result` to poll background orchestration runs by `requestId`.
 - Use `list_orchestration_traces` or the CLI trace reader for execution forensics.
 - Worker output is never the final truth.
+- When routing Cursor jobs through workflow specs, use workflow `defaultTrust` only when many Cursor jobs should share the same trust posture; otherwise prefer explicit per-job `trust`.
 
 ## Expected Turn Shape
 
@@ -305,4 +317,4 @@ If a requested model cannot be used, say so and choose the nearest justified fal
 Planning passes that are explicitly requested as Opus-level planning or validation must use `claude-4.6-opus-high`.
 
 - Gemini examples: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`
-- Cursor examples: `composer-2`, `claude-4.6-sonnet-medium`, `claude-4.6-opus-high`
+- Cursor examples: `composer-2`, `claude-4.6-sonnet-medium` (non-default), `claude-4.6-opus-high`

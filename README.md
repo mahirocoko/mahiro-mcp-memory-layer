@@ -45,6 +45,15 @@ The native headless Cursor-family entrypoint in this repo is `agent -p --output-
 
 `README.md` is the canonical command/reference document for this package. `AGENTS.md` owns worker-selection posture, orchestration behavior, and verification discipline.
 
+Trust behavior:
+
+- current workspace paths are trusted by default for Cursor-family runs
+- nested paths under the current workspace are also trusted by default
+- unrelated workspaces stay untrusted unless you opt in explicitly
+- use `--trust` to force trust on
+- use `--no-trust` to force trust off
+- set `CURSOR_TRUSTED_WORKSPACES` to a path-delimited list of extra trusted roots
+
 Model selection:
 
 - `--model` is required on every invocation
@@ -61,6 +70,7 @@ agent -p --model claude-4.6-opus-high --output-format json "Plan a deep cross-mo
 
 # Repo-local wrapper around the same headless path
 bun run cursor -- --model composer-2 "Review this diff"
+bun run cursor -- --model composer-2 --no-trust "Review this external repo"
 ```
 
 ## Cursor worker
@@ -85,6 +95,11 @@ Input shape:
   "cwd": "/path/to/project"
 }
 ```
+
+Notes:
+
+- omit `trust` to use the default workspace-based trust resolution above
+- set `trust: true` or `trust: false` to override that default explicitly
 
 Result shape includes:
 
@@ -241,12 +256,19 @@ Parallel workflow fields:
 
 - `maxConcurrency` -> optional positive integer limit for how many parallel jobs run at once
 - `timeoutMs` -> optional workflow-level deadline in milliseconds; bounds started jobs and stops launching new ones after expiry
+- `defaultTrust` -> optional default trust mode applied to Cursor jobs that do not set `input.trust`
 - per-job `retries` / `retryDelayMs` -> optional retry policy for transient worker failures with exponential backoff
 
 Parallel example:
 
 ```bash
 echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
+```
+
+Parallel trust-default example:
+
+```bash
+echo '{"mode":"parallel","defaultTrust":false,"jobs":[{"kind":"cursor","input":{"prompt":"Review this external repo","model":"composer-2"}},{"kind":"cursor","input":{"prompt":"Review this local repo","model":"composer-2","trust":true}}]}' | bun run orchestrate -- --file -
 ```
 
 Example result shape:
@@ -319,6 +341,7 @@ Sequential failure control:
 - per-step `continueOnFailure` defaults to continuing with later steps
 - set `continueOnFailure: false` when a failed step should stop the workflow
 - code-level sequential step functions can return `null` to skip a step entirely
+- `defaultTrust` also applies to sequential Cursor steps unless a step sets `input.trust` explicitly
 
 Stop-on-failure example:
 
