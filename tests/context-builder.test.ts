@@ -60,10 +60,82 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
-    expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Decisions:"));
-    expect(result.context.indexOf("Decisions:")).toBeLessThan(result.context.indexOf("Tasks:"));
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+    expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Tasks:"));
     expect(result.context).toContain("Use LanceDB for indexed retrieval.");
     expect(result.context).toContain("Improve ranking coverage.");
+  });
+
+  it("lifts preference-like fact and decision lines into a Preferences section", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-fact-pref", kind: "fact", summary: "Standardize on Bun for the toolchain." },
+        { ...baseItem, id: "mem-fact", kind: "fact", summary: "The stack uses LanceDB for retrieval." },
+        { ...baseItem, id: "mem-decision-pref", kind: "decision", summary: "Prefer SQLite for local workflows." },
+        { ...baseItem, id: "mem-decision", kind: "decision", summary: "JSONL is the canonical memory log." },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Facts:");
+    expect(result.context).toContain("Preferences:");
+    expect(result.context).toContain("Decisions:");
+    expect(result.context).toContain("The stack uses LanceDB for retrieval.");
+    expect(result.context).toContain("Standardize on Bun for the toolchain.");
+    expect(result.context).toContain("Prefer SQLite for local workflows.");
+    expect(result.context).toContain("JSONL is the canonical memory log.");
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+    expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Decisions:"));
+  });
+
+  it("flushes a pending Preferences section before later non-preference kinds", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-pref", kind: "fact", summary: "Avoid global mutable state in runtime code." },
+        { ...baseItem, id: "mem-doc", kind: "doc", summary: "Runtime architecture reference." },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Preferences:");
+    expect(result.context).toContain("Facts:");
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+  });
+
+  it("groups preference-like fact and decision lines under Preferences (facts before decisions)", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-fpref", kind: "fact" as const, summary: "Prefer Vitest for unit tests." },
+        {
+          ...baseItem,
+          id: "mem-dpref",
+          kind: "decision" as const,
+          summary: "Use Bun for scripts and CI.",
+          content: "Decision body.",
+        },
+        { ...baseItem, id: "mem-plain", kind: "fact" as const, summary: "Repository is TypeScript-first." },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+    expect(result.context).not.toContain("Decisions:");
+    expect(result.context).toContain("Prefer Vitest for unit tests.");
+    expect(result.context).toContain("Use Bun for scripts and CI.");
+    expect(result.context).toContain("Repository is TypeScript-first.");
+    expect(result.context.indexOf("Prefer Vitest")).toBeLessThan(result.context.indexOf("Use Bun for scripts"));
   });
 
   it("strips discourse hedges from profile lines", () => {
@@ -82,6 +154,7 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
+    expect(result.context).toContain("Preferences:");
     expect(result.context).toContain("we standardize on Bun for the toolchain.");
     expect(result.context).not.toContain("I think");
   });
@@ -153,6 +226,7 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
+    expect(result.context).toContain("Preferences:");
     expect(result.context.match(/Standardize on Bun/g)?.length).toBe(1);
     expect(result.items).toEqual(["mem-a"]);
   });

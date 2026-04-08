@@ -48,13 +48,81 @@ const PROFILE_KIND_ORDER: readonly MemoryKind[] = [
   "conversation",
 ];
 
-const PROFILE_SECTION_TITLE: Record<MemoryKind, string> = {
-  fact: "Facts",
-  decision: "Decisions",
-  doc: "Documents",
-  task: "Tasks",
-  conversation: "Conversation",
+type ProfileSnapshotSection = "preferences" | "stableFacts" | "decisions" | "activeWork" | "notes";
+
+const PROFILE_SNAPSHOT_LABEL: Record<ProfileSnapshotSection, string> = {
+  preferences: "Preferences",
+  stableFacts: "Facts",
+  decisions: "Decisions",
+  activeWork: "Tasks",
+  notes: "Conversation",
 };
+
+const PROFILE_SNAPSHOT_EMIT_ORDER: readonly ProfileSnapshotSection[] = [
+  "preferences",
+  "stableFacts",
+  "decisions",
+  "activeWork",
+  "notes",
+];
+
+/**
+ * Lightweight lexical cues for preference-style profile lines (fact/decision only).
+ * Keeps retrieval/index unchanged; profile rendering only.
+ */
+function isPreferenceProfileLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) {
+    return false;
+  }
+  const lower = t.toLowerCase();
+  if (/^use\s+/i.test(t)) {
+    return true;
+  }
+  if (/\b(prefer|prefers|preferred|preferring|preference)\b/i.test(t)) {
+    return true;
+  }
+  if (/\bstandardize\s+on\b/.test(lower)) {
+    return true;
+  }
+  if (/\bdefault(s)?\s+to\b/.test(lower)) {
+    return true;
+  }
+  if (/\brather\s+than\b/.test(lower)) {
+    return true;
+  }
+  if (/\binstead\s+of\b/.test(lower)) {
+    return true;
+  }
+  if (/\bopt(s|ed)?\s+for\b/.test(lower)) {
+    return true;
+  }
+  if (/\b(favor|favour)s?\b/.test(lower)) {
+    return true;
+  }
+  if (/\b(always|never)\s+use\b/.test(lower)) {
+    return true;
+  }
+  if (/\bavoid\s+[a-z0-9]/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function partitionProfileEntriesByPreference(
+  entries: readonly ProfileDedupEntry[],
+): { readonly main: ProfileDedupEntry[]; readonly preference: ProfileDedupEntry[] } {
+  const main: ProfileDedupEntry[] = [];
+  const preference: ProfileDedupEntry[] = [];
+  for (const e of entries) {
+    if (isPreferenceProfileLine(e.line)) {
+      preference.push(e);
+    } else {
+      main.push(e);
+    }
+  }
+  return { main, preference };
+}
 
 function profileKindRank(kind: MemoryKind): number {
   const idx = PROFILE_KIND_ORDER.indexOf(kind);
@@ -127,6 +195,16 @@ function orderItemsForProfile(items: readonly SearchMemoryItem[]): SearchMemoryI
     .map(({ item }) => item);
 }
 
+function emptyProfileSnapshotBuckets(): Record<ProfileSnapshotSection, ProfileDedupEntry[]> {
+  return {
+    preferences: [],
+    stableFacts: [],
+    decisions: [],
+    activeWork: [],
+    notes: [],
+  };
+}
+
 function buildProfileContext(input: {
   readonly task: string;
   readonly items: readonly SearchMemoryItem[];
@@ -139,8 +217,9 @@ function buildProfileContext(input: {
   let context = `Task: ${input.task}\n\n${preambleForMode("profile")}`;
   const ordered = orderItemsForProfile(input.items.slice(0, input.maxItems));
   const runs = splitOrderedIntoKindRuns(ordered);
+  const buckets = emptyProfileSnapshotBuckets();
 
-  outer: for (const run of runs) {
+  for (const run of runs) {
     const firstInRun = run[0];
 
     if (!firstInRun) {
@@ -153,19 +232,43 @@ function buildProfileContext(input: {
       return { item, line, key: profileStatementDedupKey(line), indexInKind };
     });
     const deduped = resolveProfilePrefixConflicts(dedupeProfileEntriesForKind(entries));
-    if (deduped.length === 0) {
-      continue;
+
+    switch (kind) {
+      case "fact": {
+        const { main, preference } = partitionProfileEntriesByPreference(deduped);
+        buckets.stableFacts.push(...main);
+        buckets.preferences.push(...preference);
+        break;
+      }
+      case "decision": {
+        const { main, preference } = partitionProfileEntriesByPreference(deduped);
+        buckets.decisions.push(...main);
+        buckets.preferences.push(...preference);
+        break;
+      }
+      case "doc":
+        buckets.stableFacts.push(...deduped);
+        break;
+      case "task":
+        buckets.activeWork.push(...deduped);
+        break;
+      case "conversation":
+        buckets.notes.push(...deduped);
+        break;
     }
+  }
 
-    const header = `\n${PROFILE_SECTION_TITLE[kind]}:\n`;
+  outer: for (const section of PROFILE_SNAPSHOT_EMIT_ORDER) {
+    const list = buckets[section];
 
-    for (let i = 0; i < deduped.length; i++) {
-      const d = deduped[i];
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i];
 
       if (!d) {
         continue;
       }
 
+      const header = `\n${PROFILE_SNAPSHOT_LABEL[section]}:\n`;
       const bullet = `- ${d.line}\n`;
       const addition = i === 0 ? header + bullet : bullet;
       if ((context + addition).length > input.maxChars) {
