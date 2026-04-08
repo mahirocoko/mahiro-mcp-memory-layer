@@ -1,4 +1,4 @@
-import { mkdir, readFile, appendFile } from "node:fs/promises";
+import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ListMemoriesInput, MemoryRecord } from "../types.js";
@@ -41,6 +41,21 @@ export class JsonlLogStore implements CanonicalLogStore {
 
       throw error;
     }
+  }
+
+  public async replaceRecordById(id: string, record: MemoryRecord): Promise<void> {
+    const records = await this.readAll();
+    const index = records.findIndex((existing) => existing.id === id);
+
+    if (index === -1) {
+      throw new Error(`replaceRecordById: no record with id ${id}`);
+    }
+
+    const next = records.slice();
+    next[index] = record;
+
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    await writeFile(this.filePath, `${next.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
   }
 }
 

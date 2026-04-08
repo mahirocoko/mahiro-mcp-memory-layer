@@ -8,6 +8,21 @@ const tableName = "memory_records";
 export class MemoryRecordsTable {
   public constructor(private readonly connection: Connection) {}
 
+  public async deleteRowsByIds(ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) {
+      return;
+    }
+
+    const table = await this.tryOpenTable();
+
+    if (!table) {
+      return;
+    }
+
+    const clause = ids.map((id) => `id = '${escapeSqlPredicateValue(id)}'`).join(" OR ");
+    await table.delete(`(${clause})`);
+  }
+
   public async upsertRows(rows: readonly RetrievalRow[]): Promise<void> {
     if (rows.length === 0) {
       return;
@@ -71,6 +86,10 @@ export class MemoryRecordsTable {
       return null;
     }
   }
+}
+
+function escapeSqlPredicateValue(value: string): string {
+  return value.replaceAll("'", "''");
 }
 
 function toDatabaseRow(row: RetrievalRow): Record<string, unknown> {

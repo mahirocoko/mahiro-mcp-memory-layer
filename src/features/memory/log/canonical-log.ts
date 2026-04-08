@@ -4,4 +4,5 @@ export interface CanonicalLogStore {
   append(record: MemoryRecord): Promise<void>;
   list(input: ListMemoriesInput): Promise<readonly MemoryRecord[]>;
   readAll(): Promise<readonly MemoryRecord[]>;
+  replaceRecordById(id: string, record: MemoryRecord): Promise<void>;
 }

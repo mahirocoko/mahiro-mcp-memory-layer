@@ -10,6 +10,7 @@ import { connectToLanceDb } from "../src/features/memory/index/lancedb-client.js
 import { MemoryRecordsTable } from "../src/features/memory/index/memory-records-table.js";
 import { RetrievalTraceStore } from "../src/features/memory/observability/retrieval-trace.js";
 import { rememberMemory } from "../src/features/memory/core/remember.js";
+import { upsertDocument } from "../src/features/memory/core/upsert-document.js";
 import { searchMemories } from "../src/features/memory/core/search-memories.js";
 import { buildContextForTask } from "../src/features/memory/core/build-context-for-task.js";
 import { reindexMemoryRecords } from "../src/features/memory/index/reindex.js";
@@ -435,6 +436,95 @@ describe("memory service core", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("upsert_document is idempotent for the same scope and source identity", async () => {
+    const fixture = await createFixture();
+
+    const base = {
+      projectId: "mahiro-mcp-memory-layer",
+      userId: "mahiro",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: {
+        type: "document" as const,
+        uri: "file:///docs/architecture.md",
+        title: "Architecture",
+      },
+    };
+
+    const first = await upsertDocument({
+      payload: {
+        ...base,
+        content: "Version one content.",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const second = await upsertDocument({
+      payload: {
+        ...base,
+        content: "Version two replaces the first.",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    expect(second.id).toBe(first.id);
+
+    const result = await searchMemories({
+      payload: {
+        query: "Version two replaces",
+        mode: "full",
+        scope: "project",
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      },
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+      traceStore: fixture.traceStore,
+    });
+
+    const hits = result.items.filter((item) => item.id === first.id);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.content).toContain("Version two replaces");
+  });
+
+  it("upsert_document creates distinct documents when source identity differs", async () => {
+    const fixture = await createFixture();
+
+    const scope = {
+      projectId: "mahiro-mcp-memory-layer",
+      userId: "mahiro",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    };
+
+    const a = await upsertDocument({
+      payload: {
+        ...scope,
+        source: { type: "document" as const, uri: "file:///a.md" },
+        content: "Doc A",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const b = await upsertDocument({
+      payload: {
+        ...scope,
+        source: { type: "document" as const, uri: "file:///b.md" },
+        content: "Doc B",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    expect(b.id).not.toBe(a.id);
   });
 
   it("returns degraded results when the embedding provider fails during search", async () => {
