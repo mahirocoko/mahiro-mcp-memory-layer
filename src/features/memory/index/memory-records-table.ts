@@ -1,6 +1,7 @@
 import type { Connection, Table } from "@lancedb/lancedb";
 
 import type { RetrievalRow, ScopeFilter } from "../types.js";
+import { extractLexicalTokensForCandidateQuery } from "../lib/lexical-tokens.js";
 import { toSqlScopeWhereClause } from "../lib/scope.js";
 
 const tableName = "memory_records";
@@ -47,20 +48,61 @@ export class MemoryRecordsTable {
     await this.connection.createTable(tableName, rows.map((row) => toDatabaseRow(row)), { mode: "overwrite" });
   }
 
-  public async queryScopedRows(filter: ScopeFilter, limit: number): Promise<readonly RetrievalRow[]> {
+  public async queryScopedRows(filter: ScopeFilter, limit?: number): Promise<readonly RetrievalRow[]> {
     const table = await this.tryOpenTable();
 
     if (!table) {
       return [];
     }
 
-    const rows = await table
-      .query()
-      .where(toSqlScopeWhereClause(filter))
-      .limit(limit)
-      .toArray();
+    const query = table.query().where(toSqlScopeWhereClause(filter));
+
+    const rows = await (typeof limit === "number" ? query.limit(limit) : query).toArray();
 
     return rows.map((row) => toRetrievalRow(row));
+  }
+
+  /**
+   * Rows in scope where at least one significant query token appears in content, summary, or tags
+   * (DataFusion `strpos` on lowercased columns). Run together with a capped {@link queryScopedRows}
+   * pass so lexical hits are not dropped when the scoped table is larger than the baseline limit.
+   */
+  public async queryScopedLexicalCandidates(
+    filter: ScopeFilter,
+    query: string,
+    limit: number,
+  ): Promise<readonly RetrievalRow[]> {
+    const tokens = extractLexicalTokensForCandidateQuery(query);
+
+    if (tokens.length === 0) {
+      return [];
+    }
+
+    const table = await this.tryOpenTable();
+
+    if (!table) {
+      return [];
+    }
+
+    const tokenClause = tokens
+      .map((token) => {
+        const literal = escapeSqlPredicateValue(token);
+
+        return `(strpos(lower(content), '${literal}') > 0 OR strpos(lower(summary), '${literal}') > 0 OR strpos(lower(tags), '${literal}') > 0)`;
+      })
+      .join(" OR ");
+
+    try {
+      const rows = await table
+        .query()
+        .where(`${toSqlScopeWhereClause(filter)} AND (${tokenClause})`)
+        .limit(limit)
+        .toArray();
+
+      return rows.map((row) => toRetrievalRow(row));
+    } catch {
+      return [];
+    }
   }
 
   public async vectorSearch(filter: ScopeFilter, queryVector: readonly number[], limit: number): Promise<readonly RetrievalRow[]> {

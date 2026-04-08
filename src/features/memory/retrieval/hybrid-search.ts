@@ -3,7 +3,7 @@ import { dedupeSearchItems } from "./dedupe.js";
 import { evaluateKeywordMatch, scoreCombined, scoreRecency, scoreVectorMatch, toSearchMemoryItem, weightsForMode } from "./rank.js";
 import type { EmbeddingProvider } from "../index/embedding-provider.js";
 import type { MemoryRecordsTable } from "../index/memory-records-table.js";
-import type { RetrievalTraceEntry, ScopeFilter, SearchMemoriesInput, SearchMemoriesResult } from "../types.js";
+import type { RetrievalRow, RetrievalTraceEntry, ScopeFilter, SearchMemoriesInput, SearchMemoriesResult } from "../types.js";
 import { newId } from "../../../lib/ids.js";
 import { nowIso, toTimestamp } from "../lib/time.js";
 
@@ -24,12 +24,15 @@ export async function runHybridSearch(input: {
   }
 
   const degraded = queryVector === undefined;
-  const [keywordRows, vectorRows] = await Promise.all([
-    input.table.queryScopedRows(input.filter, Math.max(limit * 4, defaultKeywordCandidateLimit)),
+  const keywordLimit = Math.max(limit * 4, defaultKeywordCandidateLimit);
+  const [keywordBaseline, keywordLexical, vectorRows] = await Promise.all([
+    input.table.queryScopedRows(input.filter, keywordLimit),
+    input.table.queryScopedLexicalCandidates(input.filter, input.search.query, keywordLimit),
     queryVector
       ? input.table.vectorSearch(input.filter, queryVector, Math.max(limit * 3, defaultVectorCandidateLimit))
       : Promise.resolve([]),
   ]);
+  const keywordRows = mergeRetrievalRowsById(keywordBaseline, keywordLexical);
 
   const rowsById = new Map<string, {
     row: (typeof keywordRows)[number];
@@ -148,4 +151,20 @@ export async function runHybridSearch(input: {
     },
     trace,
   };
+}
+
+function mergeRetrievalRowsById(primary: readonly RetrievalRow[], secondary: readonly RetrievalRow[]): RetrievalRow[] {
+  const map = new Map<string, RetrievalRow>();
+
+  for (const row of primary) {
+    map.set(row.id, row);
+  }
+
+  for (const row of secondary) {
+    if (!map.has(row.id)) {
+      map.set(row.id, row);
+    }
+  }
+
+  return [...map.values()];
 }

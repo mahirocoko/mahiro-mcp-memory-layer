@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { defaultKeywordCandidateLimit } from "../src/features/memory/constants.js";
 import { runHybridSearch } from "../src/features/memory/retrieval/hybrid-search.js";
 import type { EmbeddingProvider } from "../src/features/memory/index/embedding-provider.js";
 import type { RetrievalRow, ScopeFilter } from "../src/features/memory/types.js";
@@ -47,6 +48,7 @@ describe("runHybridSearch", () => {
 
     const table = {
       queryScopedRows: async () => keywordRows,
+      queryScopedLexicalCandidates: async () => [],
       vectorSearch: async () => {
         throw new Error("should not run vector search when embeddings fail");
       },
@@ -105,6 +107,7 @@ describe("runHybridSearch", () => {
 
     const table = {
       queryScopedRows: async () => keywordRows,
+      queryScopedLexicalCandidates: async () => [],
       vectorSearch: async () => vectorRows,
     };
 
@@ -130,5 +133,55 @@ describe("runHybridSearch", () => {
     });
 
     expect(result.items[0]?.id).toBe("mem-request-id");
+  });
+
+  it("does not cap keyword candidates before scoring lexical matches", async () => {
+    const fillerRows = Array.from({ length: 64 }, (_, index) =>
+      createRow({
+        id: `mem-filler-${index}`,
+        content: `Generic memory ${index}`,
+        createdAt: `2026-04-01T00:${String(index % 60).padStart(2, "0")}:00.000Z`,
+        updatedAt: `2026-04-01T00:${String(index % 60).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    const lexicalHit = createRow({
+      id: "mem-lexical-hit",
+      content: "Detailed notes about the retrieval fallback candidate coverage.",
+      createdAt: "2026-04-02T00:00:00.000Z",
+      updatedAt: "2026-04-02T00:00:00.000Z",
+    });
+
+    const table = {
+      queryScopedRows: async (_filter: ScopeFilter, limit?: number) => {
+        expect(limit).toBeUndefined();
+        return [...fillerRows, lexicalHit];
+      },
+      vectorSearch: async () => [],
+    };
+
+    const embeddingProvider: EmbeddingProvider = {
+      version: "test-v1",
+      dimensions: 2,
+      embedText: async () => {
+        throw new Error("embedding unavailable");
+      },
+    };
+
+    const { result } = await runHybridSearch({
+      search: {
+        query: "retrieval fallback candidate coverage",
+        mode: "full",
+        scope: "project",
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        limit: 5,
+      },
+      filter: baseFilter,
+      table: table as never,
+      embeddingProvider,
+    });
+
+    expect(result.items[0]?.id).toBe("mem-lexical-hit");
   });
 });
