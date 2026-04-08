@@ -69,14 +69,16 @@ describe("runWorkerJob", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => {
-            attempts += 1;
+          runtime: {
+            run: async () => {
+              attempts += 1;
 
-            if (attempts < 3) {
-              return createGeminiCommandResult({ exitCode: 1, stderr: "rate limit" });
-            }
+              if (attempts < 3) {
+                return createGeminiCommandResult({ exitCode: 1, stderr: "rate limit" });
+              }
 
-            return createGeminiCommandResult();
+              return createGeminiCommandResult();
+            },
           },
         },
       },
@@ -125,8 +127,10 @@ describe("runWorkerJob", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => {
-            throw new Error("spawn crash");
+          runtime: {
+            run: async () => {
+              throw new Error("spawn crash");
+            },
           },
         },
       },
@@ -161,7 +165,7 @@ describe("runWorkerJob", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => createCursorCommandResult(),
+          runtime: { run: async () => createCursorCommandResult() },
         },
       },
       { sleep },

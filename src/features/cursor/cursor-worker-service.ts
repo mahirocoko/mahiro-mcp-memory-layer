@@ -1,12 +1,13 @@
 import { ZodError } from "zod";
 
 import { normalizeCursorResult } from "./core/normalize-cursor-result.js";
-import { runCursorCommand } from "./core/run-cursor-command.js";
+import type { CursorWorkerRuntime } from "./runtime/cursor-worker-runtime.js";
+import { shellCursorRuntime } from "./runtime/shell/shell-cursor-runtime.js";
 import { cursorWorkerInputSchema } from "./schemas.js";
-import type { CursorCommandRunResult, CursorWorkerInput, CursorWorkerResult } from "./types.js";
+import type { CursorWorkerInput, CursorWorkerResult } from "./types.js";
 
 export interface RunCursorWorkerDependencies {
-  readonly runCommand?: (input: CursorWorkerInput) => Promise<CursorCommandRunResult>;
+  readonly runtime?: CursorWorkerRuntime;
 }
 
 export async function runCursorWorker(
@@ -29,8 +30,8 @@ export async function runCursorWorker(
     };
   }
 
-  const runCommand = dependencies.runCommand ?? runCursorCommand;
-  const commandResult = await runCommand(input);
+  const runtime = dependencies.runtime ?? shellCursorRuntime;
+  const commandResult = await runtime.run(input);
   return normalizeCursorResult(input, commandResult);
 }
 

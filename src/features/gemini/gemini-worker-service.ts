@@ -4,12 +4,13 @@ import { getAppEnv } from "../../config/env.js";
 import { resolveGeminiTaskRoute } from "./gemini-task-router.js";
 import { FileGeminiCacheStore, type GeminiCacheStore } from "./core/gemini-cache-store.js";
 import { normalizeGeminiResult } from "./core/normalize-gemini-result.js";
-import { runGeminiCommand } from "./core/run-gemini-command.js";
+import type { GeminiWorkerRuntime } from "./runtime/gemini-worker-runtime.js";
+import { shellGeminiRuntime } from "./runtime/shell/shell-gemini-runtime.js";
 import { geminiWorkerInputSchema } from "./schemas.js";
-import type { GeminiCommandRunResult, GeminiWorkerInput, GeminiWorkerResult } from "./types.js";
+import type { GeminiWorkerInput, GeminiWorkerResult } from "./types.js";
 
 export interface RunGeminiWorkerDependencies {
-  readonly runCommand?: (input: GeminiWorkerInput) => Promise<GeminiCommandRunResult>;
+  readonly runtime?: GeminiWorkerRuntime;
   readonly cacheStore?: GeminiCacheStore;
 }
 
@@ -33,7 +34,7 @@ export async function runGeminiWorker(
     };
   }
 
-  const runCommand = dependencies.runCommand ?? runGeminiCommand;
+  const runtime = dependencies.runtime ?? shellGeminiRuntime;
   const env = getAppEnv();
   const cacheStore = dependencies.cacheStore
     ?? new FileGeminiCacheStore(env.dataPaths.geminiCacheFilePath, env.geminiCache);
@@ -64,7 +65,7 @@ export async function runGeminiWorker(
     };
   }
 
-  const commandResult = await runCommand({
+  const commandResult = await runtime.run({
     ...input,
     prompt: route.prompt,
     taskKind: route.taskKind,

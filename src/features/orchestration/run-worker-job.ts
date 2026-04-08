@@ -1,4 +1,5 @@
 import { runCursorWorker } from "../cursor/cursor-worker-service.js";
+import { resolveCursorWorkerRuntimeDependency } from "../cursor/runtime/resolve-cursor-runtime.js";
 import { runGeminiWorker } from "../gemini/gemini-worker-service.js";
 import type { WorkerJob, WorkerJobResult } from "./types.js";
 
@@ -54,7 +55,10 @@ async function runWorkerJobOnce(job: WorkerJob, retryCount: number): Promise<Wor
       kind: job.kind,
       input: job.input,
       retryCount,
-      result: await runCursorWorker(job.input, job.dependencies),
+      result: await runCursorWorker(job.input, {
+        ...job.dependencies,
+        runtime: resolveCursorWorkerRuntimeDependency(job.dependencies?.runtime, process.env),
+      }),
     };
   } catch (error) {
     return {

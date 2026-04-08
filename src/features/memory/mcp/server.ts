@@ -1,5 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { getRegisteredCursorWorkerTools } from "../../cursor/mcp/register-cursor-worker-tools.js";
 import { getRegisteredOrchestrationTools } from "../../orchestration/mcp/register-tools.js";
 import type { MemoryService } from "../memory-service.js";
 import { getRegisteredResources } from "./register-resources.js";
@@ -14,6 +15,7 @@ export function createMemoryMcpServer(memoryService: MemoryService): McpServer {
   const tools = [
     ...getRegisteredMemoryTools(memoryService),
     ...getRegisteredOrchestrationTools(),
+    ...getRegisteredCursorWorkerTools(),
   ];
 
   for (const tool of tools) {

@@ -26,15 +26,18 @@ function createCommandResult(overrides: Partial<CursorCommandRunResult> = {}): C
 describe("runCursorWorker", () => {
   it("returns a completed normalized result for valid Cursor JSON", async () => {
     const result = await runCursorWorker(baseInput, {
-      runCommand: async () => createCommandResult({
-        stdout: JSON.stringify({
-          type: "result",
-          subtype: "success",
-          result: "Done.",
-          session_id: "session-1",
-          model: "gpt-5",
-        }),
-      }),
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify({
+              type: "result",
+              subtype: "success",
+              result: "Done.",
+              session_id: "session-1",
+              model: "gpt-5",
+            }),
+          }),
+      },
     });
 
     expect(result.status).toBe("completed");
@@ -46,7 +49,7 @@ describe("runCursorWorker", () => {
   it("returns invalid_input when model is missing from the worker payload", async () => {
     const result = await runCursorWorker(
       { taskId: "task-bad", prompt: "Review this.", model: "" } as unknown as typeof baseInput,
-      { runCommand: async () => createCommandResult() },
+      { runtime: { run: async () => createCommandResult() } },
     );
 
     expect(result.status).toBe("invalid_input");
@@ -54,15 +57,18 @@ describe("runCursorWorker", () => {
 
   it("returns command_failed when Cursor exits non-zero", async () => {
     const result = await runCursorWorker(baseInput, {
-      runCommand: async () => createCommandResult({
-        exitCode: 2,
-        stderr: "permission denied",
-        stdout: JSON.stringify({
-          type: "result",
-          subtype: "error",
-          is_error: true,
-        }),
-      }),
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            exitCode: 2,
+            stderr: "permission denied",
+            stdout: JSON.stringify({
+              type: "result",
+              subtype: "error",
+              is_error: true,
+            }),
+          }),
+      },
     });
 
     expect(result.status).toBe("command_failed");
@@ -71,7 +77,7 @@ describe("runCursorWorker", () => {
 
   it("returns invalid_json when stdout cannot be parsed", async () => {
     const result = await runCursorWorker(baseInput, {
-      runCommand: async () => createCommandResult({ stdout: "not-json" }),
+      runtime: { run: async () => createCommandResult({ stdout: "not-json" }) },
     });
 
     expect(result.status).toBe("invalid_json");
@@ -79,7 +85,7 @@ describe("runCursorWorker", () => {
 
   it("returns empty_output when Cursor prints nothing", async () => {
     const result = await runCursorWorker(baseInput, {
-      runCommand: async () => createCommandResult(),
+      runtime: { run: async () => createCommandResult() },
     });
 
     expect(result.status).toBe("empty_output");
@@ -87,7 +93,7 @@ describe("runCursorWorker", () => {
 
   it("returns timeout when the command times out", async () => {
     const result = await runCursorWorker({ ...baseInput, timeoutMs: 5000 }, {
-      runCommand: async () => createCommandResult({ timedOut: true }),
+      runtime: { run: async () => createCommandResult({ timedOut: true }) },
     });
 
     expect(result.status).toBe("timeout");
@@ -96,7 +102,9 @@ describe("runCursorWorker", () => {
 
   it("returns spawn_error when the binary cannot be launched", async () => {
     const result = await runCursorWorker(baseInput, {
-      runCommand: async () => createCommandResult({ spawnError: "spawn agent ENOENT", exitCode: null }),
+      runtime: {
+        run: async () => createCommandResult({ spawnError: "spawn agent ENOENT", exitCode: null }),
+      },
     });
 
     expect(result.status).toBe("spawn_error");

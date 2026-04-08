@@ -82,9 +82,11 @@ describe("runParallelWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => {
-            await waitForOverlap();
-            return createGeminiCommandResult();
+          runtime: {
+            run: async () => {
+              await waitForOverlap();
+              return createGeminiCommandResult();
+            },
           },
         },
       },
@@ -96,9 +98,11 @@ describe("runParallelWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => {
-            await waitForOverlap();
-            return createCursorCommandResult();
+          runtime: {
+            run: async () => {
+              await waitForOverlap();
+              return createCursorCommandResult();
+            },
           },
         },
       },
@@ -128,20 +132,22 @@ describe("runParallelWorkers", () => {
         model: "composer-2",
       },
       dependencies: {
-        runCommand: async () => {
-          activeRuns += 1;
-          maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
-          await new Promise((resolve) => setTimeout(resolve, 20));
-          activeRuns -= 1;
+        runtime: {
+          run: async () => {
+            activeRuns += 1;
+            maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            activeRuns -= 1;
 
-          return createCursorCommandResult({
-            stdout: JSON.stringify({
-              type: "result",
-              subtype: "success",
-              result: `Cursor ${index + 1} done.`,
-              model: "composer-2",
-            }),
-          });
+            return createCursorCommandResult({
+              stdout: JSON.stringify({
+                type: "result",
+                subtype: "success",
+                result: `Cursor ${index + 1} done.`,
+                model: "composer-2",
+              }),
+            });
+          },
         },
       },
     }));
@@ -176,20 +182,22 @@ describe("runParallelWorkers", () => {
         model: "composer-2",
       },
       dependencies: {
-        runCommand: async () => {
-          activeRuns += 1;
-          maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
-          await new Promise((resolve) => setTimeout(resolve, 20));
-          activeRuns -= 1;
+        runtime: {
+          run: async () => {
+            activeRuns += 1;
+            maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            activeRuns -= 1;
 
-          return createCursorCommandResult({
-            stdout: JSON.stringify({
-              type: "result",
-              subtype: "success",
-              result: `Cursor ${index + 1} done.`,
-              model: "composer-2",
-            }),
-          });
+            return createCursorCommandResult({
+              stdout: JSON.stringify({
+                type: "result",
+                subtype: "success",
+                result: `Cursor ${index + 1} done.`,
+                model: "composer-2",
+              }),
+            });
+          },
         },
       },
     }));
@@ -225,7 +233,7 @@ describe("runParallelWorkers", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
         {
@@ -236,7 +244,7 @@ describe("runParallelWorkers", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+            runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
           },
         },
       ],
@@ -270,13 +278,15 @@ describe("runParallelWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async (input) => {
-            await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
-            return createCursorCommandResult({
-              exitCode: null,
-              signal: "SIGTERM",
-              timedOut: true,
-            });
+          runtime: {
+            run: async (input) => {
+              await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
+              return createCursorCommandResult({
+                exitCode: null,
+                signal: "SIGTERM",
+                timedOut: true,
+              });
+            },
           },
         },
       })),
@@ -299,7 +309,7 @@ describe("runParallelWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => createGeminiCommandResult({ exitCode: 1, stderr: "api error" }),
+          runtime: { run: async () => createGeminiCommandResult({ exitCode: 1, stderr: "api error" }) },
         },
       },
       {
@@ -310,7 +320,7 @@ describe("runParallelWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => createCursorCommandResult(),
+          runtime: { run: async () => createCursorCommandResult() },
         },
       },
     ]);
@@ -332,8 +342,10 @@ describe("runParallelWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => {
-            throw new Error("boom");
+          runtime: {
+            run: async () => {
+              throw new Error("boom");
+            },
           },
         },
       },

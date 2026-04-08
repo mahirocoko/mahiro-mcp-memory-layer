@@ -87,15 +87,17 @@ async function runWorker(
 describe("runGeminiWorker", () => {
   it("returns a completed normalized result for valid Gemini JSON", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done.",
-            stats: {
-              model: "gemini-3-flash-preview",
-            },
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done.",
+              stats: {
+                model: "gemini-3-flash-preview",
+              },
+            }),
           }),
-        }),
+      },
     });
 
     expect(result.status).toBe("completed");
@@ -110,11 +112,13 @@ describe("runGeminiWorker", () => {
     await runWorker(
       { ...baseInput, model: "custom-model-99" },
       {
-        runCommand: async (input) => {
-          capturedModel = input.model;
-          return createCommandResult({
-            stdout: JSON.stringify({ response: "Done." }),
-          });
+        runtime: {
+          run: async (input) => {
+            capturedModel = input.model;
+            return createCommandResult({
+              stdout: JSON.stringify({ response: "Done." }),
+            });
+          },
         },
       },
     );
@@ -124,15 +128,17 @@ describe("runGeminiWorker", () => {
 
   it("extracts the reported model from the Gemini stats object", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done.",
-            stats: {
-              model: "actual-model-returned-by-api",
-            },
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done.",
+              stats: {
+                model: "actual-model-returned-by-api",
+              },
+            }),
           }),
-        }),
+      },
     });
 
     expect(result.requestedModel).toBe("gemini-3-flash-preview");
@@ -141,21 +147,23 @@ describe("runGeminiWorker", () => {
 
   it("falls back to the single stats.models key for reported model", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done.",
-            stats: {
-              models: {
-                "gemini-3-flash-preview": {
-                  tokens: {
-                    total: 10,
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done.",
+              stats: {
+                models: {
+                  "gemini-3-flash-preview": {
+                    tokens: {
+                      total: 10,
+                    },
                   },
                 },
               },
-            },
+            }),
           }),
-        }),
+      },
     });
 
     expect(result.reportedModel).toBe("gemini-3-flash-preview");
@@ -163,21 +171,23 @@ describe("runGeminiWorker", () => {
 
   it("extracts cached token counts from Gemini stats models", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done.",
-            stats: {
-              models: {
-                "gemini-3-flash-preview": {
-                  tokens: {
-                    cached: 321,
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done.",
+              stats: {
+                models: {
+                  "gemini-3-flash-preview": {
+                    tokens: {
+                      cached: 321,
+                    },
                   },
                 },
               },
-            },
+            }),
           }),
-        }),
+      },
     });
 
     expect(result.status).toBe("completed");
@@ -187,7 +197,7 @@ describe("runGeminiWorker", () => {
   it("returns invalid_input when model is missing from the worker payload", async () => {
     const result = await runWorker(
       { taskId: "task-bad", prompt: "Summarize this.", model: "" } as unknown as typeof baseInput,
-      { runCommand: async () => createCommandResult() },
+      { runtime: { run: async () => createCommandResult() } },
     );
 
     expect(result.status).toBe("invalid_input");
@@ -201,19 +211,21 @@ describe("runGeminiWorker", () => {
         taskKind: "summarize",
       },
       {
-        runCommand: async (input) => {
-          expect(input.prompt).toContain("Return JSON only");
-          return createCommandResult({
-            stdout: JSON.stringify({
-              response: JSON.stringify({
-                summary: "Short summary",
-                keyPoints: ["One", "Two"],
+        runtime: {
+          run: async (input) => {
+            expect(input.prompt).toContain("Return JSON only");
+            return createCommandResult({
+              stdout: JSON.stringify({
+                response: JSON.stringify({
+                  summary: "Short summary",
+                  keyPoints: ["One", "Two"],
+                }),
+                stats: {
+                  model: "gemini-3-flash-preview",
+                },
               }),
-              stats: {
-                model: "gemini-3-flash-preview",
-              },
-            }),
-          });
+            });
+          },
         },
       },
     );
@@ -233,15 +245,17 @@ describe("runGeminiWorker", () => {
         taskKind: "summarize",
       },
       {
-        runCommand: async () =>
-          createCommandResult({
-            stdout: JSON.stringify({
-              response: "```json\n{\"summary\":\"Short summary\",\"keyPoints\":[\"One\",\"Two\"]}\n```",
-              stats: {
-                model: "gemini-3-flash-preview",
-              },
+        runtime: {
+          run: async () =>
+            createCommandResult({
+              stdout: JSON.stringify({
+                response: "```json\n{\"summary\":\"Short summary\",\"keyPoints\":[\"One\",\"Two\"]}\n```",
+                stats: {
+                  model: "gemini-3-flash-preview",
+                },
+              }),
             }),
-          }),
+        },
       },
     );
 
@@ -259,15 +273,17 @@ describe("runGeminiWorker", () => {
         taskKind: "summarize",
       },
       {
-        runCommand: async () =>
-          createCommandResult({
-            stdout: JSON.stringify({
-              response: "```\n{\"summary\":\"Short summary\",\"keyPoints\":[\"One\",\"Two\"]}\n```",
-              stats: {
-                model: "gemini-3-flash-preview",
-              },
+        runtime: {
+          run: async () =>
+            createCommandResult({
+              stdout: JSON.stringify({
+                response: "```\n{\"summary\":\"Short summary\",\"keyPoints\":[\"One\",\"Two\"]}\n```",
+                stats: {
+                  model: "gemini-3-flash-preview",
+                },
+              }),
             }),
-          }),
+        },
       },
     );
 
@@ -285,14 +301,16 @@ describe("runGeminiWorker", () => {
         taskKind: "extract-facts",
       },
       {
-        runCommand: async () =>
-          createCommandResult({
-            stdout: JSON.stringify({
-              response: JSON.stringify({
-                summary: "Missing facts",
+        runtime: {
+          run: async () =>
+            createCommandResult({
+              stdout: JSON.stringify({
+                response: JSON.stringify({
+                  summary: "Missing facts",
+                }),
               }),
             }),
-          }),
+        },
       },
     );
 
@@ -302,14 +320,16 @@ describe("runGeminiWorker", () => {
 
   it("returns command_failed when Gemini exits non-zero with structured JSON", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          exitCode: 2,
-          stderr: "command failed",
-          stdout: JSON.stringify({
-            error: "rate limited",
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            exitCode: 2,
+            stderr: "command failed",
+            stdout: JSON.stringify({
+              error: "rate limited",
+            }),
           }),
-        }),
+      },
     });
 
     expect(result.status).toBe("command_failed");
@@ -319,10 +339,12 @@ describe("runGeminiWorker", () => {
 
   it("returns invalid_json when stdout cannot be parsed", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: "not-json",
-        }),
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: "not-json",
+          }),
+      },
     });
 
     expect(result.status).toBe("invalid_json");
@@ -331,13 +353,15 @@ describe("runGeminiWorker", () => {
 
   it("keeps the outer Gemini envelope strict when stdout is fenced markdown", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: `\
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: `\
 \`\`\`json
 ${JSON.stringify({ response: "Done." })}
 \`\`\``,
-        }),
+          }),
+      },
     });
 
     expect(result.status).toBe("invalid_json");
@@ -346,10 +370,12 @@ ${JSON.stringify({ response: "Done." })}
 
   it("returns invalid_json when stdout is JSON but not a valid Gemini envelope", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          stdout: JSON.stringify(["unexpected"]),
-        }),
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            stdout: JSON.stringify(["unexpected"]),
+          }),
+      },
     });
 
     expect(result.status).toBe("invalid_json");
@@ -358,7 +384,7 @@ ${JSON.stringify({ response: "Done." })}
 
   it("returns empty_output when Gemini prints nothing", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () => createCommandResult(),
+      runtime: { run: async () => createCommandResult() },
     });
 
     expect(result.status).toBe("empty_output");
@@ -372,10 +398,12 @@ ${JSON.stringify({ response: "Done." })}
         timeoutMs: 5000,
       },
       {
-        runCommand: async () =>
-          createCommandResult({
-            timedOut: true,
-          }),
+        runtime: {
+          run: async () =>
+            createCommandResult({
+              timedOut: true,
+            }),
+        },
       },
     );
 
@@ -385,11 +413,13 @@ ${JSON.stringify({ response: "Done." })}
 
   it("returns spawn_error when the binary cannot be launched", async () => {
     const result = await runWorker(baseInput, {
-      runCommand: async () =>
-        createCommandResult({
-          spawnError: "spawn gemini ENOENT",
-          exitCode: null,
-        }),
+      runtime: {
+        run: async () =>
+          createCommandResult({
+            spawnError: "spawn gemini ENOENT",
+            exitCode: null,
+          }),
+      },
     });
 
     expect(result.status).toBe("spawn_error");
@@ -402,16 +432,18 @@ ${JSON.stringify({ response: "Done." })}
 
     const firstResult = await runGeminiWorker(baseInput, {
       cacheStore,
-      runCommand: async () => {
-        calls += 1;
-        return createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done once.",
-            stats: {
-              model: "gemini-3-flash-preview",
-            },
-          }),
-        });
+      runtime: {
+        run: async () => {
+          calls += 1;
+          return createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done once.",
+              stats: {
+                model: "gemini-3-flash-preview",
+              },
+            }),
+          });
+        },
       },
     });
 
@@ -422,9 +454,11 @@ ${JSON.stringify({ response: "Done." })}
       },
       {
         cacheStore,
-        runCommand: async () => {
-          calls += 1;
-          return createCommandResult();
+        runtime: {
+          run: async () => {
+            calls += 1;
+            return createCommandResult();
+          },
         },
       },
     );
@@ -442,13 +476,15 @@ ${JSON.stringify({ response: "Done." })}
 
     await runGeminiWorker(baseInput, {
       cacheStore,
-      runCommand: async () => {
-        calls += 1;
-        return createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done once.",
-          }),
-        });
+      runtime: {
+        run: async () => {
+          calls += 1;
+          return createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done once.",
+            }),
+          });
+        },
       },
     });
 
@@ -461,13 +497,15 @@ ${JSON.stringify({ response: "Done." })}
       },
       {
         cacheStore,
-        runCommand: async () => {
-          calls += 1;
-          return createCommandResult({
-            stdout: JSON.stringify({
-              response: "Done twice.",
-            }),
-          });
+        runtime: {
+          run: async () => {
+            calls += 1;
+            return createCommandResult({
+              stdout: JSON.stringify({
+                response: "Done twice.",
+              }),
+            });
+          },
         },
       },
     );
@@ -481,13 +519,15 @@ ${JSON.stringify({ response: "Done." })}
 
     await runGeminiWorker(baseInput, {
       cacheStore,
-      runCommand: async () => {
-        calls += 1;
-        return createCommandResult({
-          stdout: JSON.stringify({
-            response: "Done once.",
-          }),
-        });
+      runtime: {
+        run: async () => {
+          calls += 1;
+          return createCommandResult({
+            stdout: JSON.stringify({
+              response: "Done once.",
+            }),
+          });
+        },
       },
     });
 
@@ -500,13 +540,15 @@ ${JSON.stringify({ response: "Done." })}
       },
       {
         cacheStore,
-        runCommand: async () => {
-          calls += 1;
-          return createCommandResult({
-            stdout: JSON.stringify({
-              response: "Done twice.",
-            }),
-          });
+        runtime: {
+          run: async () => {
+            calls += 1;
+            return createCommandResult({
+              stdout: JSON.stringify({
+                response: "Done twice.",
+              }),
+            });
+          },
         },
       },
     );

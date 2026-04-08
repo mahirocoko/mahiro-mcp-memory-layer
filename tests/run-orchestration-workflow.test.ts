@@ -69,7 +69,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
       ],
@@ -135,13 +135,15 @@ describe("runOrchestrationWorkflow", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => {
-            activeRuns += 1;
-            maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
-            await new Promise((resolve) => setTimeout(resolve, 20));
-            activeRuns -= 1;
+          runtime: {
+            run: async () => {
+              activeRuns += 1;
+              maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              activeRuns -= 1;
 
-            return createCursorCommandResult();
+              return createCursorCommandResult();
+            },
           },
         },
       })),
@@ -176,7 +178,7 @@ describe("runOrchestrationWorkflow", () => {
             },
             dependencies: {
               cacheStore: createNoopCacheStore(),
-              runCommand: async () => createGeminiCommandResult(),
+              runtime: { run: async () => createGeminiCommandResult() },
             },
           },
         ],
@@ -216,13 +218,15 @@ describe("runOrchestrationWorkflow", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async (input) => {
-            await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
-            return createCursorCommandResult({
-              exitCode: null,
-              signal: "SIGTERM",
-              timedOut: true,
-            });
+          runtime: {
+            run: async (input) => {
+              await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
+              return createCursorCommandResult({
+                exitCode: null,
+                signal: "SIGTERM",
+                timedOut: true,
+              });
+            },
           },
         },
       })),
@@ -255,7 +259,7 @@ describe("runOrchestrationWorkflow", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+            runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
           },
         },
       ],
@@ -287,7 +291,7 @@ describe("runOrchestrationWorkflow", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+            runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
           },
         },
         {
@@ -299,7 +303,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
       ],
@@ -332,7 +336,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
       ],
@@ -365,7 +369,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
         {
@@ -376,9 +380,11 @@ describe("runOrchestrationWorkflow", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async (input) => {
-              expect(input.prompt).toBe("Plan from summary: Gemini summary");
-              return createCursorCommandResult();
+            runtime: {
+              run: async (input) => {
+                expect(input.prompt).toBe("Plan from summary: Gemini summary");
+                return createCursorCommandResult();
+              },
             },
           },
         },
@@ -409,7 +415,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
         ({ lastResult }) => {
@@ -434,7 +440,7 @@ describe("runOrchestrationWorkflow", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult(),
+            runtime: { run: async () => createCursorCommandResult() },
           },
         },
       ],
@@ -466,7 +472,7 @@ describe("runOrchestrationWorkflow", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+            runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
           },
         },
         {
@@ -509,7 +515,7 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
+            runtime: { run: async () => createGeminiCommandResult() },
           },
         },
         {
@@ -553,13 +559,15 @@ describe("runOrchestrationWorkflow", () => {
           },
           dependencies: {
             cacheStore: createNoopCacheStore(),
-            runCommand: async (input) => {
-              await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
-              return createGeminiCommandResult({
-                exitCode: null,
-                signal: "SIGTERM",
-                timedOut: true,
-              });
+            runtime: {
+              run: async (input) => {
+                await new Promise((resolve) => setTimeout(resolve, (input.timeoutMs ?? 0) + 5));
+                return createGeminiCommandResult({
+                  exitCode: null,
+                  signal: "SIGTERM",
+                  timedOut: true,
+                });
+              },
             },
           },
         },

@@ -72,7 +72,7 @@ describe("runSequentialWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => createGeminiCommandResult(),
+          runtime: { run: async () => createGeminiCommandResult() },
         },
       },
       ({ lastResult, stepIndex, results }) => {
@@ -88,9 +88,11 @@ describe("runSequentialWorkers", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async (input) => {
-              expect(input.prompt).toContain("Gemini summary");
-              return createCursorCommandResult();
+            runtime: {
+              run: async (input) => {
+                expect(input.prompt).toContain("Gemini summary");
+                return createCursorCommandResult();
+              },
             },
           },
         };
@@ -115,7 +117,7 @@ describe("runSequentialWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+          runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
         },
       },
       {
@@ -127,7 +129,7 @@ describe("runSequentialWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => createGeminiCommandResult(),
+          runtime: { run: async () => createGeminiCommandResult() },
         },
       },
     ]);
@@ -149,7 +151,7 @@ describe("runSequentialWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => createGeminiCommandResult(),
+          runtime: { run: async () => createGeminiCommandResult() },
         },
       },
       () => null,
@@ -161,7 +163,7 @@ describe("runSequentialWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => createCursorCommandResult(),
+          runtime: { run: async () => createCursorCommandResult() },
         },
       },
     ]);
@@ -184,10 +186,10 @@ describe("runSequentialWorkers", () => {
             prompt: "Summarize retrieval flow.",
             model: "gemini-3-flash-preview",
           },
-          dependencies: {
-            cacheStore: createNoopCacheStore(),
-            runCommand: async () => createGeminiCommandResult(),
-          },
+        dependencies: {
+          cacheStore: createNoopCacheStore(),
+          runtime: { run: async () => createGeminiCommandResult() },
+        },
         },
         () => null,
         {
@@ -198,7 +200,7 @@ describe("runSequentialWorkers", () => {
             model: "composer-2",
           },
           dependencies: {
-            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+            runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
           },
         },
       ],
@@ -244,7 +246,7 @@ describe("runSequentialWorkers", () => {
           model: "composer-2",
         },
         dependencies: {
-          runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+          runtime: { run: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }) },
         },
       },
       {
@@ -277,7 +279,7 @@ describe("runSequentialWorkers", () => {
         },
         dependencies: {
           cacheStore: createNoopCacheStore(),
-          runCommand: async () => createGeminiCommandResult(),
+          runtime: { run: async () => createGeminiCommandResult() },
         },
       },
       () => {
