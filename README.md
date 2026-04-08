@@ -100,6 +100,8 @@ Notes:
 
 - omit `trust` to use the default workspace-based trust resolution above
 - set `trust: true` or `trust: false` to override that default explicitly
+- shell is still the default Cursor worker runtime
+- set `MAHIRO_CURSOR_RUNTIME=mcp` to opt into the MCP-backed Cursor runtime prototype
 
 Result shape includes:
 
@@ -189,6 +191,11 @@ Result shape includes:
 - `finishedAt`
 - `durationMs`
 
+Runtime selection:
+
+- shell is still the default Gemini worker runtime
+- set `MAHIRO_GEMINI_RUNTIME=mcp` to opt into the MCP-backed Gemini runtime prototype
+
 ## Parallel execution playbook
 
 Run workers in parallel only when their inputs are fully independent — neither worker's output is needed to form the other's prompt.
@@ -257,7 +264,14 @@ Parallel workflow fields:
 - `maxConcurrency` -> optional positive integer limit for how many parallel jobs run at once
 - `timeoutMs` -> optional workflow-level deadline in milliseconds; bounds started jobs and stops launching new ones after expiry
 - `defaultTrust` -> optional default trust mode applied to Cursor jobs that do not set `input.trust`
+- `workerRuntime` -> optional per-job execution backend: `shell` or `mcp`; overrides env-based runtime selection for that job
 - per-job `retries` / `retryDelayMs` -> optional retry policy for transient worker failures with exponential backoff
+
+Worker runtime (Cursor / Gemini):
+
+- default remains **shell** (spawn the local `agent` / `gemini` CLIs in-process) when nothing selects MCP
+- `MAHIRO_CURSOR_RUNTIME=mcp` and `MAHIRO_GEMINI_RUNTIME=mcp` opt into the MCP stdio client path for that worker family (out-of-process: connect to this server and call `run_cursor_worker` / `run_gemini_worker`)
+- per-job `workerRuntime`: `shell` or `mcp` on `cursor` and `gemini` jobs (parallel) or steps (sequential); explicit job-level selection overrides the env for that job
 
 Parallel example:
 
@@ -269,6 +283,12 @@ Parallel trust-default example:
 
 ```bash
 echo '{"mode":"parallel","defaultTrust":false,"jobs":[{"kind":"cursor","input":{"prompt":"Review this external repo","model":"composer-2"}},{"kind":"cursor","input":{"prompt":"Review this local repo","model":"composer-2","trust":true}}]}' | bun run orchestrate -- --file -
+```
+
+Parallel runtime-selection example:
+
+```bash
+echo '{"mode":"parallel","jobs":[{"kind":"gemini","workerRuntime":"mcp","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}},{"kind":"cursor","workerRuntime":"shell","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
 ```
 
 Example result shape:
@@ -342,6 +362,7 @@ Sequential failure control:
 - set `continueOnFailure: false` when a failed step should stop the workflow
 - code-level sequential step functions can return `null` to skip a step entirely
 - `defaultTrust` also applies to sequential Cursor steps unless a step sets `input.trust` explicitly
+- `workerRuntime` also applies to sequential steps and overrides env-based runtime selection for that step
 
 Stop-on-failure example:
 
