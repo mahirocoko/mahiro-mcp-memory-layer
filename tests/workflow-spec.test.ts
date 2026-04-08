@@ -94,3 +94,35 @@ describe("normalizeWorkflowSpec - defaultTrust", () => {
     expect("trust" in job.input).toBe(false);
   });
 });
+
+describe("normalizeWorkflowSpec - workerRuntime", () => {
+  it("passes workerRuntime through on gemini and cursor jobs", () => {
+    const spec: WorkflowSpecInput = {
+      mode: "parallel",
+      jobs: [
+        { ...baseGeminiJob, workerRuntime: "mcp" },
+        { ...baseCursorJob, workerRuntime: "shell" },
+      ],
+    };
+
+    const result = normalizeWorkflowSpec(spec, undefined);
+
+    if (result.mode !== "parallel") throw new Error("expected parallel");
+    expect(result.jobs[0]?.kind === "gemini" && result.jobs[0].workerRuntime).toBe("mcp");
+    expect(result.jobs[1]?.kind === "cursor" && result.jobs[1].workerRuntime).toBe("shell");
+  });
+
+  it("omits workerRuntime when not set in the workflow job", () => {
+    const spec: WorkflowSpecInput = {
+      mode: "sequential",
+      steps: [baseGeminiJob],
+    };
+
+    const result = normalizeWorkflowSpec(spec, undefined);
+
+    if (result.mode !== "sequential") throw new Error("expected sequential");
+    const step = result.steps[0];
+    if (typeof step === "function" || !step || step.kind !== "gemini") throw new Error("expected gemini step");
+    expect("workerRuntime" in step).toBe(false);
+  });
+});

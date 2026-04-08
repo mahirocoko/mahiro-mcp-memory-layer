@@ -13,10 +13,13 @@ export const cursorWorkflowInputSchema = cursorWorkerInputSchema.omit({ taskId: 
   taskId: z.string().trim().min(1).optional(),
 });
 
+const workerRuntimeSchema = z.enum(["shell", "mcp"]);
+
 export const workflowJobSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("gemini"),
     input: geminiWorkflowInputSchema,
+    workerRuntime: workerRuntimeSchema.optional(),
     retries: z.number().int().min(0).max(5).optional(),
     retryDelayMs: z.number().int().positive().max(30_000).optional(),
     continueOnFailure: z.boolean().optional(),
@@ -24,6 +27,7 @@ export const workflowJobSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("cursor"),
     input: cursorWorkflowInputSchema,
+    workerRuntime: workerRuntimeSchema.optional(),
     retries: z.number().int().min(0).max(5).optional(),
     retryDelayMs: z.number().int().positive().max(30_000).optional(),
     continueOnFailure: z.boolean().optional(),
@@ -118,6 +122,7 @@ function normalizeJob(
         taskId: job.input.taskId ?? newId("gemini"),
         cwd: job.input.cwd ?? defaultCwd,
       },
+      ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
       retries: job.retries,
       retryDelayMs: job.retryDelayMs,
       continueOnFailure: job.continueOnFailure,
@@ -132,6 +137,7 @@ function normalizeJob(
       cwd: job.input.cwd ?? defaultCwd,
       trust: job.input.trust !== undefined ? job.input.trust : defaultTrust,
     },
+    ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
     retries: job.retries,
     retryDelayMs: job.retryDelayMs,
     continueOnFailure: job.continueOnFailure,

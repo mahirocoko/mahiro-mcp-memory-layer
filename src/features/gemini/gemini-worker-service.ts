@@ -1,9 +1,11 @@
 import { ZodError } from "zod";
 
 import { getAppEnv } from "../../config/env.js";
+import type { WorkerRuntimeSelection } from "../orchestration/worker-runtime-selection.js";
 import { resolveGeminiTaskRoute } from "./gemini-task-router.js";
 import { FileGeminiCacheStore, type GeminiCacheStore } from "./core/gemini-cache-store.js";
 import { normalizeGeminiResult } from "./core/normalize-gemini-result.js";
+import { resolveGeminiWorkerRuntimeDependency } from "./runtime/resolve-gemini-runtime.js";
 import type { GeminiWorkerRuntime } from "./runtime/gemini-worker-runtime.js";
 import { shellGeminiRuntime } from "./runtime/shell/shell-gemini-runtime.js";
 import { geminiWorkerInputSchema } from "./schemas.js";
@@ -11,6 +13,7 @@ import type { GeminiWorkerInput, GeminiWorkerResult } from "./types.js";
 
 export interface RunGeminiWorkerDependencies {
   readonly runtime?: GeminiWorkerRuntime;
+  readonly workerRuntimeSelection?: WorkerRuntimeSelection;
   readonly cacheStore?: GeminiCacheStore;
 }
 
@@ -34,7 +37,11 @@ export async function runGeminiWorker(
     };
   }
 
-  const runtime = dependencies.runtime ?? shellGeminiRuntime;
+  const runtime = resolveGeminiWorkerRuntimeDependency(
+    dependencies.runtime,
+    dependencies.workerRuntimeSelection,
+    process.env,
+  ) ?? shellGeminiRuntime;
   const env = getAppEnv();
   const cacheStore = dependencies.cacheStore
     ?? new FileGeminiCacheStore(env.dataPaths.geminiCacheFilePath, env.geminiCache);

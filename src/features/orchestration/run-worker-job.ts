@@ -1,6 +1,7 @@
 import { runCursorWorker } from "../cursor/cursor-worker-service.js";
 import { resolveCursorWorkerRuntimeDependency } from "../cursor/runtime/resolve-cursor-runtime.js";
 import { runGeminiWorker } from "../gemini/gemini-worker-service.js";
+import { resolveGeminiWorkerRuntimeDependency } from "../gemini/runtime/resolve-gemini-runtime.js";
 import type { WorkerJob, WorkerJobResult } from "./types.js";
 
 const defaultRetryDelayMs = 250;
@@ -37,7 +38,15 @@ async function runWorkerJobOnce(job: WorkerJob, retryCount: number): Promise<Wor
         kind: job.kind,
         input: job.input,
         retryCount,
-        result: await runGeminiWorker(job.input, job.dependencies),
+        result: await runGeminiWorker(job.input, {
+          ...job.dependencies,
+          workerRuntimeSelection: job.workerRuntime,
+          runtime: resolveGeminiWorkerRuntimeDependency(
+            job.dependencies?.runtime,
+            job.workerRuntime,
+            process.env,
+          ),
+        }),
       };
     } catch (error) {
       return {
@@ -55,9 +64,14 @@ async function runWorkerJobOnce(job: WorkerJob, retryCount: number): Promise<Wor
       kind: job.kind,
       input: job.input,
       retryCount,
-      result: await runCursorWorker(job.input, {
-        ...job.dependencies,
-        runtime: resolveCursorWorkerRuntimeDependency(job.dependencies?.runtime, process.env),
+        result: await runCursorWorker(job.input, {
+          ...job.dependencies,
+          workerRuntimeSelection: job.workerRuntime,
+          runtime: resolveCursorWorkerRuntimeDependency(
+            job.dependencies?.runtime,
+            job.workerRuntime,
+          process.env,
+        ),
       }),
     };
   } catch (error) {

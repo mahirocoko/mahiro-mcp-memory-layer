@@ -11,7 +11,7 @@ export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
     {
       name: "run_cursor_worker",
       description:
-        "Run a Cursor-family worker job via the local shell runtime (agent CLI). Intended for MCP stdio clients; orchestration defaults still use shell directly unless MAHIRO_CURSOR_RUNTIME=mcp.",
+        "Run a Cursor-family worker job via the local shell runtime (agent CLI). Intended for MCP stdio clients; orchestration defaults still use shell directly unless MAHIRO_CURSOR_RUNTIME=mcp or workerRuntime is set.",
       inputSchema: cursorWorkerInputSchema.shape,
       execute: async (input) => {
         const parsed = cursorWorkerInputSchema.parse(input);

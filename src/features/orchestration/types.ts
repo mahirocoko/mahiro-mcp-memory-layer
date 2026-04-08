@@ -3,10 +3,15 @@ import type { CursorWorkerInput, CursorWorkerResult } from "../cursor/types.js";
 import type { RunGeminiWorkerDependencies } from "../gemini/gemini-worker-service.js";
 import type { GeminiWorkerInput, GeminiWorkerResult } from "../gemini/types.js";
 import type { JobErrorClass } from "./job-error-class.js";
+import type { WorkerRuntimeSelection } from "./worker-runtime-selection.js";
+
+export type { WorkerRuntimeSelection } from "./worker-runtime-selection.js";
 
 export interface GeminiWorkerJob {
   readonly kind: "gemini";
   readonly input: GeminiWorkerInput;
+  /** When set on a normalized workflow job, selects shell vs MCP worker runtime; overrides env-based selection. */
+  readonly workerRuntime?: WorkerRuntimeSelection;
   readonly dependencies?: RunGeminiWorkerDependencies;
   readonly retries?: number;
   readonly retryDelayMs?: number;
@@ -16,6 +21,8 @@ export interface GeminiWorkerJob {
 export interface CursorWorkerJob {
   readonly kind: "cursor";
   readonly input: CursorWorkerInput;
+  /** When set on a normalized workflow job, selects shell vs MCP worker runtime; overrides env-based selection. */
+  readonly workerRuntime?: WorkerRuntimeSelection;
   readonly dependencies?: RunCursorWorkerDependencies;
   readonly retries?: number;
   readonly retryDelayMs?: number;
