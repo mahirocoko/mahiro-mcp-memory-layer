@@ -8,6 +8,14 @@ const sourceSchema = z.object({
   title: z.string().trim().min(1).optional(),
 });
 
+/** Identity for upsert_document: scope + (uri, title) pair. At least one of uri or title must be set. */
+const upsertDocumentSourceSchema = sourceSchema.refine(
+  (src) => src.uri !== undefined || src.title !== undefined,
+  {
+    message: "Provide at least one of source.uri or source.title so document identity is not empty.",
+  },
+);
+
 export const rememberInputSchema = z.object({
   content: z.string().trim().min(1),
   kind: z.enum(memoryKinds),
@@ -49,7 +57,7 @@ export const upsertDocumentInputSchema = z.object({
   userId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
   sessionId: z.string().trim().min(1).optional(),
-  source: sourceSchema,
+  source: upsertDocumentSourceSchema,
   content: z.string().trim().min(1),
   tags: z.array(z.string().trim().min(1)).optional(),
   summary: z.string().trim().min(1).optional(),

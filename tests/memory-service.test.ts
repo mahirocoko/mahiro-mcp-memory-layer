@@ -11,6 +11,7 @@ import { MemoryRecordsTable } from "../src/features/memory/index/memory-records-
 import { RetrievalTraceStore } from "../src/features/memory/observability/retrieval-trace.js";
 import { rememberMemory } from "../src/features/memory/core/remember.js";
 import { upsertDocument } from "../src/features/memory/core/upsert-document.js";
+import { upsertDocumentInputSchema } from "../src/features/memory/schemas.js";
 import { searchMemories } from "../src/features/memory/core/search-memories.js";
 import { buildContextForTask } from "../src/features/memory/core/build-context-for-task.js";
 import { reindexMemoryRecords } from "../src/features/memory/index/reindex.js";
@@ -525,6 +526,38 @@ describe("memory service core", () => {
     });
 
     expect(b.id).not.toBe(a.id);
+  });
+
+  it("upsert_document rejects when source.uri and source.title are both absent", async () => {
+    const parsed = upsertDocumentInputSchema.safeParse({
+      projectId: "mahiro-mcp-memory-layer",
+      userId: "mahiro",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "document" },
+      content: "No stable identity.",
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      throw new Error("expected schema failure");
+    }
+    expect(parsed.error.issues.some((i) => i.message.includes("Provide at least one of source.uri"))).toBe(true);
+
+    const fixture = await createFixture();
+
+    await expect(
+      upsertDocument({
+        payload: {
+          projectId: "mahiro-mcp-memory-layer",
+          userId: "mahiro",
+          containerId: "workspace:mahiro-mcp-memory-layer",
+          source: { type: "document" },
+          content: "No stable identity.",
+        },
+        logStore: fixture.logStore,
+        table: fixture.table,
+        embeddingProvider: fixture.embeddingProvider,
+      }),
+    ).rejects.toThrow();
   });
 
   it("returns degraded results when the embedding provider fails during search", async () => {

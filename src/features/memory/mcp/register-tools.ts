@@ -24,7 +24,8 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
     },
     {
       name: "upsert_document",
-      description: "Store or refresh a document-shaped memory source.",
+      description:
+        "Store or refresh a document-shaped memory source. Idempotency matches scope plus source.uri and source.title; at least one of uri or title is required. Prefer a stable source.uri (e.g. file path or canonical URL); title-only identity can collide across different documents that share a title.",
       inputSchema: upsertDocumentInputSchema.shape,
       execute: (input) => memoryService.upsertDocument(input as never),
     },
