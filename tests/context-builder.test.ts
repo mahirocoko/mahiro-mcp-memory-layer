@@ -66,6 +66,59 @@ describe("buildContextFromItems", () => {
     expect(result.context).toContain("Improve ranking coverage.");
   });
 
+  it("strips discourse hedges from profile lines", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          summary: "I think we standardize on Bun for the toolchain.",
+          content: "Longer body.",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 500,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("we standardize on Bun for the toolchain.");
+    expect(result.context).not.toContain("I think");
+  });
+
+  it("keeps the first substantive sentence for long non-conversation profile items", () => {
+    const longFirst =
+      "The service uses LanceDB for vector storage and keeps embeddings local. " +
+      "This second sentence is elaboration that should not appear in the profile bullet.";
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [{ ...baseItem, kind: "fact", summary: longFirst, content: "Body." }],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("The service uses LanceDB for vector storage and keeps embeddings local.");
+    expect(result.context).not.toContain("This second sentence");
+  });
+
+  it("prefers the first sentence for chatty conversation memories", () => {
+    const summary =
+      "User asked about ranking weights again. The assistant pointed to rank.ts and tests.";
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [{ ...baseItem, id: "mem-chat", kind: "conversation", summary, content: "Full thread." }],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("User asked about ranking weights again.");
+    expect(result.context).not.toContain("The assistant pointed");
+  });
+
   it("preserves retrieval order within the same kind in profile mode", () => {
     const second = { ...baseItem, id: "mem-second", kind: "fact" as const, summary: "Second fact." };
     const first = { ...baseItem, id: "mem-first", kind: "fact" as const, summary: "First fact." };
@@ -81,6 +134,30 @@ describe("buildContextFromItems", () => {
 
     expect(result.items).toEqual(["mem-second", "mem-first"]);
     expect(result.context.indexOf("Second fact.")).toBeLessThan(result.context.indexOf("First fact."));
+  });
+
+  it("extracts a stable first statement for profile items without summaries", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-conversation",
+          kind: "conversation",
+          summary: undefined,
+          content: "First stable statement. Second sentence should not appear.\n- noisy bullet",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 500,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Conversation:");
+    expect(result.context).toContain("First stable statement.");
+    expect(result.context).not.toContain("Second sentence should not appear.");
+    expect(result.context).not.toContain("noisy bullet");
   });
 
   it("includes timestamps in recent mode", () => {
