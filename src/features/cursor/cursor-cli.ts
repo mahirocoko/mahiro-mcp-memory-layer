@@ -68,6 +68,9 @@ export function parseCursorCliArgs(argv: readonly string[]): CursorWorkerInput {
       case "--trust":
         options.trust = true;
         break;
+      case "--no-trust":
+        options.trust = false;
+        break;
       default:
         throw new Error(`Unknown flag: ${token}`);
     }

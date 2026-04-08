@@ -46,6 +46,19 @@ describe("parseCursorCliArgs", () => {
     expect(input.trust).toBe(true);
   });
 
+  it("allows explicitly disabling trust", () => {
+    const input = parseCursorCliArgs([
+      "--model",
+      "composer-2",
+      "--no-trust",
+      "Review",
+      "this",
+      "repo",
+    ]);
+
+    expect(input.trust).toBe(false);
+  });
+
   it("keeps explicit model values even in plan mode", () => {
     const input = parseCursorCliArgs([
       "--mode",

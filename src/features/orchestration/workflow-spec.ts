@@ -35,11 +35,13 @@ export const workflowSpecSchema = z.discriminatedUnion("mode", [
     mode: z.literal("parallel"),
     maxConcurrency: z.number().int().positive().max(100).optional(),
     timeoutMs: z.number().int().positive().max(600_000).optional(),
+    defaultTrust: z.boolean().optional(),
     jobs: z.array(workflowJobSchema).min(1),
   }),
   z.object({
     mode: z.literal("sequential"),
     timeoutMs: z.number().int().positive().max(600_000).optional(),
+    defaultTrust: z.boolean().optional(),
     steps: z.array(workflowJobSchema).min(1),
   }),
 ]);
@@ -66,8 +68,8 @@ export const orchestrateToolInputSchema = z.object({
 export type WorkflowSpecInput = z.infer<typeof workflowSpecSchema>;
 
 export type OrchestrateWorkflowSpec =
-  | { readonly mode: "parallel"; readonly maxConcurrency?: number; readonly timeoutMs?: number; readonly jobs: readonly WorkerJob[] }
-  | { readonly mode: "sequential"; readonly timeoutMs?: number; readonly steps: readonly SequentialWorkerStep[] };
+  | { readonly mode: "parallel"; readonly maxConcurrency?: number; readonly timeoutMs?: number; readonly defaultTrust?: boolean; readonly jobs: readonly WorkerJob[] }
+  | { readonly mode: "sequential"; readonly timeoutMs?: number; readonly defaultTrust?: boolean; readonly steps: readonly SequentialWorkerStep[] };
 
 export function isMcpSyncEligibleWorkflowSpec(spec: WorkflowSpecInput): boolean {
   const units = spec.mode === "parallel" ? spec.jobs : spec.steps;
@@ -90,20 +92,23 @@ export function normalizeWorkflowSpec(
       mode: spec.mode,
       maxConcurrency: spec.maxConcurrency,
       timeoutMs: spec.timeoutMs,
-      jobs: spec.jobs.map((job) => normalizeJob(job, defaultCwd)),
+      defaultTrust: spec.defaultTrust,
+      jobs: spec.jobs.map((job) => normalizeJob(job, defaultCwd, spec.defaultTrust)),
     };
   }
 
   return {
     mode: spec.mode,
     timeoutMs: spec.timeoutMs,
-    steps: spec.steps.map((step) => normalizeJob(step, defaultCwd)),
+    defaultTrust: spec.defaultTrust,
+    steps: spec.steps.map((step) => normalizeJob(step, defaultCwd, spec.defaultTrust)),
   };
 }
 
 function normalizeJob(
   job: z.infer<typeof workflowJobSchema>,
   defaultCwd: string | undefined,
+  defaultTrust: boolean | undefined,
 ): WorkerJob {
   if (job.kind === "gemini") {
     return {
@@ -125,6 +130,7 @@ function normalizeJob(
       ...job.input,
       taskId: job.input.taskId ?? newId("cursor"),
       cwd: job.input.cwd ?? defaultCwd,
+      trust: job.input.trust !== undefined ? job.input.trust : defaultTrust,
     },
     retries: job.retries,
     retryDelayMs: job.retryDelayMs,

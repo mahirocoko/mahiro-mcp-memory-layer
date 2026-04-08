@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 
+import { shouldTrustCursorWorkspace } from "./resolve-cursor-trust.js";
 import type { CursorCommandRunResult, CursorWorkerInput } from "../types.js";
 
 export async function runCursorCommand(input: CursorWorkerInput): Promise<CursorCommandRunResult> {
@@ -19,7 +20,7 @@ export async function runCursorCommand(input: CursorWorkerInput): Promise<Cursor
       args.push("--force");
     }
 
-    if (input.trust) {
+    if (shouldTrustCursorWorkspace(input)) {
       args.push("--trust");
     }
 
