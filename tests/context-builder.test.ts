@@ -136,6 +136,93 @@ describe("buildContextFromItems", () => {
     expect(result.context.indexOf("Second fact.")).toBeLessThan(result.context.indexOf("First fact."));
   });
 
+  it("dedupes case- and whitespace-normalized duplicate profile lines within a kind", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-a", summary: "Standardize on Bun for the toolchain." },
+        {
+          ...baseItem,
+          id: "mem-b",
+          summary: "  standardize ON BUN   for the toolchain.  ",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context.match(/Standardize on Bun/g)?.length).toBe(1);
+    expect(result.items).toEqual(["mem-a"]);
+  });
+
+  it("collapses strict-prefix profile lines to the longer statement (same kind)", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-short", summary: "Uses LanceDB for vectors." },
+        {
+          ...baseItem,
+          id: "mem-long",
+          summary: "Uses LanceDB for vectors and keeps embeddings on disk.",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Uses LanceDB for vectors and keeps embeddings on disk.");
+    expect(result.context).not.toContain("- Uses LanceDB for vectors.\n");
+    expect(result.items).toEqual(["mem-long"]);
+  });
+
+  it("collapses embedded near-duplicate profile lines when the shorter phrase appears inside the longer (same kind)", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-shorter",
+          summary: "uses LanceDB for local vector search",
+        },
+        {
+          ...baseItem,
+          id: "mem-longer",
+          summary: "The stack uses LanceDB for local vector search and keeps embeddings on disk.",
+        },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("The stack uses LanceDB for local vector search and keeps embeddings on disk.");
+    expect(result.context.match(/uses LanceDB for local vector search/g)?.length).toBe(1);
+    expect(result.items).toEqual(["mem-longer"]);
+  });
+
+  it("does not dedupe across different kinds in profile mode", () => {
+    const line = "Same text in two sections.";
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        { ...baseItem, id: "mem-fact", kind: "fact", summary: line },
+        { ...baseItem, id: "mem-decision", kind: "decision", summary: line },
+      ],
+      maxItems: 5,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context.match(/Same text in two sections\./g)?.length).toBe(2);
+    expect(result.items).toEqual(["mem-fact", "mem-decision"]);
+  });
+
   it("extracts a stable first statement for profile items without summaries", () => {
     const result = buildContextFromItems({
       task: "Profile task",

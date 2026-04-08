@@ -247,6 +247,9 @@ function truncateProfileStatement(input: string): string {
 /** Minimum normalized length for prefix-style redundancy (avoids tiny substring false positives). */
 const PROFILE_DEDUP_PREFIX_MIN_LEN = 8;
 
+/** Minimum word count on the shorter line for embedding-style dedup (avoids tiny phrase false positives). */
+const PROFILE_DEDUP_EMBED_MIN_WORDS = 3;
+
 /**
  * Stable key for profile dedup: case/whitespace-insensitive, trailing punctuation stripped.
  * Profile-mode only; keeps retrieval/index unchanged.
@@ -261,10 +264,55 @@ function profileStatementDedupKey(line: string): string {
 
 type ProfileDedupEntry = { readonly item: SearchMemoryItem; readonly line: string; readonly key: string };
 
+function profileKeyWords(key: string): string[] {
+  return key.split(/\s+/).filter(Boolean);
+}
+
+/**
+ * True when `needleWords` appears as one contiguous run inside `haystackWords` (same order, token equality).
+ */
+function isContiguousWordSubsequence(
+  needleWords: readonly string[],
+  haystackWords: readonly string[],
+): boolean {
+  if (needleWords.length === 0 || needleWords.length > haystackWords.length) {
+    return false;
+  }
+  outer: for (let i = 0; i <= haystackWords.length - needleWords.length; i++) {
+    for (let j = 0; j < needleWords.length; j++) {
+      if (haystackWords[i + j] !== needleWords[j]) {
+        continue outer;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Shorter line is redundant when its full word sequence is embedded in a longer line (not only strict prefix),
+ * e.g. "uses lancedb for local search" inside "the stack uses lancedb for local search".
+ */
+function shorterProfileKeyEmbedsInLonger(shorterKey: string, longerKey: string): boolean {
+  if (shorterKey.length >= longerKey.length) {
+    return false;
+  }
+  const sw = profileKeyWords(shorterKey);
+  const lw = profileKeyWords(longerKey);
+  if (sw.length === 0 || sw.length >= lw.length) {
+    return false;
+  }
+  if (sw.length < PROFILE_DEDUP_EMBED_MIN_WORDS) {
+    return false;
+  }
+  return isContiguousWordSubsequence(sw, lw);
+}
+
 /**
  * Within one kind section, drop exact duplicates (after keying) and collapse strict-prefix pairs:
  * if a longer line extends a shorter one with a space boundary ("foo" vs "foo bar"), keep one line
  * (the longer unless order dictates replacing an earlier short with a later long).
+ * Also drops lines whose words form a contiguous subsequence of another line (near-duplicate embedding).
  */
 function dedupeProfileEntriesForKind(entries: readonly ProfileDedupEntry[]): ProfileDedupEntry[] {
   const out: ProfileDedupEntry[] = [];
@@ -277,11 +325,12 @@ function dedupeProfileEntriesForKind(entries: readonly ProfileDedupEntry[]): Pro
     const superseded: number[] = [];
     for (let i = 0; i < out.length; i++) {
       const prev = out[i];
-      if (
+      const prefixExtension =
         cur.key.length > prev.key.length &&
         prev.key.length >= PROFILE_DEDUP_PREFIX_MIN_LEN &&
-        cur.key.startsWith(`${prev.key} `)
-      ) {
+        cur.key.startsWith(`${prev.key} `);
+      const embedded = shorterProfileKeyEmbedsInLonger(prev.key, cur.key);
+      if (prefixExtension || embedded) {
         superseded.push(i);
       }
     }
@@ -289,13 +338,16 @@ function dedupeProfileEntriesForKind(entries: readonly ProfileDedupEntry[]): Pro
       out.splice(i, 1);
     }
 
-    const redundant =
+    const redundantPrefix =
       cur.key.length >= PROFILE_DEDUP_PREFIX_MIN_LEN &&
       out.some(
         (prev) =>
           prev.key.length > cur.key.length && prev.key.startsWith(`${cur.key} `),
       );
-    if (redundant) {
+    const redundantEmbedded = out.some(
+      (prev) => prev.key.length > cur.key.length && shorterProfileKeyEmbedsInLonger(cur.key, prev.key),
+    );
+    if (redundantPrefix || redundantEmbedded) {
       continue;
     }
 
