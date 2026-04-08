@@ -132,7 +132,7 @@ describe("runSequentialWorkers", () => {
       },
     ]);
 
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("failed");
     expect(result.results).toHaveLength(2);
     expect(result.results[0] && "result" in result.results[0] ? result.results[0].result.status : undefined).toBe("command_failed");
     expect(result.results[1] && "result" in result.results[1] ? result.results[1].result.status : undefined).toBe("completed");

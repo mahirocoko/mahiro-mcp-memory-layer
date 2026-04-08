@@ -178,6 +178,45 @@ describe("listOrchestrationTraces", () => {
     expect(traces[0]?.requestId).toBe("workflow-day");
   });
 
+  it("normalizes stale completed traces before status filtering", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "orchestration-traces-"));
+    tempDirectories.push(directory);
+
+    const filePath = path.join(directory, "orchestration-trace.jsonl");
+
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        requestId: "workflow-stale",
+        source: "mcp",
+        mode: "parallel",
+        status: "completed",
+        jobKinds: ["cursor"],
+        taskIds: ["cursor-1"],
+        totalJobs: 1,
+        finishedJobs: 1,
+        completedJobs: 0,
+        failedJobs: 1,
+        skippedJobs: 0,
+        startedAt: "2026-04-05T12:00:00.000Z",
+        finishedAt: "2026-04-05T12:00:01.000Z",
+        durationMs: 1000,
+        createdAt: "2026-04-05T12:00:01.000Z",
+      }),
+      "utf8",
+    );
+
+    const traces = await listOrchestrationTraces({
+      payload: {
+        status: "failed",
+      },
+      filePath,
+    });
+
+    expect(traces).toHaveLength(1);
+    expect(traces[0]?.status).toBe("failed");
+  });
+
   it("returns an empty list when the trace file does not exist", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "orchestration-traces-"));
     tempDirectories.push(directory);

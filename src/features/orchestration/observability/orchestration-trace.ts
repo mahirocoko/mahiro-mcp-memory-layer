@@ -1,6 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
+import { getEffectiveOrchestrationTraceStatus } from "./effective-orchestration-trace-status.js";
 import { classifyWorkerJobError } from "../job-error-class.js";
 import type { OrchestrationRunResult } from "../run-orchestration-workflow.js";
 import type { OrchestrateWorkflowSpec } from "../workflow-spec.js";
@@ -66,16 +67,22 @@ export function buildOrchestrationTraceEntry(
   spec: OrchestrateWorkflowSpec,
   result: OrchestrationRunResult,
 ): OrchestrationTraceEntry {
+  const jobModels = buildJobModelsFromWorkerResults(result.results);
+
   return {
     requestId,
     source,
     mode: spec.mode,
-    status: result.status,
+    status: getEffectiveOrchestrationTraceStatus({
+      status: result.status,
+      failedJobs: result.summary.failedJobs,
+      jobModels,
+    }),
     maxConcurrency: spec.mode === "parallel" ? spec.maxConcurrency : undefined,
     timeoutMs: spec.timeoutMs,
     jobKinds: result.results.map((job) => job.kind),
     taskIds: result.results.map((job) => job.input.taskId),
-    jobModels: buildJobModelsFromWorkerResults(result.results),
+    jobModels,
     totalJobs: result.summary.totalJobs,
     finishedJobs: result.summary.finishedJobs,
     completedJobs: result.summary.completedJobs,

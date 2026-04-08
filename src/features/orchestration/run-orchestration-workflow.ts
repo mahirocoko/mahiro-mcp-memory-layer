@@ -27,14 +27,14 @@ export type OrchestrationRunResult =
   | {
       readonly requestId?: string;
       readonly mode: "parallel";
-      readonly status: "completed" | "timed_out";
+      readonly status: "completed" | "failed" | "timed_out";
       readonly results: readonly WorkerJobResult[];
       readonly summary: OrchestrationRunSummary;
     }
   | {
       readonly requestId?: string;
       readonly mode: "sequential";
-      readonly status: "completed" | "step_failed" | "timed_out";
+      readonly status: "completed" | "failed" | "step_failed" | "timed_out";
       readonly results: readonly WorkerJobResult[];
       readonly failedStepIndex?: number;
       readonly error?: string;
@@ -55,12 +55,18 @@ export async function runOrchestrationWorkflow(
       onJobComplete: options.onJobComplete,
     });
 
+    const parallelSummary = buildRunSummary(spec.jobs.length, parallelRun.results, startedAtDate, startedAt);
+    const parallelStatus = parallelRun.timedOut
+      ? "timed_out"
+      : parallelSummary.failedJobs > 0
+        ? "failed"
+        : "completed";
     const result: OrchestrationRunResult = {
       requestId: options.traceRequestId,
       mode: spec.mode,
-      status: parallelRun.timedOut ? "timed_out" : "completed",
+      status: parallelStatus,
       results: parallelRun.results,
-      summary: buildRunSummary(spec.jobs.length, parallelRun.results, startedAtDate, startedAt),
+      summary: parallelSummary,
     };
 
     await appendTraceIfNeeded(spec, result, options);
@@ -89,11 +95,16 @@ export async function runOrchestrationWorkflow(
     },
   );
 
+  const sequentialSummary = buildRunSummary(spec.steps.length, sequentialRun.results, startedAtDate, startedAt);
+  const sequentialStatus =
+    sequentialRun.status === "completed" && sequentialSummary.failedJobs > 0 ? "failed" : sequentialRun.status;
+
   const result: OrchestrationRunResult = {
     requestId: options.traceRequestId,
     mode: spec.mode,
     ...sequentialRun,
-    summary: buildRunSummary(spec.steps.length, sequentialRun.results, startedAtDate, startedAt),
+    status: sequentialStatus,
+    summary: sequentialSummary,
   };
 
   await appendTraceIfNeeded(spec, result, options);

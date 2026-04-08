@@ -497,6 +497,55 @@ describe("getRegisteredOrchestrationTools", () => {
     });
   });
 
+  it("surfaces a failed workflow status when get_orchestration_result reads a failed result", async () => {
+    const requestId = "workflow_0123456789abcdef0123456789abcdef";
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId,
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["cursor_fail"],
+      },
+      status: "failed",
+      result: {
+        requestId,
+        mode: "parallel",
+        status: "failed",
+        results: [],
+        summary: {
+          totalJobs: 1,
+          finishedJobs: 1,
+          completedJobs: 0,
+          failedJobs: 1,
+          skippedJobs: 0,
+          startedAt: "2026-04-05T00:00:00.000Z",
+          finishedAt: "2026-04-05T00:00:01.000Z",
+          durationMs: 1000,
+        },
+      },
+      createdAt: "2026-04-05T00:00:00.000Z",
+      updatedAt: "2026-04-05T00:00:01.000Z",
+    });
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "get_orchestration_result");
+
+    const result = await tool?.execute({ requestId });
+
+    expect(orchestrationResultStoreMock.read).toHaveBeenCalledWith(requestId);
+    expect(result).toMatchObject({
+      requestId,
+      status: "failed",
+      result: expect.objectContaining({
+        status: "failed",
+        summary: expect.objectContaining({
+          failedJobs: 1,
+          completedJobs: 0,
+        }),
+      }),
+    });
+  });
+
   it("rejects get_orchestration_result when requestId is not a workflow_* id", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "get_orchestration_result");

@@ -25,7 +25,7 @@ export type OrchestrationResultRecord =
       readonly status: "running";
     })
   | (BaseOrchestrationResultRecord & {
-      readonly status: "completed" | "step_failed" | "timed_out";
+      readonly status: "completed" | "failed" | "step_failed" | "timed_out";
       readonly result: OrchestrationRunResult;
     })
   | (BaseOrchestrationResultRecord & {

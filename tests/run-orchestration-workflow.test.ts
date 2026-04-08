@@ -261,12 +261,60 @@ describe("runOrchestrationWorkflow", () => {
       ],
     });
 
+    expect(result).toMatchObject({
+      mode: "parallel",
+      status: "failed",
+    });
     expect(result.summary).toMatchObject({
       totalJobs: 1,
       finishedJobs: 1,
       completedJobs: 0,
       failedJobs: 1,
       skippedJobs: 0,
+    });
+    expect(hasOrchestrationFailures(result)).toBe(true);
+  });
+
+  it("marks sequential workflows as failed when a step fails but later steps still run", async () => {
+    const result = await runOrchestrationWorkflow({
+      mode: "sequential",
+      steps: [
+        {
+          kind: "cursor",
+          input: {
+            taskId: "cursor-1",
+            prompt: "Review this diff.",
+            model: "composer-2",
+          },
+          dependencies: {
+            runCommand: async () => createCursorCommandResult({ exitCode: 1, stderr: "bad diff" }),
+          },
+        },
+        {
+          kind: "gemini",
+          input: {
+            taskId: "gemini-1",
+            prompt: "Summarize anyway.",
+            model: "gemini-3-flash-preview",
+          },
+          dependencies: {
+            cacheStore: createNoopCacheStore(),
+            runCommand: async () => createGeminiCommandResult(),
+          },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      mode: "sequential",
+      status: "failed",
+      summary: {
+        totalJobs: 2,
+        finishedJobs: 2,
+        completedJobs: 1,
+        failedJobs: 1,
+        skippedJobs: 0,
+      },
     });
     expect(hasOrchestrationFailures(result)).toBe(true);
   });

@@ -32,7 +32,7 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
 
     const result: OrchestrationRunResult = {
       mode: "parallel",
-      status: "completed",
+      status: "failed",
       results: [
         {
           kind: "cursor",
@@ -48,6 +48,7 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
     expect(buildOrchestrationTraceEntry("r1", "cli", spec, result).jobModels).toEqual([
       { kind: "cursor", taskId: "t1", status: "runner_failed", retryCount: 1, errorClass: "infra_failure", requestedModel: "composer-2" },
     ]);
+    expect(buildOrchestrationTraceEntry("r1", "cli", spec, result).status).toBe("failed");
   });
 
   it("records requested and reported model from worker results", () => {
@@ -144,5 +145,39 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
         requestedModel: "composer-2",
       },
     ]);
+  });
+
+  it("normalizes stale completed timeout traces to timed_out", () => {
+    const spec = {
+      mode: "parallel" as const,
+      jobs: [
+        {
+          kind: "gemini" as const,
+          input: { taskId: "g1", prompt: "p", model: "gemini-3-flash-preview" },
+        },
+      ],
+    };
+
+    const trace = buildOrchestrationTraceEntry("r4", "mcp", spec, {
+      mode: "parallel",
+      status: "completed",
+      results: [
+        {
+          kind: "gemini",
+          input: { taskId: "g1", prompt: "p", model: "gemini-3-flash-preview" },
+          retryCount: 0,
+          result: {
+            status: "timeout",
+            requestedModel: "gemini-3-flash-preview",
+            durationMs: 10,
+            startedAt: "2026-04-05T00:00:00.000Z",
+            finishedAt: "2026-04-05T00:00:00.010Z",
+          },
+        },
+      ],
+      summary: { ...sampleSummary, completedJobs: 0, failedJobs: 1 },
+    });
+
+    expect(trace.status).toBe("timed_out");
   });
 });

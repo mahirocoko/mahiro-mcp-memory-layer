@@ -55,7 +55,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
       byRequestedModel: { "gemini-3-flash-preview": 1, "composer-2": 1 },
       byReportedModel: { "gemini-3-flash-preview": 1, "composer-2": 1 },
       bySource: { cli: 1 },
-      byWorkflowStatus: { completed: 1 },
+      byWorkflowStatus: { failed: 1 },
       byJobStatus: { completed: 1, command_failed: 1 },
       byErrorClass: { none: 1, rate_limited: 1 },
       bySourceErrorClass: { cli: { none: 1, rate_limited: 1 } },
@@ -63,12 +63,12 @@ describe("summarizeOrchestrationTraceUsage", () => {
         "2026-04-05": {
           traceCount: 1,
           jobCount: 2,
-          completedJobs: 2,
-          failedJobs: 0,
+          completedJobs: 1,
+          failedJobs: 1,
         },
       },
-      workflowOutcome: { completed: 1, failed: 0, successRate: 1 },
-      jobOutcome: { completed: 2, failed: 0, successRate: 1 },
+      workflowOutcome: { completed: 0, failed: 1, successRate: 0 },
+      jobOutcome: { completed: 1, failed: 1, successRate: 0.5 },
       retryOutcome: { totalRetries: 2, retriedJobs: 1, avgRetriesPerJob: 1 },
       durationOutcome: { totalDurationMs: 3000, avgDurationMs: 1500, p50DurationMs: 1000, p95DurationMs: 2000 },
       cacheOutcome: { cachedJobs: 1, uncachedJobs: 0, cacheHitRate: 1, totalCachedTokens: 400 },
@@ -157,9 +157,11 @@ describe("summarizeOrchestrationTraceUsage", () => {
 
     expect(summary.byRequestedModel).toEqual({ "gemini-3-flash-preview": 1 });
     expect(summary.byReportedModel).toEqual({});
+    expect(summary.byWorkflowStatus).toEqual({ failed: 1 });
     expect(summary.byJobStatus).toEqual({ runner_failed: 1 });
     expect(summary.byErrorClass).toEqual({ infra_failure: 1 });
     expect(summary.bySourceErrorClass).toEqual({ cli: { infra_failure: 1 } });
+    expect(summary.workflowOutcome).toEqual({ completed: 0, failed: 1, successRate: 0 });
     expect(summary.retryOutcome).toEqual({ totalRetries: 1, retriedJobs: 1, avgRetriesPerJob: 1 });
     expect(summary.durationOutcome).toEqual({ totalDurationMs: 500, avgDurationMs: 500, p50DurationMs: 500, p95DurationMs: 500 });
     expect(summary.cacheOutcome).toEqual({ cachedJobs: 0, uncachedJobs: 1, cacheHitRate: 0, totalCachedTokens: 0 });

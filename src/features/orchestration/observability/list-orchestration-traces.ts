@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { normalizeOrchestrationTraceEntry } from "./effective-orchestration-trace-status.js";
 import { listOrchestrationTracesInputSchema } from "../schemas.js";
 import type { ListOrchestrationTracesInput, OrchestrationTraceEntry } from "../types.js";
 
@@ -15,6 +16,7 @@ export async function listOrchestrationTraces(input: {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => JSON.parse(line) as OrchestrationTraceEntry)
+    .map((entry) => normalizeOrchestrationTraceEntry(entry))
     .reverse()
     .filter((entry) => matchesTraceFilter(entry, payload))
     .slice(0, payload.limit ?? 20);

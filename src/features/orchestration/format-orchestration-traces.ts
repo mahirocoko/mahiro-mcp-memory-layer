@@ -1,3 +1,7 @@
+import {
+  formatOrchestrationTraceStatus,
+  normalizeOrchestrationTraceEntry,
+} from "./observability/effective-orchestration-trace-status.js";
 import type { OrchestrationTraceEntry } from "./types.js";
 
 export function formatOrchestrationTracesAsText(
@@ -13,8 +17,10 @@ export function formatOrchestrationTracesAsText(
   ];
 
   for (const trace of traces) {
+    const normalizedTrace = normalizeOrchestrationTraceEntry(trace);
+
     lines.push(
-      `| ${trace.requestId} | ${trace.source} | ${trace.mode} | ${trace.status} | ${trace.totalJobs} | ${trace.finishedJobs} | ${trace.failedJobs} | ${trace.durationMs}ms | ${trace.createdAt} |`,
+      `| ${normalizedTrace.requestId} | ${normalizedTrace.source} | ${normalizedTrace.mode} | ${formatOrchestrationTraceStatus(trace)} | ${normalizedTrace.totalJobs} | ${normalizedTrace.finishedJobs} | ${normalizedTrace.failedJobs} | ${normalizedTrace.durationMs}ms | ${normalizedTrace.createdAt} |`,
     );
   }
 
@@ -30,33 +36,34 @@ export function formatOrchestrationTracesAsDetail(
 
   return traces
     .map((trace) => {
+      const normalizedTrace = normalizeOrchestrationTraceEntry(trace);
       const lines = [
-        `Request ID: ${trace.requestId}`,
-        `Source: ${trace.source}`,
-        `Mode: ${trace.mode}`,
-        `Status: ${trace.status}`,
-        `Jobs: ${trace.totalJobs} total, ${trace.finishedJobs} finished, ${trace.completedJobs} completed, ${trace.failedJobs} failed, ${trace.skippedJobs} skipped`,
-        `Task IDs: ${trace.taskIds.join(", ") || "-"}`,
-        `Job Kinds: ${trace.jobKinds.join(", ") || "-"}`,
-        `Max Concurrency: ${trace.maxConcurrency ?? "-"}`,
-        `Timeout Ms: ${trace.timeoutMs ?? "-"}`,
-        `Started At: ${trace.startedAt}`,
-        `Finished At: ${trace.finishedAt}`,
-        `Duration: ${trace.durationMs}ms`,
-        `Created At: ${trace.createdAt}`,
+        `Request ID: ${normalizedTrace.requestId}`,
+        `Source: ${normalizedTrace.source}`,
+        `Mode: ${normalizedTrace.mode}`,
+        `Status: ${formatOrchestrationTraceStatus(trace)}`,
+        `Jobs: ${normalizedTrace.totalJobs} total, ${normalizedTrace.finishedJobs} finished, ${normalizedTrace.completedJobs} completed, ${normalizedTrace.failedJobs} failed, ${normalizedTrace.skippedJobs} skipped`,
+        `Task IDs: ${normalizedTrace.taskIds.join(", ") || "-"}`,
+        `Job Kinds: ${normalizedTrace.jobKinds.join(", ") || "-"}`,
+        `Max Concurrency: ${normalizedTrace.maxConcurrency ?? "-"}`,
+        `Timeout Ms: ${normalizedTrace.timeoutMs ?? "-"}`,
+        `Started At: ${normalizedTrace.startedAt}`,
+        `Finished At: ${normalizedTrace.finishedAt}`,
+        `Duration: ${normalizedTrace.durationMs}ms`,
+        `Created At: ${normalizedTrace.createdAt}`,
       ];
 
-      if (trace.failedStepIndex !== undefined) {
-        lines.push(`Failed Step Index: ${trace.failedStepIndex}`);
+      if (normalizedTrace.failedStepIndex !== undefined) {
+        lines.push(`Failed Step Index: ${normalizedTrace.failedStepIndex}`);
       }
 
-      if (trace.error) {
-        lines.push(`Error: ${trace.error}`);
+      if (normalizedTrace.error) {
+        lines.push(`Error: ${normalizedTrace.error}`);
       }
 
-      if (trace.jobModels && trace.jobModels.length > 0) {
+      if (normalizedTrace.jobModels && normalizedTrace.jobModels.length > 0) {
         lines.push(
-          `Job models: ${trace.jobModels
+          `Job models: ${normalizedTrace.jobModels
             .map(
               (job) =>
                 `${job.taskId} (${job.kind}) status=${typeof job.status === "string" ? job.status : "-"} requested=${job.requestedModel}` +

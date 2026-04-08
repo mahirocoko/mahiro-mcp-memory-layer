@@ -74,8 +74,10 @@ export async function runSequentialWorkers(
     }
   }
 
+  const hasFailures = results.some((item) => !("result" in item) || item.result.status !== "completed");
+
   return {
-    status: "completed",
+    status: hasFailures ? "failed" : "completed",
     results,
   };
 }

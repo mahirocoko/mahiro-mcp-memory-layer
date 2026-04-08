@@ -109,4 +109,36 @@ describe("formatOrchestrationTracesAsText", () => {
     expect(detail).toContain("g1 (gemini) status=completed requested=gemini-3-flash-preview retries=0 duration=800ms cached=true cachedTokens=300 errorClass=none reported=gemini-3-flash-preview");
     expect(detail).toContain("c1 (cursor) status=command_failed requested=composer-2 retries=2 duration=1400ms errorClass=rate_limited reported=composer-2");
   });
+
+  it("shows effective status for stale completed traces with failed jobs", () => {
+    const detail = formatOrchestrationTracesAsDetail([
+      {
+        requestId: "workflow-stale",
+        source: "cli",
+        mode: "parallel",
+        status: "completed",
+        jobKinds: ["cursor"],
+        taskIds: ["c1"],
+        jobModels: [
+          {
+            kind: "cursor",
+            taskId: "c1",
+            status: "command_failed",
+            requestedModel: "composer-2",
+          },
+        ],
+        totalJobs: 1,
+        finishedJobs: 1,
+        completedJobs: 0,
+        failedJobs: 1,
+        skippedJobs: 0,
+        startedAt: "2026-04-05T00:00:00.000Z",
+        finishedAt: "2026-04-05T00:00:02.000Z",
+        durationMs: 2000,
+        createdAt: "2026-04-05T00:00:02.000Z",
+      },
+    ]);
+
+    expect(detail).toContain("Status: failed (stored: completed)");
+  });
 });

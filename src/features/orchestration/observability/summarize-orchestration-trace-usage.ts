@@ -1,4 +1,5 @@
 import { classifyJobErrorFromTelemetry } from "../job-error-class.js";
+import { normalizeOrchestrationTraceEntry } from "./effective-orchestration-trace-status.js";
 import type { OrchestrationJobStatus, OrchestrationTraceEntry } from "../types.js";
 
 export interface OrchestrationTraceDaySummary {
@@ -135,21 +136,24 @@ export function summarizeOrchestrationTraceUsage(
   let modelMismatchCount = 0;
 
   for (const trace of traces) {
-    bySource[trace.source] = (bySource[trace.source] ?? 0) + 1;
-    byWorkflowStatus[trace.status] = (byWorkflowStatus[trace.status] ?? 0) + 1;
+    const normalizedTrace = normalizeOrchestrationTraceEntry(trace);
+    const workflowStatus = normalizedTrace.status;
 
-    if (trace.status === "completed") {
+    bySource[normalizedTrace.source] = (bySource[normalizedTrace.source] ?? 0) + 1;
+    byWorkflowStatus[workflowStatus] = (byWorkflowStatus[workflowStatus] ?? 0) + 1;
+
+    if (workflowStatus === "completed") {
       completedWorkflows += 1;
     } else {
       failedWorkflows += 1;
     }
 
-    completedJobs += trace.completedJobs;
-    failedJobs += trace.failedJobs;
-    accumulateByDay(byDay, trace);
+    completedJobs += normalizedTrace.completedJobs;
+    failedJobs += normalizedTrace.failedJobs;
+    accumulateByDay(byDay, normalizedTrace);
 
-    if (trace.jobModels && trace.jobModels.length > 0) {
-      for (const job of trace.jobModels) {
+    if (normalizedTrace.jobModels && normalizedTrace.jobModels.length > 0) {
+      for (const job of normalizedTrace.jobModels) {
         jobCount += 1;
         byWorkerKind[job.kind] = (byWorkerKind[job.kind] ?? 0) + 1;
         byRequestedModel[job.requestedModel] = (byRequestedModel[job.requestedModel] ?? 0) + 1;
@@ -199,11 +203,11 @@ export function summarizeOrchestrationTraceUsage(
 
           if (errorClass) {
             byErrorClass[errorClass] = (byErrorClass[errorClass] ?? 0) + 1;
-            let sourceSummary = bySourceErrorClass[trace.source];
+            let sourceSummary = bySourceErrorClass[normalizedTrace.source];
 
             if (!sourceSummary) {
               sourceSummary = {};
-              bySourceErrorClass[trace.source] = sourceSummary;
+              bySourceErrorClass[normalizedTrace.source] = sourceSummary;
             }
 
             sourceSummary[errorClass] = (sourceSummary[errorClass] ?? 0) + 1;
@@ -241,10 +245,10 @@ export function summarizeOrchestrationTraceUsage(
       continue;
     }
 
-    for (const kind of trace.jobKinds) {
-      jobCount += 1;
-      byWorkerKind[kind] = (byWorkerKind[kind] ?? 0) + 1;
-    }
+     for (const kind of normalizedTrace.jobKinds) {
+       jobCount += 1;
+       byWorkerKind[kind] = (byWorkerKind[kind] ?? 0) + 1;
+     }
   }
 
   return {

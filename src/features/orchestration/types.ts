@@ -109,7 +109,7 @@ export interface OrchestrationTraceEntry {
   readonly requestId: string;
   readonly source: "cli" | "mcp";
   readonly mode: "parallel" | "sequential";
-  readonly status: "completed" | "step_failed" | "timed_out" | "runner_failed";
+  readonly status: "completed" | "failed" | "step_failed" | "timed_out" | "runner_failed";
   readonly maxConcurrency?: number;
   readonly timeoutMs?: number;
   readonly jobKinds: readonly WorkerJob["kind"][];
@@ -146,7 +146,7 @@ export interface ParallelWorkersResult {
 }
 
 export interface SequentialWorkersResult {
-  readonly status: "completed" | "step_failed" | "timed_out";
+  readonly status: "completed" | "failed" | "step_failed" | "timed_out";
   readonly results: readonly WorkerJobResult[];
   readonly failedStepIndex?: number;
   readonly error?: string;
