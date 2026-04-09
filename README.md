@@ -35,6 +35,13 @@ Recommended write flow for agents:
 3. Persist the chosen candidate with `remember`.
 4. Use `upsert_document` instead when the memory is document-shaped and should be idempotent by source identity.
 
+`build_context_for_task` can also help with this in one round-trip:
+
+- set `includeMemorySuggestions: true`
+- pass `recentConversation`
+- the result includes `memorySuggestions` next to the built context bundle
+- this still does not write storage automatically; callers decide whether to persist anything
+
 ### suggest_memory_candidates
 
 Use this tool when an agent needs help deciding whether a conversation contains durable memory worth saving.
