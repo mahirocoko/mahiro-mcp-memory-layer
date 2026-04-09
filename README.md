@@ -22,6 +22,8 @@ Standard path:
 
 OpenCode installs npm plugins with Bun at startup, so this is the only step for the normal plugin path.
 
+With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, or `wake_up_memory`.
+
 Plugin override path:
 
 - `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's debounce window without adding extra `opencode.json` fields.
@@ -29,7 +31,7 @@ Plugin override path:
 Manual MCP fallback:
 
 - If you want the standalone MCP server, keep using the existing repo scripts: `bun run start` or `bun run dev`.
-- That path preserves the current MCP tool names and behavior, but it is separate from the standard plugin-only install and from the published plugin package root.
+- That path preserves the current MCP tool names and behavior as a fallback, but it is separate from the standard plugin-only install and from the published plugin package root.
 
 ## Commands
 
@@ -46,6 +48,8 @@ bun run reindex
 ```
 
 ## Memory tools
+
+OpenCode plugin users now get the same memory tool names natively from the shared in-process backend, plus the plugin-only diagnostic tool `memory_context` for cached session state.
 
 The memory side now has two distinct loops:
 

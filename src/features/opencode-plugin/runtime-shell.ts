@@ -1,5 +1,6 @@
 import { MemoryService } from "../memory/memory-service.js";
-import type { MemoryFacade } from "../memory/memory-facade.js";
+import type { ZodRawShape } from "zod";
+import type { MemoryToolBackend } from "../memory/lib/tool-definitions.js";
 import type {
   PrepareHostTurnMemoryResult,
   PrepareTurnMemoryResult,
@@ -8,10 +9,7 @@ import type {
 import { resolveOpenCodeScope, type OpenCodeScopeResolution } from "./resolve-scope.js";
 import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
 
-export type OpenCodePluginMemoryBackend = Pick<
-  MemoryFacade,
-  "wakeUpMemory" | "prepareTurnMemory" | "prepareHostTurnMemory"
->;
+export type OpenCodePluginMemoryBackend = MemoryToolBackend;
 
 export interface OpenCodePluginCompactionInput {
   readonly sessionID?: unknown;
@@ -34,11 +32,11 @@ export interface OpenCodePluginToolExecutionContext {
 
 export interface OpenCodePluginToolDefinition {
   readonly description: string;
-  readonly args: Record<string, never>;
+  readonly args: ZodRawShape;
   readonly execute: (
-    args: Record<string, never>,
+    args: Record<string, unknown>,
     context: OpenCodePluginToolExecutionContext,
-  ) => Promise<OpenCodePluginMemoryContextResult>;
+  ) => Promise<unknown>;
 }
 
 export interface OpenCodePluginHooks {
@@ -50,9 +48,7 @@ export interface OpenCodePluginHooks {
     input: OpenCodePluginCompactionInput,
     output: OpenCodePluginCompactionOutput,
   ) => Promise<void>;
-  readonly tool: {
-    readonly memory_context: OpenCodePluginToolDefinition;
-  };
+  readonly tool: Record<string, OpenCodePluginToolDefinition>;
 }
 
 export interface OpenCodePluginCachedSession {
@@ -76,14 +72,12 @@ export interface OpenCodePluginCachedSession {
 export interface OpenCodePluginReadyMemoryContextResult {
   readonly status: "ready";
   readonly latestSessionId?: string;
-  readonly availableSessionIds: readonly string[];
   readonly session: OpenCodePluginCachedSession;
 }
 
 export interface OpenCodePluginEmptyMemoryContextResult {
   readonly status: "empty";
   readonly latestSessionId?: string;
-  readonly availableSessionIds: readonly string[];
 }
 
 export type OpenCodePluginMemoryContextResult =
@@ -598,13 +592,10 @@ function buildMemoryContextResult(
   runtimeState: OpenCodePluginRuntimeState,
   sessionId: string | undefined,
 ): OpenCodePluginMemoryContextResult {
-  const availableSessionIds = Array.from(runtimeState.sessions.keys()).sort();
-
   if (!sessionId) {
     return {
       status: "empty",
       latestSessionId: runtimeState.latestSessionId,
-      availableSessionIds,
     };
   }
 
@@ -614,14 +605,12 @@ function buildMemoryContextResult(
     return {
       status: "empty",
       latestSessionId: runtimeState.latestSessionId,
-      availableSessionIds,
     };
   }
 
   return {
     status: "ready",
     latestSessionId: runtimeState.latestSessionId,
-    availableSessionIds,
     session: {
       sessionId: sessionState.sessionId,
       scopeResolution: sessionState.scopeResolution,

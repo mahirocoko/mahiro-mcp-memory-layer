@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
 import { getRegisteredMemoryTools } from "../src/features/memory/mcp/register-tools.js";
 import type { MemoryService } from "../src/features/memory/memory-service.js";
 
@@ -97,6 +98,124 @@ function createFixedPrepareHostTurnResult(context: string) {
   };
 }
 
+function createSharedMemoryBackend(): MemoryToolBackend {
+  return {
+    remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
+    search: vi.fn().mockResolvedValue({ items: [{ id: "search-hit" }], degraded: false }),
+    buildContext: vi.fn().mockResolvedValue({
+      context: "built-context",
+      items: ["built-context"],
+      truncated: false,
+      degraded: false,
+    }),
+    upsertDocument: vi.fn().mockResolvedValue({ id: "upserted-document" }),
+    list: vi.fn().mockResolvedValue([{ id: "listed-memory" }]),
+    suggestMemoryCandidates: vi.fn().mockReturnValue({
+      recommendation: "consider_saving",
+      signals: { durable: ["explicit_durable_language"], ephemeral: [] },
+      candidates: [
+        {
+          kind: "decision",
+          scope: "project",
+          reason: "Explicit durable language.",
+          draftContent: "Use the plugin-native memory surface.",
+          confidence: "high",
+        },
+      ],
+    }),
+    applyConservativeMemoryPolicy: vi.fn().mockResolvedValue({
+      recommendation: "consider_saving",
+      signals: { durable: ["explicit_durable_language"], ephemeral: [] },
+      candidates: [
+        {
+          kind: "decision",
+          scope: "project",
+          reason: "Explicit durable language.",
+          draftContent: "Use the plugin-native memory surface.",
+          confidence: "high",
+        },
+      ],
+      autoSaved: [],
+      autoSaveSkipped: [],
+      reviewOnlySuggestions: [
+        {
+          kind: "decision",
+          scope: "project",
+          reason: "Explicit durable language.",
+          draftContent: "Use the plugin-native memory surface.",
+          confidence: "high",
+        },
+      ],
+    }),
+    prepareHostTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareHostTurnResult("host-turn-context")),
+    wakeUpMemory: vi.fn().mockResolvedValue(createFixedWakeUpResult("wake-up-context")),
+    prepareTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareTurnResult("turn-context")),
+  };
+}
+
+function createSharedToolPayloads(repoPath: string): Record<string, Record<string, unknown>> {
+  return {
+    remember: {
+      content: "Persist the chosen memory.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      source: { type: "tool", title: "plugin-test" },
+    },
+    search_memories: {
+      query: "plugin-native memory tools",
+      mode: "query",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+    },
+    build_context_for_task: {
+      task: "Summarize plugin-native memory support.",
+      mode: "query",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+      sessionId: "session-1",
+    },
+    upsert_document: {
+      projectId: "mahiro-mcp-memory-layer",
+      source: { type: "document", uri: "file:///README.md", title: "README" },
+      content: "Plugin-first install docs.",
+    },
+    list_memories: {
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+    },
+    suggest_memory_candidates: {
+      conversation: "We decided plugin users should get memory tools without MCP setup.",
+      projectId: "mahiro-mcp-memory-layer",
+    },
+    apply_conservative_memory_policy: {
+      conversation: "We decided plugin users should get memory tools without MCP setup.",
+      projectId: "mahiro-mcp-memory-layer",
+    },
+    prepare_host_turn_memory: {
+      task: "Summarize relevant memory context for the latest OpenCode turn.",
+      mode: "query",
+      recentConversation: "Summarize recent memory context for this turn.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+      sessionId: "session-1",
+    },
+    wake_up_memory: {
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+      sessionId: "session-1",
+    },
+    prepare_turn_memory: {
+      task: "Summarize relevant memory context for the latest OpenCode turn.",
+      mode: "query",
+      recentConversation: "Summarize recent memory context for this turn.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+      sessionId: "session-1",
+    },
+  };
+}
+
 async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -139,15 +258,13 @@ describe("OpenCode plugin package", () => {
     expect(packagedPaths.some((filePath) => filePath.startsWith("src/lib/"))).toBe(false);
   });
 
-  it("keeps plugin and MCP adapters aligned on fixed inputs", async () => {
+  it("keeps plugin and MCP adapters aligned on the shared native memory tool surface", async () => {
     vi.useFakeTimers();
 
     try {
-      const wakeUpMemory = vi.fn().mockResolvedValue(createFixedWakeUpResult("wake-up-context"));
-      const prepareTurnMemory = vi.fn().mockResolvedValue(createFixedPrepareTurnResult("turn-context"));
-      const prepareHostTurnMemory = vi
-        .fn()
-        .mockResolvedValue(createFixedPrepareHostTurnResult("host-turn-context"));
+      const sharedMemoryBackend = createSharedMemoryBackend();
+      const sharedToolDefinitions = getMemoryToolDefinitions();
+      const sharedToolPayloads = createSharedToolPayloads(repoRoot);
 
       const pluginModule = (await import("mahiro-mcp-memory-layer")) as {
         readonly server: (
@@ -161,11 +278,7 @@ describe("OpenCode plugin package", () => {
           },
           options?: {
             readonly __test?: {
-              readonly memory?: {
-                readonly wakeUpMemory: typeof wakeUpMemory;
-                readonly prepareTurnMemory: typeof prepareTurnMemory;
-                readonly prepareHostTurnMemory: typeof prepareHostTurnMemory;
-              };
+              readonly memory?: MemoryToolBackend;
               readonly messageDebounceMs?: number;
             };
           },
@@ -174,8 +287,10 @@ describe("OpenCode plugin package", () => {
           readonly "message.updated": (input: { readonly event: ReturnType<typeof createMessageUpdatedEvent> }) => Promise<void>;
           readonly "session.idle": (input: { readonly event: ReturnType<typeof createSessionIdleEvent> }) => Promise<void>;
           readonly tool: {
-            readonly memory_context: {
-              readonly execute: (args: Record<string, never>, context: Record<string, unknown>) => Promise<unknown>;
+            readonly [toolName: string]: {
+              readonly description: string;
+              readonly args: Record<string, unknown>;
+              readonly execute: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
             };
           };
         }>;
@@ -200,11 +315,7 @@ describe("OpenCode plugin package", () => {
         },
         {
           __test: {
-            memory: {
-              wakeUpMemory,
-              prepareTurnMemory,
-              prepareHostTurnMemory,
-            },
+            memory: sharedMemoryBackend,
             messageDebounceMs: 0,
           },
         },
@@ -221,13 +332,13 @@ describe("OpenCode plugin package", () => {
 
       const pluginResult = await pluginHooks.tool.memory_context.execute({}, { sessionID: "session-1" });
 
-      expect(wakeUpMemory).toHaveBeenCalledWith({
+      expect(sharedMemoryBackend.wakeUpMemory).toHaveBeenCalledWith({
         userId: undefined,
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
         sessionId: "session-1",
       });
-      expect(prepareTurnMemory).toHaveBeenCalledWith({
+      expect(sharedMemoryBackend.prepareTurnMemory).toHaveBeenCalledWith({
         task: "Summarize relevant memory context for the latest OpenCode turn.",
         mode: "query",
         recentConversation: "Summarize recent memory context for this turn.",
@@ -236,7 +347,7 @@ describe("OpenCode plugin package", () => {
         containerId: `worktree:${repoRoot}`,
         sessionId: "session-1",
       });
-      expect(prepareHostTurnMemory).toHaveBeenCalledWith({
+      expect(sharedMemoryBackend.prepareHostTurnMemory).toHaveBeenCalledWith({
         task: "Summarize relevant memory context for the latest OpenCode turn.",
         mode: "query",
         recentConversation: "Summarize recent memory context for this turn.",
@@ -248,7 +359,6 @@ describe("OpenCode plugin package", () => {
       expect(pluginResult).toMatchObject({
         status: "ready",
         latestSessionId: "session-1",
-        availableSessionIds: ["session-1"],
         session: {
           sessionId: "session-1",
           scopeResolution: {
@@ -280,61 +390,37 @@ describe("OpenCode plugin package", () => {
           },
         },
       });
+      expect(pluginResult).not.toHaveProperty("availableSessionIds");
       expect((pluginResult as { readonly session: { readonly lastUpdatedAt: string } }).session.lastUpdatedAt).toEqual(
         expect.any(String),
       );
 
-      const sharedWakeUp = vi.fn().mockResolvedValue(createFixedWakeUpResult("wake-up-context"));
-      const sharedPrepareTurn = vi.fn().mockResolvedValue(createFixedPrepareTurnResult("turn-context"));
-      const sharedPrepareHostTurn = vi
-        .fn()
-        .mockResolvedValue(createFixedPrepareHostTurnResult("host-turn-context"));
-
       const tools = getRegisteredMemoryTools(
-        {
-          wakeUpMemory: sharedWakeUp,
-          prepareTurnMemory: sharedPrepareTurn,
-          prepareHostTurnMemory: sharedPrepareHostTurn,
-        } as unknown as MemoryService,
+        sharedMemoryBackend as unknown as MemoryService,
       );
 
-      const wakeUpTool = tools.find((tool) => tool.name === "wake_up_memory");
-      const prepareTurnTool = tools.find((tool) => tool.name === "prepare_turn_memory");
-      const prepareHostTurnTool = tools.find((tool) => tool.name === "prepare_host_turn_memory");
+      const expectedToolNames = [...sharedToolDefinitions.map((tool) => tool.name), "memory_context"].sort();
 
-      expect(wakeUpTool).toBeDefined();
-      expect(prepareTurnTool).toBeDefined();
-      expect(prepareHostTurnTool).toBeDefined();
+      expect(Object.keys(pluginHooks.tool).sort()).toEqual(expectedToolNames);
+      expect(tools.map((tool) => tool.name).sort()).toEqual(sharedToolDefinitions.map((tool) => tool.name).sort());
 
-      await expect(
-        wakeUpTool?.execute({
-          projectId: "mahiro-mcp-memory-layer",
-          containerId: `worktree:${repoRoot}`,
-          sessionId: "session-1",
-        }),
-      ).resolves.toEqual(createFixedWakeUpResult("wake-up-context"));
+      for (const sharedToolDefinition of sharedToolDefinitions) {
+        const pluginTool = pluginHooks.tool[sharedToolDefinition.name];
+        const mcpTool = tools.find((tool) => tool.name === sharedToolDefinition.name);
+        const payload = sharedToolPayloads[sharedToolDefinition.name];
 
-      await expect(
-        prepareTurnTool?.execute({
-          task: "Summarize relevant memory context for the latest OpenCode turn.",
-          mode: "query",
-          recentConversation: "Summarize recent memory context for this turn.",
-          projectId: "mahiro-mcp-memory-layer",
-          containerId: `worktree:${repoRoot}`,
-          sessionId: "session-1",
-        }),
-      ).resolves.toEqual(createFixedPrepareTurnResult("turn-context"));
+        expect(pluginTool).toBeDefined();
+        expect(pluginTool.description).toBe(sharedToolDefinition.description);
+        expect(pluginTool.args).toEqual(sharedToolDefinition.inputSchema);
 
-      await expect(
-        prepareHostTurnTool?.execute({
-          task: "Summarize relevant memory context for the latest OpenCode turn.",
-          mode: "query",
-          recentConversation: "Summarize recent memory context for this turn.",
-          projectId: "mahiro-mcp-memory-layer",
-          containerId: `worktree:${repoRoot}`,
-          sessionId: "session-1",
-        }),
-      ).resolves.toEqual(createFixedPrepareHostTurnResult("host-turn-context"));
+        expect(mcpTool).toBeDefined();
+        expect(mcpTool?.description).toBe(sharedToolDefinition.description);
+        expect(mcpTool?.inputSchema).toBe(sharedToolDefinition.inputSchema);
+
+        await expect(pluginTool.execute(payload, { sessionID: "session-1" })).resolves.toEqual(
+          await mcpTool?.execute(payload),
+        );
+      }
     } finally {
       vi.useRealTimers();
     }

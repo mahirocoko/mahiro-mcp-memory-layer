@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
+import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
+
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
     throw new Error("OpenCode plugin path must not spawn child_process stdio processes.");
@@ -32,6 +34,11 @@ interface OpenCodePluginHooks {
   readonly "session.idle"?: (input: { event: PluginEvent }) => Promise<void>;
   readonly "experimental.session.compacting"?: (input: unknown, output: unknown) => Promise<void>;
   readonly tool?: {
+    readonly [toolName: string]: {
+      readonly description?: string;
+      readonly args?: Record<string, unknown>;
+      readonly execute?: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
+    };
     readonly memory_context?: {
       readonly description?: string;
       readonly args?: Record<string, unknown>;
@@ -228,10 +235,56 @@ function createOptionalBunSpawnSpy() {
   }
 }
 
+function createToolTestMemoryBackend(overrides?: Partial<MemoryToolBackend>): MemoryToolBackend {
+  return {
+    remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
+    search: vi.fn().mockResolvedValue({ items: [], degraded: false }),
+    buildContext: vi.fn().mockResolvedValue({
+      context: "built-context",
+      items: ["built-context"],
+      truncated: false,
+      degraded: false,
+    }),
+    upsertDocument: vi.fn().mockResolvedValue({ id: "upserted-document" }),
+    list: vi.fn().mockResolvedValue([]),
+    suggestMemoryCandidates: vi.fn().mockReturnValue({
+      recommendation: "likely_skip",
+      signals: { durable: [], ephemeral: [] },
+      candidates: [],
+    }),
+    applyConservativeMemoryPolicy: vi.fn().mockResolvedValue({
+      recommendation: "likely_skip",
+      signals: { durable: [], ephemeral: [] },
+      candidates: [],
+      autoSaved: [],
+      autoSaveSkipped: [],
+      reviewOnlySuggestions: [],
+    }),
+    prepareHostTurnMemory: vi.fn().mockResolvedValue(createPrepareHostTurnResult("host context")),
+    wakeUpMemory: vi.fn().mockResolvedValue({
+      wakeUpContext: "profile\n\n---\n\nrecent",
+      profile: {
+        context: "profile",
+        items: ["profile-item"],
+        truncated: false,
+        degraded: false,
+      },
+      recent: {
+        context: "recent",
+        items: ["recent-item"],
+        truncated: false,
+        degraded: false,
+      },
+      truncated: false,
+      degraded: false,
+    }),
+    prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context")),
+    ...overrides,
+  };
+}
+
 async function createPluginHarness(options?: {
-  readonly wakeUpMemory?: ReturnType<typeof vi.fn>;
-  readonly prepareTurnMemory?: ReturnType<typeof vi.fn>;
-  readonly prepareHostTurnMemory?: ReturnType<typeof vi.fn>;
+  readonly memoryOverrides?: Partial<MemoryToolBackend>;
   readonly createMemoryBackend?: ReturnType<typeof vi.fn>;
   readonly messageDebounceMs?: number;
   readonly resetModules?: boolean;
@@ -247,11 +300,7 @@ async function createPluginHarness(options?: {
   const childProcessSpawn = childProcess.spawn as unknown as MockInstance;
   const bunSpawn = createOptionalBunSpawnSpy();
 
-  const memory = {
-    wakeUpMemory: options?.wakeUpMemory ?? vi.fn(),
-    prepareTurnMemory: options?.prepareTurnMemory ?? vi.fn(),
-    prepareHostTurnMemory: options?.prepareHostTurnMemory ?? vi.fn(),
-  };
+  const memory = createToolTestMemoryBackend(options?.memoryOverrides);
 
   const module = await importPluginModule();
   const testOptions = {
@@ -314,14 +363,23 @@ afterEach(async () => {
 });
 
 describe("product memory OpenCode plugin contract", () => {
-  it("initializes as an OpenCode plugin module with documented hooks, one native memory tool, and no stdio self-spawn", async () => {
+  it("initializes as an OpenCode plugin module with the shared native memory tool surface, memory_context, and no stdio self-spawn", async () => {
     const harness = await createPluginHarness();
+    const sharedMemoryToolNames = getMemoryToolDefinitions().map((tool) => tool.name).sort();
 
     expect(harness.hooks.event).toEqual(expect.any(Function));
     expect(harness.hooks["session.created"]).toEqual(expect.any(Function));
     expect(harness.hooks["message.updated"]).toEqual(expect.any(Function));
     expect(harness.hooks["session.idle"]).toEqual(expect.any(Function));
     expect(harness.hooks["experimental.session.compacting"]).toEqual(expect.any(Function));
+    expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual([...sharedMemoryToolNames, "memory_context"].sort());
+    for (const sharedMemoryTool of getMemoryToolDefinitions()) {
+      expect(harness.hooks.tool?.[sharedMemoryTool.name]?.description).toBe(sharedMemoryTool.description);
+      expect(Object.keys(harness.hooks.tool?.[sharedMemoryTool.name]?.args ?? {}).sort()).toEqual(
+        Object.keys(sharedMemoryTool.inputSchema).sort(),
+      );
+      expect(harness.hooks.tool?.[sharedMemoryTool.name]?.execute).toEqual(expect.any(Function));
+    }
     expect(harness.hooks.tool?.memory_context?.description).toContain("cached memory context");
     expect(harness.hooks.tool?.memory_context?.args).toEqual({});
     expect(harness.hooks.tool?.memory_context?.execute).toEqual(expect.any(Function));
@@ -330,10 +388,11 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("serves the native memory_context tool from cached singleton runtime state", async () => {
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockResolvedValue({
-        wakeUpContext: "profile\n\n---\n\nrecent",
-        profile: {
-          context: "profile",
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "profile\n\n---\n\nrecent",
+          profile: {
+            context: "profile",
           items: ["profile-item"],
           truncated: false,
           degraded: false,
@@ -346,7 +405,8 @@ describe("product memory OpenCode plugin contract", () => {
         },
         truncated: false,
         degraded: false,
-      }),
+        }),
+      },
     });
 
     await harness.hooks.event?.({ event: createSessionCreatedEvent("session-tool") });
@@ -364,7 +424,6 @@ describe("product memory OpenCode plugin contract", () => {
     expect(result).toMatchObject({
       status: "ready",
       latestSessionId: "session-tool",
-      availableSessionIds: ["session-tool"],
       session: {
         sessionId: "session-tool",
         lastEventType: "session.created",
@@ -404,8 +463,54 @@ describe("product memory OpenCode plugin contract", () => {
     expect(result).toEqual({
       status: "empty",
       latestSessionId: "session-tool-b",
-      availableSessionIds: ["session-tool-a", "session-tool-b"],
     });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("keeps memory_context strictly session-scoped when multiple sessions are cached", async () => {
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "profile\n\n---\n\nrecent",
+          profile: {
+            context: "profile",
+          items: ["profile-item"],
+          truncated: false,
+          degraded: false,
+        },
+        recent: {
+          context: "recent",
+          items: ["recent-item"],
+          truncated: false,
+          degraded: false,
+        },
+        truncated: false,
+        degraded: false,
+        }),
+      },
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-one") });
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-two") });
+    await flushMicrotasks();
+
+    const result = await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-one",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: "ready",
+      latestSessionId: "session-two",
+      session: {
+        sessionId: "session-one",
+      },
+    });
+    expect(result).not.toHaveProperty("availableSessionIds");
     expectNoSelfSpawn(harness);
   });
 
@@ -434,7 +539,9 @@ describe("product memory OpenCode plugin contract", () => {
   it("debounces repeated message.updated events into one read-only precompute", async () => {
     vi.useFakeTimers();
     const harness = await createPluginHarness({
-      prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context: draft three")),
+      memoryOverrides: {
+        prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context: draft three")),
+      },
       messageDebounceMs: 25,
     });
 
@@ -521,7 +628,9 @@ describe("product memory OpenCode plugin contract", () => {
       .mockImplementationOnce(() => firstTurn.promise)
       .mockImplementationOnce(() => secondTurn.promise);
     const harness = await createPluginHarness({
-      prepareTurnMemory,
+      memoryOverrides: {
+        prepareTurnMemory,
+      },
       messageDebounceMs: 25,
     });
 
@@ -569,7 +678,9 @@ describe("product memory OpenCode plugin contract", () => {
   it("keeps message.updated fail-open when precompute errors", async () => {
     vi.useFakeTimers();
     const harness = await createPluginHarness({
-      prepareTurnMemory: vi.fn().mockRejectedValue(new Error("turn precompute unavailable")),
+      memoryOverrides: {
+        prepareTurnMemory: vi.fn().mockRejectedValue(new Error("turn precompute unavailable")),
+      },
       messageDebounceMs: 25,
     });
 
@@ -613,7 +724,9 @@ describe("product memory OpenCode plugin contract", () => {
       .fn()
       .mockResolvedValue(createPrepareHostTurnResult("host context: latest turn"));
     const harness = await createPluginHarness({
-      prepareHostTurnMemory,
+      memoryOverrides: {
+        prepareHostTurnMemory,
+      },
     });
 
     await harness.hooks["message.updated"]?.({ event: createMessageUpdatedEvent("session-idle", "latest turn") });
@@ -665,7 +778,9 @@ describe("product memory OpenCode plugin contract", () => {
       .mockResolvedValueOnce(createPrepareHostTurnResult("host context: first turn"))
       .mockResolvedValueOnce(createPrepareHostTurnResult("host context: second turn"));
     const harness = await createPluginHarness({
-      prepareHostTurnMemory,
+      memoryOverrides: {
+        prepareHostTurnMemory,
+      },
     });
 
     await harness.hooks["message.updated"]?.({ event: createMessageUpdatedEvent("session-next-turn", "first turn", "session-next-turn-message-1") });
@@ -703,7 +818,9 @@ describe("product memory OpenCode plugin contract", () => {
       .fn()
       .mockResolvedValueOnce(createPrepareHostTurnResult("host context: first turn"));
     const harness = await createPluginHarness({
-      prepareHostTurnMemory,
+      memoryOverrides: {
+        prepareHostTurnMemory,
+      },
     });
 
     await harness.hooks["message.updated"]?.({
@@ -771,7 +888,9 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("keeps session.idle fail-open when conservative persistence errors", async () => {
     const harness = await createPluginHarness({
-      prepareHostTurnMemory: vi.fn().mockRejectedValue(new Error("idle persistence unavailable")),
+      memoryOverrides: {
+        prepareHostTurnMemory: vi.fn().mockRejectedValue(new Error("idle persistence unavailable")),
+      },
     });
 
     await harness.hooks["message.updated"]?.({ event: createMessageUpdatedEvent("session-idle-error", "turn fail") });
@@ -811,10 +930,11 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("appends best-effort compaction continuity from cached session state and logs invoked outcome", async () => {
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockResolvedValue({
-        wakeUpContext: "wake-up continuity",
-        profile: {
-          context: "profile",
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "wake-up continuity",
+          profile: {
+            context: "profile",
           items: [],
           truncated: false,
           degraded: false,
@@ -827,7 +947,8 @@ describe("product memory OpenCode plugin contract", () => {
         },
         truncated: false,
         degraded: false,
-      }),
+        }),
+      },
     });
 
     await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent("session-compact") });
@@ -888,10 +1009,11 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("logs degraded compaction outcome when output prompt is already set", async () => {
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockResolvedValue({
-        wakeUpContext: "wake-up continuity",
-        profile: {
-          context: "profile",
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "wake-up continuity",
+          profile: {
+            context: "profile",
           items: [],
           truncated: false,
           degraded: false,
@@ -904,7 +1026,8 @@ describe("product memory OpenCode plugin contract", () => {
         },
         truncated: false,
         degraded: false,
-      }),
+        }),
+      },
     });
 
     await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent("session-compact-degraded") });
@@ -936,10 +1059,11 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("logs compaction error outcome when continuity append fails", async () => {
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockResolvedValue({
-        wakeUpContext: "wake-up continuity",
-        profile: {
-          context: "profile",
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "wake-up continuity",
+          profile: {
+            context: "profile",
           items: [],
           truncated: false,
           degraded: false,
@@ -952,7 +1076,8 @@ describe("product memory OpenCode plugin contract", () => {
         },
         truncated: false,
         degraded: false,
-      }),
+        }),
+      },
     });
 
     await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent("session-compact-error") });
@@ -997,7 +1122,9 @@ describe("product memory OpenCode plugin contract", () => {
       degraded: boolean;
     }>();
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockImplementation(() => deferredWakeUp.promise),
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockImplementation(() => deferredWakeUp.promise),
+      },
     });
 
     await expect(
@@ -1046,7 +1173,9 @@ describe("product memory OpenCode plugin contract", () => {
 
   it("keeps session.created fail-open when wake-up errors", async () => {
     const harness = await createPluginHarness({
-      wakeUpMemory: vi.fn().mockRejectedValue(new Error("backend unavailable")),
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockRejectedValue(new Error("backend unavailable")),
+      },
     });
 
     await expect(
@@ -1083,11 +1212,7 @@ describe("product memory OpenCode plugin contract", () => {
   });
 
   it("creates the backend lazily and reuses the singleton across plugin server instances", async () => {
-    const createMemoryBackend = vi.fn().mockResolvedValue({
-      wakeUpMemory: vi.fn(),
-      prepareTurnMemory: vi.fn(),
-      prepareHostTurnMemory: vi.fn(),
-    });
+    const createMemoryBackend = vi.fn().mockResolvedValue(createToolTestMemoryBackend());
 
     const first = await createPluginHarness({ createMemoryBackend });
     const second = await createPluginHarness({ createMemoryBackend, resetModules: false });
