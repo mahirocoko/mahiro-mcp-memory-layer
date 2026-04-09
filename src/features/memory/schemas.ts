@@ -41,16 +41,35 @@ export const searchMemoriesInputSchema = z.object({
   limit: z.number().int().positive().max(50).optional(),
 });
 
-export const buildContextForTaskInputSchema = z.object({
-  task: z.string().trim().min(1),
-  mode: z.enum(retrievalModes),
-  userId: z.string().trim().min(1).optional(),
-  projectId: z.string().trim().min(1).optional(),
-  containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
-  maxItems: z.number().int().positive().max(50).optional(),
-  maxChars: z.number().int().positive().max(50_000).optional(),
-});
+export const buildContextForTaskInputSchema = z
+  .object({
+    task: z.string().trim().min(1),
+    mode: z.enum(retrievalModes),
+    userId: z.string().trim().min(1).optional(),
+    projectId: z.string().trim().min(1).optional(),
+    containerId: z.string().trim().min(1).optional(),
+    sessionId: z.string().trim().min(1).optional(),
+    maxItems: z.number().int().positive().max(50).optional(),
+    maxChars: z.number().int().positive().max(50_000).optional(),
+    /** When true, also run heuristic memory suggestions on `recentConversation` (same scope ids as this request). */
+    includeMemorySuggestions: z.boolean().optional(),
+    /** Recent user/assistant text for suggestion heuristics; required when `includeMemorySuggestions` is true. */
+    recentConversation: z.string().optional(),
+    suggestionMaxCandidates: z.number().int().positive().max(10).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.includeMemorySuggestions !== true) {
+      return;
+    }
+    const trimmed = data.recentConversation?.trim();
+    if (!trimmed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "recentConversation is required when includeMemorySuggestions is true.",
+        path: ["recentConversation"],
+      });
+    }
+  });
 
 export const upsertDocumentInputSchema = z.object({
   projectId: z.string().trim().min(1).optional(),

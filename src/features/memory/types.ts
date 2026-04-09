@@ -78,6 +78,10 @@ export interface BuildContextForTaskInput {
   readonly sessionId?: string;
   readonly maxItems?: number;
   readonly maxChars?: number;
+  /** Opt-in: attach `suggest_memory_candidates` output for the same scope as this build. */
+  readonly includeMemorySuggestions?: boolean;
+  readonly recentConversation?: string;
+  readonly suggestionMaxCandidates?: number;
 }
 
 export interface BuildContextForTaskResult {
@@ -85,6 +89,8 @@ export interface BuildContextForTaskResult {
   readonly items: readonly string[];
   readonly truncated: boolean;
   readonly degraded: boolean;
+  /** Present when `includeMemorySuggestions` was true and validation passed. */
+  readonly memorySuggestions?: SuggestMemoryCandidatesResult;
 }
 
 export interface UpsertDocumentInput {
