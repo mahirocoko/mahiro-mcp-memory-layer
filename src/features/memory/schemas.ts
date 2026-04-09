@@ -147,3 +147,14 @@ export const applyConservativeMemoryPolicyInputSchema = applyConservativeMemoryP
     }
   },
 );
+
+/** MCP `prepare_host_turn_memory`: same retrieval + suggestion inputs as `build_context_for_task` with suggestions always on; optional policy `sourceOverride` / `extraTags`. */
+export const prepareHostTurnMemoryInputObjectSchema = buildContextForTaskInputObjectSchema
+  .omit({ includeMemorySuggestions: true, recentConversation: true })
+  .extend({
+    recentConversation: z.string().trim().min(1),
+    sourceOverride: applyConservativeMemoryPolicyInputObjectSchema.shape.sourceOverride,
+    extraTags: applyConservativeMemoryPolicyInputObjectSchema.shape.extraTags,
+  });
+
+export const prepareHostTurnMemoryInputSchema = prepareHostTurnMemoryInputObjectSchema;

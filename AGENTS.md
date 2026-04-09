@@ -17,7 +17,7 @@ Then use `README.md` for command, install, and interface reference.
 ## Public Contract
 
 - MCP server name: `mahiro-mcp-memory-layer`
-- Primary memory tools: `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`
+- Primary memory tools: `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`
 - Orchestration tools: `orchestrate_workflow`, `get_orchestration_result`, `list_orchestration_traces`
 - Default orchestration posture: async
 - Omit `waitForCompletion` to start work in background and get `{ requestId, status: "running", autoAsync: true }`

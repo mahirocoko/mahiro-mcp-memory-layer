@@ -6,6 +6,7 @@ import {
   listMemoriesInputSchema,
   suggestMemoryCandidatesInputSchema,
   applyConservativeMemoryPolicyInputObjectSchema,
+  prepareHostTurnMemoryInputObjectSchema,
 } from "../schemas.js";
 import type { MemoryService } from "../memory-service.js";
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
@@ -57,6 +58,13 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
         "One-call conservative save policy: runs the same heuristics as suggest_memory_candidates (unless `suggestion` is provided), then strong_candidate → auto-remember complete-scope candidates; consider_saving → review-only suggestions (no writes); likely_skip → no action. Prefer this over ad-hoc save logic in agent loops.",
       inputSchema: applyConservativeMemoryPolicyInputObjectSchema.shape,
       execute: async (input) => memoryService.applyConservativeMemoryPolicy(input as never),
+    },
+    {
+      name: "prepare_host_turn_memory",
+      description:
+        "Host integration: one call with task + recentConversation + scope ids — builds retrieval context (same as build_context_for_task with memory suggestions on), then applies conservative_memory_policy using that suggestion snapshot so heuristics run once. Returns context fields plus memorySuggestions and conservativePolicy (auto-saves only strong_candidate with complete scope ids).",
+      inputSchema: prepareHostTurnMemoryInputObjectSchema.shape,
+      execute: async (input) => memoryService.prepareHostTurnMemory(input as never),
     },
   ];
 }

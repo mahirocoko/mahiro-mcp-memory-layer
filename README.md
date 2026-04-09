@@ -28,7 +28,13 @@ The memory side now has two distinct loops:
 - read loop: `search_memories` and `build_context_for_task`
 - write loop: `remember`, `upsert_document`, `suggest_memory_candidates`, and `apply_conservative_memory_policy`
 
-Recommended conservative write flow (one call):
+**Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`.
+
+Recommended conservative write flow:
+
+- **Retrieval context + policy in one call:** use `prepare_host_turn_memory` (see Host one-call above). It returns `memorySuggestions` and `conservativePolicy` from the same heuristic snapshot.
+
+**Policy without building retrieval context** (for example you already have a `suggestion` object):
 
 1. Call `apply_conservative_memory_policy` with the same scope identifiers you use elsewhere (`userId`, `projectId`, `containerId`, `sessionId` as required by each candidate’s `scope`) plus `conversation`, **or** pass a precomputed `suggestion` object from `suggest_memory_candidates` / `build_context_for_task.memorySuggestions`.
 2. Policy behavior:

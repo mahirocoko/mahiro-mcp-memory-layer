@@ -14,7 +14,7 @@ import { applyConservativeMemoryPolicy as runApplyConservativeMemoryPolicy } fro
 import { suggestMemoryCandidates } from "./core/suggest-memory-candidates.js";
 import { upsertDocument } from "./core/upsert-document.js";
 import { reindexMemoryRecords } from "./index/reindex.js";
-import { applyConservativeMemoryPolicyInputSchema } from "./schemas.js";
+import { applyConservativeMemoryPolicyInputSchema, prepareHostTurnMemoryInputSchema } from "./schemas.js";
 import type {
   ApplyConservativeMemoryPolicyInput,
   ApplyConservativeMemoryPolicyResult,
@@ -22,6 +22,8 @@ import type {
   BuildContextForTaskResult,
   ListMemoriesInput,
   MemoryRecord,
+  PrepareHostTurnMemoryInput,
+  PrepareHostTurnMemoryResult,
   RememberInput,
   SearchMemoriesInput,
   SearchMemoriesResult,
@@ -110,6 +112,49 @@ export class MemoryService {
       payload: parsed,
       remember: (p: RememberInput) => this.remember(p),
     });
+  }
+
+  /**
+   * Host one-call: `build_context_for_task` with suggestions on, then `apply_conservative_memory_policy` using that
+   * snapshot (single heuristic pass). Conservative writes only for `strong_candidate` with complete scope ids.
+   */
+  public async prepareHostTurnMemory(payload: PrepareHostTurnMemoryInput): Promise<PrepareHostTurnMemoryResult> {
+    const parsed = prepareHostTurnMemoryInputSchema.parse(payload);
+    const buildPayload: BuildContextForTaskInput = {
+      task: parsed.task,
+      mode: parsed.mode,
+      userId: parsed.userId,
+      projectId: parsed.projectId,
+      containerId: parsed.containerId,
+      sessionId: parsed.sessionId,
+      maxItems: parsed.maxItems,
+      maxChars: parsed.maxChars,
+      includeMemorySuggestions: true,
+      recentConversation: parsed.recentConversation,
+      suggestionMaxCandidates: parsed.suggestionMaxCandidates,
+    };
+    const built = await this.buildContext(buildPayload);
+    const memorySuggestions = built.memorySuggestions;
+    if (!memorySuggestions) {
+      throw new Error("internal: expected memorySuggestions from build_context_for_task with includeMemorySuggestions");
+    }
+    const conservativePolicy = await this.applyConservativeMemoryPolicy({
+      suggestion: memorySuggestions,
+      userId: parsed.userId,
+      projectId: parsed.projectId,
+      containerId: parsed.containerId,
+      sessionId: parsed.sessionId,
+      sourceOverride: parsed.sourceOverride,
+      extraTags: parsed.extraTags,
+    });
+    return {
+      context: built.context,
+      items: built.items,
+      truncated: built.truncated,
+      degraded: built.degraded,
+      memorySuggestions,
+      conservativePolicy,
+    };
   }
 
   public reindex(): Promise<void> {

@@ -172,6 +172,20 @@ export interface ApplyConservativeMemoryPolicyResult {
   readonly reviewOnlySuggestions: readonly MemorySuggestionCandidate[];
 }
 
+/** Input for `prepare_host_turn_memory`: task + retrieval scope + `recentConversation`; optional policy tags/source for auto-saves. */
+export interface PrepareHostTurnMemoryInput
+  extends Omit<BuildContextForTaskInput, "includeMemorySuggestions"> {
+  readonly recentConversation: string;
+  readonly sourceOverride?: MemorySource;
+  readonly extraTags?: readonly string[];
+}
+
+/** Result: built context bundle + suggestion snapshot + conservative policy outcome (policy uses `memorySuggestions` as `suggestion`, so heuristics run once). */
+export interface PrepareHostTurnMemoryResult extends BuildContextForTaskResult {
+  readonly memorySuggestions: SuggestMemoryCandidatesResult;
+  readonly conservativePolicy: ApplyConservativeMemoryPolicyResult;
+}
+
 export interface ScopeFilter {
   readonly scope: MemoryScope;
   readonly userId?: string;
