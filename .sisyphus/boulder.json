@@ -1,0 +1,114 @@
+{
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/opencode-memory-plugin.md",
+  "started_at": "2026-04-09T08:01:54.818Z",
+  "session_ids": [
+    "ses_28f094aacffenCg28gF0rohUu7",
+    "ses_28ebc7218ffeRoXnNuZouSrIWy",
+    "ses_28eacd8b5ffeG6ROeEiIqg9mfi",
+    "ses_28eae0a65ffeA3pwBDXQpEPY5b",
+    "ses_28ea669fcffe7ChmZp5sEHm8tV",
+    "ses_28ea588c2ffewnyY8SYd9SZNA1",
+    "ses_28e9da5b7ffe9CSog49bfxxfnG",
+    "ses_28e9e5d3cffeYUm9VIMHUBOO09",
+    "ses_28e5f7599ffezOcQoeQOUHxDYL",
+    "ses_28e5ec5c1ffe9AAre4foed1aDC",
+    "ses_28e5ec5bfffeU80BAezy5SD5w4",
+    "ses_28e5ec5e5ffek5RuETzBISofi6",
+    "ses_28e5dea04ffekZGtDLnjAgGvOR",
+    "ses_28e5b7469ffevINUkKe9p0wofX",
+    "ses_28e5dea0dffe6B7xKR6EUVEpjq",
+    "ses_28e562a4cffeBqLTv8DBo7d35o",
+    "ses_28e56d038ffepwgupnEbZC8YRs",
+    "ses_28e494e75ffeaJA3rdhV6XHHwR",
+    "ses_28e4a86edffebuLlGlmV9tGm37",
+    "ses_28e3ed28cffeDiGM7CAmS9OC1w",
+    "ses_28e34ce47ffeHMt87SxbzSw0kV",
+    "ses_28e28dc97ffeJFA4QnZMz22QZb",
+    "ses_28e29282bffei2R0MUJS0CAN71",
+    "ses_28e1f4046ffeUxkpD2cog2ONMc",
+    "ses_28e1f4166ffe29YYawhqoonZhD",
+    "ses_28e1edd59ffekdpzLXO0ZyXcip",
+    "ses_28e1ebc7effeSft3od1OctVDD9",
+    "ses_28e1f4047ffedUD28l01b328SY",
+    "ses_28e1f4048ffev8ScscC5VlO6Y5",
+    "ses_28e0d7dc2ffe9qiDtaJbjReiwj",
+    "ses_28e0c2fb9ffedzb7aKDrDWT3p6",
+    "ses_28e0b8a6bffeynYQ7A8QWhIJbY"
+  ],
+  "plan_name": "opencode-memory-plugin",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Add failing OpenCode plugin contract tests",
+      "session_id": "ses_28ebc7218ffeRoXnNuZouSrIWy",
+      "agent": "Sisyphus-Junior",
+      "category": "ultrabrain",
+      "updated_at": "2026-04-09T08:05:14.921Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Extract a transport-free memory facade",
+      "session_id": "ses_28eae0a65ffeA3pwBDXQpEPY5b",
+      "agent": "Sisyphus-Junior",
+      "category": "ultrabrain",
+      "updated_at": "2026-04-09T08:24:46.727Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Define OpenCode plugin config and scope-resolution contract",
+      "session_id": "ses_28e9e5d3cffeYUm9VIMHUBOO09",
+      "agent": "Sisyphus-Junior",
+      "category": "ultrabrain",
+      "updated_at": "2026-04-09T08:46:02.713Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Build the OpenCode plugin runtime shell",
+      "session_id": "ses_28e56d038ffepwgupnEbZC8YRs",
+      "agent": "Sisyphus-Junior",
+      "category": "ultrabrain",
+      "updated_at": "2026-04-09T10:04:29.433Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Implement `session.created` wake-up flow",
+      "session_id": "ses_28e4a86edffebuLlGlmV9tGm37",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-09T10:15:38.073Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Implement debounced read-only `message.updated` precompute",
+      "session_id": "ses_28e414ec7ffeInXHe2UbVkiWF2",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-09T10:18:35.382Z"
+    },
+    "todo:9": {
+      "task_key": "todo:9",
+      "task_label": "9",
+      "task_title": "Package the plugin-first install path and update docs",
+      "session_id": "ses_28e29282bffei2R0MUJS0CAN71",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-04-09T10:50:58.824Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_28e0b8a9bffefBYlIsoN5oIj0U",
+      "agent": "Sisyphus-Junior",
+      "category": "ultrabrain",
+      "updated_at": "2026-04-09T11:45:40.280Z"
+    }
+  }
+}

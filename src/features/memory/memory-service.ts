@@ -14,7 +14,8 @@ import { applyConservativeMemoryPolicy as runApplyConservativeMemoryPolicy } fro
 import { suggestMemoryCandidates } from "./core/suggest-memory-candidates.js";
 import { upsertDocument } from "./core/upsert-document.js";
 import { reindexMemoryRecords } from "./index/reindex.js";
-import { applyConservativeMemoryPolicyInputSchema, prepareHostTurnMemoryInputSchema } from "./schemas.js";
+import { createMemoryFacade, type MemoryFacade } from "./memory-facade.js";
+import { applyConservativeMemoryPolicyInputSchema } from "./schemas.js";
 import type {
   ApplyConservativeMemoryPolicyInput,
   ApplyConservativeMemoryPolicyResult,
@@ -24,15 +25,21 @@ import type {
   MemoryRecord,
   PrepareHostTurnMemoryInput,
   PrepareHostTurnMemoryResult,
+  PrepareTurnMemoryInput,
+  PrepareTurnMemoryResult,
   RememberInput,
   SearchMemoriesInput,
   SearchMemoriesResult,
   SuggestMemoryCandidatesInput,
   SuggestMemoryCandidatesResult,
   UpsertDocumentInput,
+  WakeUpMemoryInput,
+  WakeUpMemoryResult,
 } from "./types.js";
 
 export class MemoryService {
+  private readonly facade: MemoryFacade;
+
   public static async create(): Promise<MemoryService> {
     const env = getAppEnv();
     await Promise.all([
@@ -55,7 +62,12 @@ export class MemoryService {
     private readonly table: MemoryRecordsTable,
     private readonly embeddingProvider: DeterministicEmbeddingProvider,
     private readonly traceStore: RetrievalTraceStore,
-  ) {}
+  ) {
+    this.facade = createMemoryFacade({
+      buildContext: (payload) => this.buildContext(payload),
+      applyConservativeMemoryPolicy: (payload) => this.applyConservativeMemoryPolicy(payload),
+    });
+  }
 
   public remember(payload: RememberInput) {
     return rememberMemory({
@@ -114,47 +126,25 @@ export class MemoryService {
     });
   }
 
+  /** Product alias for {@link prepareHostTurnMemory} (same schema and result). */
+  public prepareTurnMemory(payload: PrepareTurnMemoryInput): Promise<PrepareTurnMemoryResult> {
+    return this.prepareHostTurnMemory(payload);
+  }
+
+  /**
+   * Wake-up: two `build_context_for_task` calls for the same scope — `mode: "profile"` and `mode: "recent"` — plus a
+   * combined `wakeUpContext` string. Does not run suggestion or conservative policy.
+   */
+  public async wakeUpMemory(payload: WakeUpMemoryInput): Promise<WakeUpMemoryResult> {
+    return this.facade.wakeUpMemory(payload);
+  }
+
   /**
    * Host one-call: `build_context_for_task` with suggestions on, then `apply_conservative_memory_policy` using that
    * snapshot (single heuristic pass). Conservative writes only for `strong_candidate` with complete scope ids.
    */
   public async prepareHostTurnMemory(payload: PrepareHostTurnMemoryInput): Promise<PrepareHostTurnMemoryResult> {
-    const parsed = prepareHostTurnMemoryInputSchema.parse(payload);
-    const buildPayload: BuildContextForTaskInput = {
-      task: parsed.task,
-      mode: parsed.mode,
-      userId: parsed.userId,
-      projectId: parsed.projectId,
-      containerId: parsed.containerId,
-      sessionId: parsed.sessionId,
-      maxItems: parsed.maxItems,
-      maxChars: parsed.maxChars,
-      includeMemorySuggestions: true,
-      recentConversation: parsed.recentConversation,
-      suggestionMaxCandidates: parsed.suggestionMaxCandidates,
-    };
-    const built = await this.buildContext(buildPayload);
-    const memorySuggestions = built.memorySuggestions;
-    if (!memorySuggestions) {
-      throw new Error("internal: expected memorySuggestions from build_context_for_task with includeMemorySuggestions");
-    }
-    const conservativePolicy = await this.applyConservativeMemoryPolicy({
-      suggestion: memorySuggestions,
-      userId: parsed.userId,
-      projectId: parsed.projectId,
-      containerId: parsed.containerId,
-      sessionId: parsed.sessionId,
-      sourceOverride: parsed.sourceOverride,
-      extraTags: parsed.extraTags,
-    });
-    return {
-      context: built.context,
-      items: built.items,
-      truncated: built.truncated,
-      degraded: built.degraded,
-      memorySuggestions,
-      conservativePolicy,
-    };
+    return this.facade.prepareHostTurnMemory(payload);
   }
 
   public reindex(): Promise<void> {

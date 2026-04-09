@@ -7,6 +7,30 @@ Local-first MCP memory layer prototype with:
 - deterministic local embeddings for v0
 - MCP tools and resources built on a thin server layer
 
+## OpenCode plugin install
+
+Standard path:
+
+1. Add the package name to your OpenCode config:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["mahiro-mcp-memory-layer"]
+}
+```
+
+OpenCode installs npm plugins with Bun at startup, so this is the only step for the normal plugin path.
+
+Plugin override path:
+
+- `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's debounce window without adding extra `opencode.json` fields.
+
+Manual MCP fallback:
+
+- If you want the standalone MCP server, keep using the existing repo scripts: `bun run start` or `bun run dev`.
+- That path preserves the current MCP tool names and behavior, but it is separate from the standard plugin-only install and from the published plugin package root.
+
 ## Commands
 
 ```bash
@@ -25,10 +49,16 @@ bun run reindex
 
 The memory side now has two distinct loops:
 
-- read loop: `search_memories` and `build_context_for_task`
+- read loop: `search_memories`, `build_context_for_task`, and product wrappers `wake_up_memory` / `prepare_turn_memory`
 - write loop: `remember`, `upsert_document`, `suggest_memory_candidates`, and `apply_conservative_memory_policy`
 
-**Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`.
+Plugin override knob:
+
+- `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's message debounce window.
+
+**Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
+
+**Wake-up:** `wake_up_memory` — same scope + optional `maxItems` / `maxChars` as `build_context_for_task`, but runs two internal retrieval passes (`profile` and `recent` modes) and returns `wakeUpContext` (combined) plus `profile` and `recent` section objects (each matches one `build_context_for_task` result). No suggestions or policy.
 
 Recommended conservative write flow:
 

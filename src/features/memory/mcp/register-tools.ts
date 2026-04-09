@@ -7,6 +7,7 @@ import {
   suggestMemoryCandidatesInputSchema,
   applyConservativeMemoryPolicyInputObjectSchema,
   prepareHostTurnMemoryInputObjectSchema,
+  wakeUpMemoryInputObjectSchema,
 } from "../schemas.js";
 import type { MemoryService } from "../memory-service.js";
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
@@ -65,6 +66,20 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
         "Host integration: one call with task + recentConversation + scope ids — builds retrieval context (same as build_context_for_task with memory suggestions on), then applies conservative_memory_policy using that suggestion snapshot so heuristics run once. Returns context fields plus memorySuggestions and conservativePolicy (auto-saves only strong_candidate with complete scope ids).",
       inputSchema: prepareHostTurnMemoryInputObjectSchema.shape,
       execute: async (input) => memoryService.prepareHostTurnMemory(input as never),
+    },
+    {
+      name: "wake_up_memory",
+      description:
+        "Product wake-up: same scope + limits as build_context_for_task, but runs two retrieval passes internally — profile mode and recent mode — and returns wakeUpContext (combined) plus profile and recent sections (each matches one build_context_for_task result). No memory suggestions or conservative policy.",
+      inputSchema: wakeUpMemoryInputObjectSchema.shape,
+      execute: async (input) => memoryService.wakeUpMemory(input as never),
+    },
+    {
+      name: "prepare_turn_memory",
+      description:
+        "Alias for prepare_host_turn_memory: identical inputs and behavior (retrieval + suggestions + conservative policy in one call).",
+      inputSchema: prepareHostTurnMemoryInputObjectSchema.shape,
+      execute: async (input) => memoryService.prepareTurnMemory(input as never),
     },
   ];
 }

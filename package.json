@@ -1,9 +1,30 @@
 {
   "name": "mahiro-mcp-memory-layer",
-  "private": true,
   "version": "0.0.0",
   "packageManager": "bun@1.3.11",
   "type": "module",
+  "main": "./src/features/opencode-plugin/index.ts",
+  "exports": {
+    ".": "./src/features/opencode-plugin/index.ts"
+  },
+  "files": [
+    "src/config",
+    "src/features/memory/constants.ts",
+    "src/features/memory/core",
+    "src/features/memory/index",
+    "src/features/memory/lib",
+    "src/features/memory/log",
+    "src/features/memory/memory-facade.ts",
+    "src/features/memory/memory-service.ts",
+    "src/features/memory/observability",
+    "src/features/memory/retrieval",
+    "src/features/memory/schemas.ts",
+    "src/features/memory/types.ts",
+    "src/features/opencode-plugin",
+    "README.md",
+    "AGENTS.md",
+    "package.json"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",

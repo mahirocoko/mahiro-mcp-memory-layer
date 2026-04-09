@@ -186,6 +186,33 @@ export interface PrepareHostTurnMemoryResult extends BuildContextForTaskResult {
   readonly conservativePolicy: ApplyConservativeMemoryPolicyResult;
 }
 
+/** Product alias for `prepare_host_turn_memory` (identical inputs and behavior). */
+export type PrepareTurnMemoryInput = PrepareHostTurnMemoryInput;
+/** Product alias for `prepare_host_turn_memory` (identical inputs and behavior). */
+export type PrepareTurnMemoryResult = PrepareHostTurnMemoryResult;
+
+/** Input for `wake_up_memory`: session-start retrieval bundle with stable profile + recent activity sections for the same scope. */
+export interface WakeUpMemoryInput {
+  readonly userId?: string;
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly sessionId?: string;
+  /** Applied per section (`profile` and `recent`). */
+  readonly maxItems?: number;
+  /** Applied per section (`profile` and `recent`). */
+  readonly maxChars?: number;
+}
+
+/** Combined profile + recent retrieval for one scope; `profile` / `recent` mirror two `build_context_for_task` calls. */
+export interface WakeUpMemoryResult {
+  /** Convenience string: `profile.context` and `recent.context` separated by a fixed divider. */
+  readonly wakeUpContext: string;
+  readonly profile: BuildContextForTaskResult;
+  readonly recent: BuildContextForTaskResult;
+  readonly truncated: boolean;
+  readonly degraded: boolean;
+}
+
 export interface ScopeFilter {
   readonly scope: MemoryScope;
   readonly userId?: string;

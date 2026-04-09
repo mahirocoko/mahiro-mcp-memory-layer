@@ -158,3 +158,15 @@ export const prepareHostTurnMemoryInputObjectSchema = buildContextForTaskInputOb
   });
 
 export const prepareHostTurnMemoryInputSchema = prepareHostTurnMemoryInputObjectSchema;
+
+/** `wake_up_memory`: scope + optional limits; runs `profile` and `recent` builds internally (no suggestions). */
+export const wakeUpMemoryInputObjectSchema = z.object({
+  userId: z.string().trim().min(1).optional(),
+  projectId: z.string().trim().min(1).optional(),
+  containerId: z.string().trim().min(1).optional(),
+  sessionId: z.string().trim().min(1).optional(),
+  maxItems: z.number().int().positive().max(50).optional(),
+  maxChars: z.number().int().positive().max(50_000).optional(),
+});
+
+export const wakeUpMemoryInputSchema = wakeUpMemoryInputObjectSchema;
