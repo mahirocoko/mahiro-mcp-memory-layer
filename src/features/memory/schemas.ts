@@ -102,3 +102,48 @@ export const suggestMemoryCandidatesInputSchema = z.object({
   sessionId: z.string().trim().min(1).optional(),
   maxCandidates: z.number().int().positive().max(10).optional(),
 });
+
+const memorySuggestionCandidateSchema = z.object({
+  kind: z.enum(memoryKinds),
+  scope: z.enum(memoryScopes),
+  reason: z.string(),
+  draftContent: z.string().trim().min(1),
+  confidence: z.enum(["low", "medium", "high"]),
+});
+
+export const suggestMemoryCandidatesResultSchema = z.object({
+  recommendation: z.enum(["likely_skip", "consider_saving", "strong_candidate"]),
+  signals: z.object({
+    durable: z.array(z.string()),
+    ephemeral: z.array(z.string()),
+  }),
+  candidates: z.array(memorySuggestionCandidateSchema),
+});
+
+export const applyConservativeMemoryPolicyInputObjectSchema = z.object({
+  conversation: z.string().optional(),
+  userId: z.string().trim().min(1).optional(),
+  projectId: z.string().trim().min(1).optional(),
+  containerId: z.string().trim().min(1).optional(),
+  sessionId: z.string().trim().min(1).optional(),
+  maxCandidates: z.number().int().positive().max(10).optional(),
+  suggestion: suggestMemoryCandidatesResultSchema.optional(),
+  sourceOverride: sourceSchema.optional(),
+  extraTags: z.array(z.string().trim().min(1)).optional(),
+});
+
+export const applyConservativeMemoryPolicyInputSchema = applyConservativeMemoryPolicyInputObjectSchema.superRefine(
+  (data, ctx) => {
+    if (data.suggestion) {
+      return;
+    }
+    const trimmed = data.conversation?.trim();
+    if (!trimmed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide `conversation` or a precomputed `suggestion` object.",
+        path: ["conversation"],
+      });
+    }
+  },
+);

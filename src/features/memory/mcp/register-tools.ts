@@ -5,6 +5,7 @@ import {
   upsertDocumentInputSchema,
   listMemoriesInputSchema,
   suggestMemoryCandidatesInputSchema,
+  applyConservativeMemoryPolicyInputObjectSchema,
 } from "../schemas.js";
 import type { MemoryService } from "../memory-service.js";
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
@@ -49,6 +50,13 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
         "Analyze conversation text and return durable-memory candidates (kind, suggested scope, reason, draft content) plus a save recommendation. Deterministic heuristics for agent/tool loops; does not write storage.",
       inputSchema: suggestMemoryCandidatesInputSchema.shape,
       execute: async (input) => memoryService.suggestMemoryCandidates(input as never),
+    },
+    {
+      name: "apply_conservative_memory_policy",
+      description:
+        "One-call conservative save policy: runs the same heuristics as suggest_memory_candidates (unless `suggestion` is provided), then strong_candidate → auto-remember complete-scope candidates; consider_saving → review-only suggestions (no writes); likely_skip → no action. Prefer this over ad-hoc save logic in agent loops.",
+      inputSchema: applyConservativeMemoryPolicyInputObjectSchema.shape,
+      execute: async (input) => memoryService.applyConservativeMemoryPolicy(input as never),
     },
   ];
 }

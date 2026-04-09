@@ -145,6 +145,33 @@ export interface SuggestMemoryCandidatesResult {
   readonly candidates: readonly MemorySuggestionCandidate[];
 }
 
+/** Input for `apply_conservative_memory_policy`: same scope fields as suggest, plus optional precomputed suggestion. */
+export interface ApplyConservativeMemoryPolicyInput {
+  /** Required unless `suggestion` is provided (hosts may reuse a prior `suggest_memory_candidates` result). */
+  readonly conversation?: string;
+  readonly userId?: string;
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly sessionId?: string;
+  readonly maxCandidates?: number;
+  /** When set, heuristics are skipped and policy applies to this snapshot. */
+  readonly suggestion?: SuggestMemoryCandidatesResult;
+  /** Overrides default `{ type: "tool", title: "apply_conservative_memory_policy" }` on auto-saved memories. */
+  readonly sourceOverride?: MemorySource;
+  /** Appended to default tags on auto-saved memories (`conservative_auto_save`). */
+  readonly extraTags?: readonly string[];
+}
+
+/** Result: conservative policy — auto-save only on `strong_candidate` with complete scope ids; `consider_saving` is review-only. */
+export interface ApplyConservativeMemoryPolicyResult {
+  readonly recommendation: MemorySaveRecommendation;
+  readonly signals: SuggestMemoryCandidatesResult["signals"];
+  readonly candidates: readonly MemorySuggestionCandidate[];
+  readonly autoSaved: readonly { readonly candidateIndex: number; readonly id: string }[];
+  readonly autoSaveSkipped: readonly { readonly candidateIndex: number; readonly reason: "incomplete_scope_ids" }[];
+  readonly reviewOnlySuggestions: readonly MemorySuggestionCandidate[];
+}
+
 export interface ScopeFilter {
   readonly scope: MemoryScope;
   readonly userId?: string;

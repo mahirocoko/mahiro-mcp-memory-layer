@@ -26,13 +26,21 @@ bun run reindex
 The memory side now has two distinct loops:
 
 - read loop: `search_memories` and `build_context_for_task`
-- write loop: `remember`, `upsert_document`, and `suggest_memory_candidates`
+- write loop: `remember`, `upsert_document`, `suggest_memory_candidates`, and `apply_conservative_memory_policy`
 
-Recommended write flow for agents:
+Recommended conservative write flow (one call):
+
+1. Call `apply_conservative_memory_policy` with the same scope identifiers you use elsewhere (`userId`, `projectId`, `containerId`, `sessionId` as required by each candidate’s `scope`) plus `conversation`, **or** pass a precomputed `suggestion` object from `suggest_memory_candidates` / `build_context_for_task.memorySuggestions`.
+2. Policy behavior:
+   - `strong_candidate` → auto-`remember` each candidate **only when** scope identifiers are complete for that candidate’s `scope` (incomplete rows appear in `autoSaveSkipped`).
+   - `consider_saving` → **no** writes; inspect `reviewOnlySuggestions` (same as `candidates`).
+   - `likely_skip` → no writes; `autoSaved` and `reviewOnlySuggestions` are empty.
+
+Manual / advanced flow:
 
 1. Call `suggest_memory_candidates` on the recent conversation or notes.
 2. If the result says `strong_candidate` or `consider_saving`, inspect the returned candidates.
-3. Persist the chosen candidate with `remember`.
+3. Persist the chosen candidate with `remember` (or use `apply_conservative_memory_policy` to apply the policy above).
 4. Use `upsert_document` instead when the memory is document-shaped and should be idempotent by source identity.
 
 `build_context_for_task` can also help with this in one round-trip:
@@ -40,7 +48,7 @@ Recommended write flow for agents:
 - set `includeMemorySuggestions: true`
 - pass `recentConversation`
 - the result includes `memorySuggestions` next to the built context bundle
-- this still does not write storage automatically; callers decide whether to persist anything
+- this still does not write storage automatically; pass that object to `apply_conservative_memory_policy` as `suggestion` if you want the conservative policy applied in a follow-up call
 
 ### suggest_memory_candidates
 
@@ -91,6 +99,27 @@ Example flow:
   ]
 }
 ```
+
+### apply_conservative_memory_policy
+
+Single entrypoint for hosts that want the **conservative** policy without implementing their own branching:
+
+- Runs the same heuristics as `suggest_memory_candidates` when `conversation` is provided and `suggestion` is omitted.
+- If `suggestion` is set, heuristics are skipped and that snapshot is used (for example, reuse `memorySuggestions` from `build_context_for_task`).
+
+Input (JSON shape; all fields optional except you must supply **`conversation`** or **`suggestion`**):
+
+- `conversation`, `userId`, `projectId`, `containerId`, `sessionId`, `maxCandidates` — same meaning as `suggest_memory_candidates`.
+- `suggestion` — optional full `suggest_memory_candidates` result object.
+- `sourceOverride` — optional `source` for auto-saved memories (default: `{ "type": "tool", "title": "apply_conservative_memory_policy" }`).
+- `extraTags` — optional extra tags appended on auto-saves (always includes `conservative_auto_save`).
+
+Result:
+
+- `recommendation`, `signals`, `candidates` — same as `suggest_memory_candidates` (full transparency).
+- `autoSaved` — `{ candidateIndex, id }[]` for memories written under `strong_candidate`.
+- `autoSaveSkipped` — candidates not written because scope ids were incomplete (`reason: "incomplete_scope_ids"`).
+- `reviewOnlySuggestions` — populated only for `consider_saving` (no auto-save).
 
 ## Operator Shortcut
 

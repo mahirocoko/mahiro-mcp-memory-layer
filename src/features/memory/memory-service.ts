@@ -10,10 +10,14 @@ import { buildContextForTask } from "./core/build-context-for-task.js";
 import { listMemories } from "./core/list-memories.js";
 import { rememberMemory } from "./core/remember.js";
 import { searchMemories } from "./core/search-memories.js";
+import { applyConservativeMemoryPolicy as runApplyConservativeMemoryPolicy } from "./core/apply-conservative-memory-policy.js";
 import { suggestMemoryCandidates } from "./core/suggest-memory-candidates.js";
 import { upsertDocument } from "./core/upsert-document.js";
 import { reindexMemoryRecords } from "./index/reindex.js";
+import { applyConservativeMemoryPolicyInputSchema } from "./schemas.js";
 import type {
+  ApplyConservativeMemoryPolicyInput,
+  ApplyConservativeMemoryPolicyResult,
   BuildContextForTaskInput,
   BuildContextForTaskResult,
   ListMemoriesInput,
@@ -96,6 +100,16 @@ export class MemoryService {
 
   public suggestMemoryCandidates(payload: SuggestMemoryCandidatesInput): SuggestMemoryCandidatesResult {
     return suggestMemoryCandidates(payload);
+  }
+
+  public applyConservativeMemoryPolicy(
+    payload: ApplyConservativeMemoryPolicyInput,
+  ): Promise<ApplyConservativeMemoryPolicyResult> {
+    const parsed = applyConservativeMemoryPolicyInputSchema.parse(payload);
+    return runApplyConservativeMemoryPolicy({
+      payload: parsed,
+      remember: (p: RememberInput) => this.remember(p),
+    });
   }
 
   public reindex(): Promise<void> {
