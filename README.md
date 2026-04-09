@@ -21,6 +21,70 @@ bun run test
 bun run reindex
 ```
 
+## Memory tools
+
+The memory side now has two distinct loops:
+
+- read loop: `search_memories` and `build_context_for_task`
+- write loop: `remember`, `upsert_document`, and `suggest_memory_candidates`
+
+Recommended write flow for agents:
+
+1. Call `suggest_memory_candidates` on the recent conversation or notes.
+2. If the result says `strong_candidate` or `consider_saving`, inspect the returned candidates.
+3. Persist the chosen candidate with `remember`.
+4. Use `upsert_document` instead when the memory is document-shaped and should be idempotent by source identity.
+
+### suggest_memory_candidates
+
+Use this tool when an agent needs help deciding whether a conversation contains durable memory worth saving.
+
+- deterministic heuristic extraction only; it does not write storage
+- returns a top-level `recommendation`
+- returns `signals` for durable vs ephemeral language
+- returns candidate memories with suggested `kind`, `scope`, `reason`, `draftContent`, and `confidence`
+
+Input shape:
+
+```json
+{
+  "conversation": "We decided to use Bun for runtime scripts from now on.",
+  "userId": "mahiro",
+  "projectId": "mahiro-mcp-memory-layer",
+  "containerId": "workspace:mahiro-mcp-memory-layer",
+  "sessionId": "session-123",
+  "maxCandidates": 3
+}
+```
+
+Result shape includes:
+
+- `recommendation`: `likely_skip` | `consider_saving` | `strong_candidate`
+- `signals.durable`
+- `signals.ephemeral`
+- `candidates[]`
+
+Example flow:
+
+```json
+{
+  "recommendation": "strong_candidate",
+  "signals": {
+    "durable": ["explicit_durable_language"],
+    "ephemeral": []
+  },
+  "candidates": [
+    {
+      "kind": "decision",
+      "scope": "project",
+      "reason": "Explicit decision language (decided/agreed/chose).",
+      "draftContent": "We decided to use Bun for runtime scripts from now on.",
+      "confidence": "high"
+    }
+  ]
+}
+```
+
 ## Operator Shortcut
 
 Use `orch:` at the start of a request when you want strict orchestrator behavior.
