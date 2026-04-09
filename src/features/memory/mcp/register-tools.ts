@@ -1,7 +1,7 @@
 import {
   rememberInputSchema,
   searchMemoriesInputSchema,
-  buildContextForTaskInputSchema,
+  buildContextForTaskInputObjectSchema,
   upsertDocumentInputSchema,
   listMemoriesInputSchema,
   suggestMemoryCandidatesInputSchema,
@@ -25,8 +25,9 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
     },
     {
       name: "build_context_for_task",
-      description: "Build a model-ready context bundle for a task.",
-      inputSchema: buildContextForTaskInputSchema.shape,
+      description:
+        "Build a model-ready context bundle for a task. Optionally set includeMemorySuggestions plus recentConversation to also return heuristic save candidates (same scope ids), without writing storage.",
+      inputSchema: buildContextForTaskInputObjectSchema.shape,
       execute: (input) => memoryService.buildContext(input as never),
     },
     {

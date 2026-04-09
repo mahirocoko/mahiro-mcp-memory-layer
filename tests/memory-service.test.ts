@@ -157,6 +157,49 @@ describe("memory service core", () => {
     expect(result.context.length).toBeLessThanOrEqual(500);
   });
 
+  it("optionally attaches memory suggestions when includeMemorySuggestions is set", async () => {
+    const fixture = await createFixture();
+
+    const result = await buildContextForTask({
+      payload: {
+        task: "Continue implementation",
+        mode: "full",
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        maxItems: 5,
+        maxChars: 500,
+        includeMemorySuggestions: true,
+        recentConversation:
+          "We decided that the integration point for suggestions is build_context_for_task with an opt-in flag.",
+      },
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+      traceStore: fixture.traceStore,
+    });
+
+    expect(result.memorySuggestions).toBeDefined();
+    expect(result.memorySuggestions!.candidates.length).toBeGreaterThan(0);
+    expect(result.memorySuggestions!.candidates[0]!.draftContent).toContain("decided");
+  });
+
+  it("rejects includeMemorySuggestions without recentConversation", async () => {
+    const fixture = await createFixture();
+
+    await expect(
+      buildContextForTask({
+        payload: {
+          task: "Task",
+          mode: "full",
+          includeMemorySuggestions: true,
+        },
+        table: fixture.table,
+        embeddingProvider: fixture.embeddingProvider,
+        traceStore: fixture.traceStore,
+      }),
+    ).rejects.toThrow(/recentConversation/);
+  });
+
   it("builds mode-aware context blocks for profile and recent", async () => {
     const fixture = await createFixture();
 
