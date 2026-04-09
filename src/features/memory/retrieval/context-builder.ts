@@ -48,11 +48,18 @@ const PROFILE_KIND_ORDER: readonly MemoryKind[] = [
   "conversation",
 ];
 
-type ProfileSnapshotSection = "preferences" | "stableFacts" | "decisions" | "activeWork" | "notes";
+type ProfileSnapshotSection =
+  | "preferences"
+  | "stableFacts"
+  | "broadFacts"
+  | "decisions"
+  | "activeWork"
+  | "notes";
 
 const PROFILE_SNAPSHOT_LABEL: Record<ProfileSnapshotSection, string> = {
   preferences: "Preferences",
-  stableFacts: "Facts",
+  stableFacts: "Stable Facts",
+  broadFacts: "Facts",
   decisions: "Decisions",
   activeWork: "Tasks",
   notes: "Conversation",
@@ -61,6 +68,7 @@ const PROFILE_SNAPSHOT_LABEL: Record<ProfileSnapshotSection, string> = {
 const PROFILE_SNAPSHOT_EMIT_ORDER: readonly ProfileSnapshotSection[] = [
   "preferences",
   "stableFacts",
+  "broadFacts",
   "decisions",
   "activeWork",
   "notes",
@@ -104,6 +112,49 @@ function isPreferenceProfileLine(line: string): boolean {
     return true;
   }
   if (/\bavoid\s+[a-z0-9]/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Heuristic: lines that read like durable project truths (declarative subject/predicate or stack/repo cues).
+ * Negative filters drop questions, links, and scratch-pad noise. Profile rendering only.
+ */
+function isStableFactProfileLine(line: string): boolean {
+  const t = line.trim();
+  if (t.length < 16) {
+    return false;
+  }
+  if (/\?/.test(t)) {
+    return false;
+  }
+  if (/https?:\/\//i.test(t)) {
+    return false;
+  }
+  if (/\b(todo|fixme)\b/i.test(t)) {
+    return false;
+  }
+  if (/^see\s+/i.test(t)) {
+    return false;
+  }
+  const lower = t.toLowerCase();
+  if (/\b(is|are|was|were)\s+/.test(lower)) {
+    return true;
+  }
+  if (/^(the|this|our)\s+[\w'-]+\s+(uses|runs|stores|keeps|targets)\b/i.test(t)) {
+    return true;
+  }
+  if (/^[a-z][\w-]*\s+(uses|runs|stores|keeps|targets|powers|supports|provides)\b/i.test(lower)) {
+    return true;
+  }
+  if (/^uses\s+/i.test(t)) {
+    return true;
+  }
+  if (/^(repository|project|codebase|stack|service|the\s+stack)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(canonical|default)\s+(is|for|format|store)\b/.test(lower)) {
     return true;
   }
   return false;
@@ -199,6 +250,7 @@ function emptyProfileSnapshotBuckets(): Record<ProfileSnapshotSection, ProfileDe
   return {
     preferences: [],
     stableFacts: [],
+    broadFacts: [],
     decisions: [],
     activeWork: [],
     notes: [],
@@ -236,7 +288,13 @@ function buildProfileContext(input: {
     switch (kind) {
       case "fact": {
         const { main, preference } = partitionProfileEntriesByPreference(deduped);
-        buckets.stableFacts.push(...main);
+        for (const e of main) {
+          if (isStableFactProfileLine(e.line)) {
+            buckets.stableFacts.push(e);
+          } else {
+            buckets.broadFacts.push(e);
+          }
+        }
         buckets.preferences.push(...preference);
         break;
       }
@@ -246,9 +304,18 @@ function buildProfileContext(input: {
         buckets.preferences.push(...preference);
         break;
       }
-      case "doc":
-        buckets.stableFacts.push(...deduped);
+      case "doc": {
+        const { main, preference } = partitionProfileEntriesByPreference(deduped);
+        for (const e of main) {
+          if (isStableFactProfileLine(e.line)) {
+            buckets.stableFacts.push(e);
+          } else {
+            buckets.broadFacts.push(e);
+          }
+        }
+        buckets.preferences.push(...preference);
         break;
+      }
       case "task":
         buckets.activeWork.push(...deduped);
         break;
@@ -257,6 +324,10 @@ function buildProfileContext(input: {
         break;
     }
   }
+
+  buckets.preferences = finalizeProfileSectionEntries(buckets.preferences);
+  buckets.stableFacts = finalizeProfileSectionEntries(buckets.stableFacts);
+  buckets.broadFacts = finalizeProfileSectionEntries(buckets.broadFacts);
 
   outer: for (const section of PROFILE_SNAPSHOT_EMIT_ORDER) {
     const list = buckets[section];
@@ -385,7 +456,7 @@ type ProfileDedupEntry = {
 };
 
 /** Minimum shared prefix length (words) before a divergent tail counts as a supersede-style conflict. */
-const PROFILE_CONFLICT_MIN_SHARED_WORDS = 3;
+const PROFILE_CONFLICT_MIN_SHARED_WORDS = 2;
 
 /**
  * True when two normalized keys agree on a short shared prefix then disagree on the next word
@@ -395,8 +466,8 @@ function profileKeysConflictAtDivergence(a: string, b: string): boolean {
   if (a === b) {
     return false;
   }
-  const wa = profileKeyWords(a);
-  const wb = profileKeyWords(b);
+  const wa = significantProfileWords(a);
+  const wb = significantProfileWords(b);
   let i = 0;
   while (i < wa.length && i < wb.length && wa[i] === wb[i]) {
     i++;
@@ -531,7 +602,10 @@ function compareProfileConflictPreference(a: ProfileDedupEntry, b: ProfileDedupE
 }
 
 function profileKeyWords(key: string): string[] {
-  return key.split(/\s+/).filter(Boolean);
+  return key
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, ""))
+    .filter(Boolean);
 }
 
 /**
@@ -626,6 +700,185 @@ function dedupeProfileEntriesForKind(entries: readonly ProfileDedupEntry[]): Pro
   }
 
   return out;
+}
+
+/**
+ * Stopwords for evidence overlap only (profile rendering). Keeps short proper nouns/tool names.
+ */
+const PROFILE_AGG_STOPWORDS = new Set([
+  "the",
+  "and",
+  "but",
+  "for",
+  "not",
+  "are",
+  "was",
+  "were",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "with",
+  "from",
+  "into",
+  "onto",
+  "over",
+  "under",
+  "than",
+  "that",
+  "this",
+  "these",
+  "those",
+  "then",
+  "them",
+  "they",
+  "their",
+  "there",
+  "here",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "about",
+  "after",
+  "before",
+  "between",
+  "because",
+  "also",
+  "just",
+  "only",
+  "very",
+  "such",
+  "same",
+  "some",
+  "any",
+  "all",
+  "both",
+  "each",
+  "few",
+  "more",
+  "most",
+  "other",
+  "our",
+  "your",
+  "its",
+  "his",
+  "her",
+  "she",
+  "him",
+  "you",
+  "how",
+  "why",
+  "who",
+  "can",
+  "could",
+  "should",
+  "would",
+  "will",
+  "shall",
+  "may",
+  "might",
+  "must",
+]);
+
+function significantProfileWords(key: string): string[] {
+  return profileKeyWords(key).filter((w) => w.length >= 3 && !PROFILE_AGG_STOPWORDS.has(w));
+}
+
+/**
+ * True when two lines look like rephrased supporting evidence for the same preference/fact
+ * (high overlap on significant words), but not a supersede-style conflict or strict duplicate.
+ * Profile formatting only; no retrieval/index changes.
+ */
+function profileLinesAreSupportingEvidence(a: ProfileDedupEntry, b: ProfileDedupEntry): boolean {
+  if (a.key === b.key) {
+    return false;
+  }
+  if (profileKeysConflictAtDivergence(a.key, b.key)) {
+    return false;
+  }
+  if (shorterProfileKeyEmbedsInLonger(a.key, b.key) || shorterProfileKeyEmbedsInLonger(b.key, a.key)) {
+    return false;
+  }
+
+  const wa = significantProfileWords(a.key);
+  const wb = significantProfileWords(b.key);
+  if (wa.length < 2 || wb.length < 2) {
+    return false;
+  }
+
+  const setA = new Set(wa);
+  const setB = new Set(wb);
+  let inter = 0;
+  for (const w of setA) {
+    if (setB.has(w)) {
+      inter++;
+    }
+  }
+  const union = setA.size + setB.size - inter;
+  if (union === 0) {
+    return false;
+  }
+  const jaccard = inter / union;
+  if (jaccard < 0.4) {
+    return false;
+  }
+  if (inter < 2) {
+    return false;
+  }
+  if (Math.min(setA.size, setB.size) >= 5 && inter < 3) {
+    return false;
+  }
+  return true;
+}
+
+/** Prefer the more informative line, then newer / stronger memory. */
+function pickBetterEvidenceRepresentative(a: ProfileDedupEntry, b: ProfileDedupEntry): ProfileDedupEntry {
+  if (a.key.length !== b.key.length) {
+    return a.key.length > b.key.length ? a : b;
+  }
+  return compareProfileConflictPreference(a, b) < 0 ? b : a;
+}
+
+/**
+ * Collapse rephrased supporting lines into one bullet per cluster (greedy, first-match wins).
+ * Order within the section is preserved for representatives.
+ */
+function aggregateSupportingProfileEvidence(entries: readonly ProfileDedupEntry[]): ProfileDedupEntry[] {
+  const out: ProfileDedupEntry[] = [];
+
+  for (const cur of entries) {
+    let merged = false;
+    for (let i = 0; i < out.length; i++) {
+      const prev = out[i];
+
+      if (!prev) {
+        continue;
+      }
+
+      if (profileLinesAreSupportingEvidence(prev, cur)) {
+        out[i] = pickBetterEvidenceRepresentative(prev, cur);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) {
+      out.push(cur);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Cross-kind-run cleanup for profile sections: dedupe again at section scope, then merge
+ * rephrased supporting statements (evidence overlap) into a single representative bullet.
+ */
+function finalizeProfileSectionEntries(entries: readonly ProfileDedupEntry[]): ProfileDedupEntry[] {
+  const deduped = dedupeProfileEntriesForKind(entries);
+  return aggregateSupportingProfileEvidence(deduped);
 }
 
 function splitOrderedIntoKindRuns(ordered: readonly SearchMemoryItem[]): SearchMemoryItem[][] {

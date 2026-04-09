@@ -1,4 +1,11 @@
-import { rememberInputSchema, searchMemoriesInputSchema, buildContextForTaskInputSchema, upsertDocumentInputSchema, listMemoriesInputSchema } from "../schemas.js";
+import {
+  rememberInputSchema,
+  searchMemoriesInputSchema,
+  buildContextForTaskInputSchema,
+  upsertDocumentInputSchema,
+  listMemoriesInputSchema,
+  suggestMemoryCandidatesInputSchema,
+} from "../schemas.js";
 import type { MemoryService } from "../memory-service.js";
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
 
@@ -34,6 +41,13 @@ export function getRegisteredMemoryTools(memoryService: MemoryService): readonly
       description: "List stored memories for inspection.",
       inputSchema: listMemoriesInputSchema.shape,
       execute: (input) => memoryService.list(input as never),
+    },
+    {
+      name: "suggest_memory_candidates",
+      description:
+        "Analyze conversation text and return durable-memory candidates (kind, suggested scope, reason, draft content) plus a save recommendation. Deterministic heuristics for agent/tool loops; does not write storage.",
+      inputSchema: suggestMemoryCandidatesInputSchema.shape,
+      execute: async (input) => memoryService.suggestMemoryCandidates(input as never),
     },
   ];
 }

@@ -109,6 +109,36 @@ export interface ListMemoriesInput {
   readonly limit?: number;
 }
 
+export type MemorySuggestionConfidence = "low" | "medium" | "high";
+
+export type MemorySaveRecommendation = "likely_skip" | "consider_saving" | "strong_candidate";
+
+export interface SuggestMemoryCandidatesInput {
+  readonly conversation: string;
+  readonly userId?: string;
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly sessionId?: string;
+  readonly maxCandidates?: number;
+}
+
+export interface MemorySuggestionCandidate {
+  readonly kind: MemoryKind;
+  readonly scope: MemoryScope;
+  readonly reason: string;
+  readonly draftContent: string;
+  readonly confidence: MemorySuggestionConfidence;
+}
+
+export interface SuggestMemoryCandidatesResult {
+  readonly recommendation: MemorySaveRecommendation;
+  readonly signals: {
+    readonly durable: readonly string[];
+    readonly ephemeral: readonly string[];
+  };
+  readonly candidates: readonly MemorySuggestionCandidate[];
+}
+
 export interface ScopeFilter {
   readonly scope: MemoryScope;
   readonly userId?: string;

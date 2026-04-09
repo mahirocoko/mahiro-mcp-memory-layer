@@ -73,3 +73,12 @@ export const listMemoriesInputSchema = z.object({
   kind: z.enum(memoryKinds).optional(),
   limit: z.number().int().positive().max(100).optional(),
 });
+
+export const suggestMemoryCandidatesInputSchema = z.object({
+  conversation: z.string().trim().min(1),
+  userId: z.string().trim().min(1).optional(),
+  projectId: z.string().trim().min(1).optional(),
+  containerId: z.string().trim().min(1).optional(),
+  sessionId: z.string().trim().min(1).optional(),
+  maxCandidates: z.number().int().positive().max(10).optional(),
+});

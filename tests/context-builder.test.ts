@@ -62,6 +62,7 @@ describe("buildContextFromItems", () => {
 
     expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
     expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Tasks:"));
+    expect(result.context).not.toContain("Stable Facts:");
     expect(result.context).toContain("Use LanceDB for indexed retrieval.");
     expect(result.context).toContain("Improve ranking coverage.");
   });
@@ -73,6 +74,12 @@ describe("buildContextFromItems", () => {
       items: [
         { ...baseItem, id: "mem-fact-pref", kind: "fact", summary: "Standardize on Bun for the toolchain." },
         { ...baseItem, id: "mem-fact", kind: "fact", summary: "The stack uses LanceDB for retrieval." },
+        {
+          ...baseItem,
+          id: "mem-fact-broad",
+          kind: "fact",
+          summary: "Loose notes and links collected during onboarding.",
+        },
         { ...baseItem, id: "mem-decision-pref", kind: "decision", summary: "Prefer SQLite for local workflows." },
         { ...baseItem, id: "mem-decision", kind: "decision", summary: "JSONL is the canonical memory log." },
       ],
@@ -81,14 +88,17 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
+    expect(result.context).toContain("Stable Facts:");
     expect(result.context).toContain("Facts:");
     expect(result.context).toContain("Preferences:");
     expect(result.context).toContain("Decisions:");
     expect(result.context).toContain("The stack uses LanceDB for retrieval.");
+    expect(result.context).toContain("Loose notes and links collected during onboarding.");
     expect(result.context).toContain("Standardize on Bun for the toolchain.");
     expect(result.context).toContain("Prefer SQLite for local workflows.");
     expect(result.context).toContain("JSONL is the canonical memory log.");
-    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Stable Facts:"));
+    expect(result.context.indexOf("Stable Facts:")).toBeLessThan(result.context.indexOf("Facts:"));
     expect(result.context.indexOf("Facts:")).toBeLessThan(result.context.indexOf("Decisions:"));
   });
 
@@ -130,12 +140,148 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
-    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Facts:"));
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Stable Facts:"));
     expect(result.context).not.toContain("Decisions:");
+    expect(result.context).not.toContain("\nFacts:\n");
     expect(result.context).toContain("Prefer Vitest for unit tests.");
     expect(result.context).toContain("Use Bun for scripts and CI.");
     expect(result.context).toContain("Repository is TypeScript-first.");
     expect(result.context.indexOf("Prefer Vitest")).toBeLessThan(result.context.indexOf("Use Bun for scripts"));
+    expect(result.context).toContain("Stable Facts:");
+  });
+
+  it("routes preference-like doc summaries to Preferences like facts and decisions", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-doc-pref",
+          kind: "doc",
+          summary: "Standardize on Markdown for design docs.",
+        },
+        {
+          ...baseItem,
+          id: "mem-doc-stable",
+          kind: "doc",
+          summary: "The API gateway is deployed on port 8080.",
+        },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Preferences:");
+    expect(result.context).toContain("Stable Facts:");
+    expect(result.context).toContain("Standardize on Markdown for design docs.");
+    expect(result.context).toContain("The API gateway is deployed on port 8080.");
+    expect(result.context.indexOf("Preferences:")).toBeLessThan(result.context.indexOf("Stable Facts:"));
+  });
+
+  it("promotes declarative fact and doc lines into Stable Facts and keeps non-declarative lines under Facts", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-stable-fact",
+          kind: "fact",
+          summary: "The ingestion pipeline is idempotent for replay safety.",
+        },
+        {
+          ...baseItem,
+          id: "mem-broad-fact",
+          kind: "fact",
+          summary: "Short scratch.",
+        },
+        {
+          ...baseItem,
+          id: "mem-stable-doc",
+          kind: "doc",
+          summary: "This service runs the MCP stdio bridge on localhost.",
+        },
+        {
+          ...baseItem,
+          id: "mem-broad-doc",
+          kind: "doc",
+          summary: "Link dump: design references and drafts.",
+        },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Stable Facts:");
+    expect(result.context).toContain("Facts:");
+    expect(result.context).toContain("The ingestion pipeline is idempotent for replay safety.");
+    expect(result.context).toContain("This service runs the MCP stdio bridge on localhost.");
+    expect(result.context).toContain("Short scratch.");
+    expect(result.context).toContain("Link dump: design references and drafts.");
+    expect(result.context.indexOf("Stable Facts:")).toBeLessThan(result.context.indexOf("Facts:"));
+  });
+
+  it("aggregates repeated preference evidence into one representative bullet", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-pref-short",
+          kind: "fact",
+          summary: "Prefer Bun for local scripts and tooling.",
+        },
+        {
+          ...baseItem,
+          id: "mem-pref-long",
+          kind: "fact",
+          summary: "Prefer Bun for local scripts, tooling, and package workflows.",
+        },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Preferences:");
+    expect(result.context).toContain("Prefer Bun for local scripts, tooling, and package workflows.");
+    expect(result.context).not.toContain("Prefer Bun for local scripts and tooling.");
+    expect(result.items).toEqual(["mem-pref-long"]);
+  });
+
+  it("aggregates repeated stable-fact evidence into one representative bullet", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-fact-short",
+          kind: "fact",
+          summary: "The service uses LanceDB for vector retrieval and keeps embeddings on disk.",
+        },
+        {
+          ...baseItem,
+          id: "mem-fact-long",
+          kind: "doc",
+          summary: "The service uses LanceDB for vector retrieval, keeps embeddings on disk, and reindexes from the canonical log.",
+        },
+      ],
+      maxItems: 10,
+      maxChars: 2000,
+      degraded: false,
+    });
+
+    expect(result.context).toContain("Stable Facts:");
+    expect(result.context).toContain(
+      "The service uses LanceDB for vector retrieval, keeps embeddings on disk, and reindexes from the canonical log.",
+    );
+    expect(result.context).not.toContain("The service uses LanceDB for vector retrieval and keeps embeddings on disk.");
+    expect(result.items).toEqual(["mem-fact-long"]);
   });
 
   it("strips discourse hedges from profile lines", () => {
@@ -251,6 +397,56 @@ describe("buildContextFromItems", () => {
     expect(result.context).toContain("Uses LanceDB for vectors and keeps embeddings on disk.");
     expect(result.context).not.toContain("- Uses LanceDB for vectors.\n");
     expect(result.items).toEqual(["mem-long"]);
+  });
+
+  it("aggregates rephrased supporting evidence into one profile bullet (preferences/stable/facts sections)", () => {
+    const result = buildContextFromItems({
+      task: "Profile task",
+      mode: "profile",
+      items: [
+        {
+          ...baseItem,
+          id: "mem-long",
+          kind: "fact",
+          summary:
+            "The stack uses LanceDB for local vector search and keeps embeddings on disk for offline use.",
+          createdAt: "2026-04-01T00:00:00.000Z",
+        },
+        {
+          ...baseItem,
+          id: "mem-rephrase",
+          kind: "fact",
+          summary: "LanceDB powers local vector search in this stack.",
+          createdAt: "2026-04-02T00:00:00.000Z",
+        },
+        {
+          ...baseItem,
+          id: "mem-pref-a",
+          kind: "fact",
+          summary: "Prefer Vitest for unit tests in this repository with happy-dom.",
+        },
+        {
+          ...baseItem,
+          id: "mem-pref-b",
+          kind: "fact",
+          summary: "Prefer using Vitest and happy-dom for unit tests here in the repository.",
+        },
+      ],
+      maxItems: 10,
+      maxChars: 4000,
+      degraded: false,
+    });
+
+    expect(result.context.match(/LanceDB/g)?.length).toBe(1);
+    expect(result.context).toContain(
+      "The stack uses LanceDB for local vector search and keeps embeddings on disk for offline use.",
+    );
+    expect(result.context).not.toContain("LanceDB powers local vector search");
+    expect(result.items.filter((id) => id === "mem-long" || id === "mem-rephrase")).toEqual(["mem-long"]);
+
+    expect(result.context.match(/Vitest/g)?.length).toBe(1);
+    expect(result.context.match(/happy-dom/g)?.length).toBe(1);
+    expect(result.items.filter((id) => id === "mem-pref-a" || id === "mem-pref-b")).toEqual(["mem-pref-b"]);
   });
 
   it("collapses embedded near-duplicate profile lines when the shorter phrase appears inside the longer (same kind)", () => {
