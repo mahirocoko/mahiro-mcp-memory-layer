@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-04-10T15:10:47",
+  "generatedAt": "2026-04-11T00:01:39",
   "source": "rrr-derived",
   "streak": {
-    "days": 2
+    "days": 0
   },
   "weekChangePct": 100.0,
   "today": {
-    "sessions": 3,
-    "modifiedFiles": 14,
+    "sessions": 0,
+    "modifiedFiles": 4,
     "hasGitChanges": true
   }
 }
