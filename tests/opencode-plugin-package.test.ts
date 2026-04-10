@@ -99,6 +99,11 @@ function createFixedPrepareHostTurnResult(context: string) {
   };
 }
 
+function parsePluginToolResult(result: unknown): unknown {
+  expect(typeof result).toBe("string");
+  return JSON.parse(result as string);
+}
+
 function createSharedMemoryBackend(): MemoryToolBackend {
   return {
     remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
@@ -330,7 +335,9 @@ describe("OpenCode plugin package", () => {
       await pluginHooks["session.idle"]({ event: createSessionIdleEvent() });
       await flushMicrotasks();
 
-      const pluginResult = await pluginHooks.tool.memory_context.execute({}, { sessionID: "session-1" });
+      const pluginResult = parsePluginToolResult(
+        await pluginHooks.tool.memory_context.execute({}, { sessionID: "session-1" }),
+      );
 
       expect(sharedMemoryBackend.wakeUpMemory).toHaveBeenCalledWith({
         userId: undefined,
@@ -418,7 +425,7 @@ describe("OpenCode plugin package", () => {
         expect(mcpTool?.inputSchema).toBe(sharedToolDefinition.inputSchema);
 
         await expect(pluginTool.execute(payload, { sessionID: "session-1" })).resolves.toEqual(
-          await mcpTool?.execute(payload),
+          JSON.stringify(await mcpTool?.execute(payload), null, 2),
         );
       }
     } finally {

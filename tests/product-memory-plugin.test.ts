@@ -187,6 +187,11 @@ function createDeferredPromise<T>(): DeferredPromise<T> {
   };
 }
 
+function parsePluginToolResult(result: unknown): unknown {
+  expect(typeof result).toBe("string");
+  return JSON.parse(result as string);
+}
+
 async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -403,14 +408,14 @@ describe("product memory OpenCode plugin contract", () => {
     await harness.hooks.event?.({ event: createSessionCreatedEvent("session-tool") });
     await flushMicrotasks();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-tool",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -443,13 +448,13 @@ describe("product memory OpenCode plugin contract", () => {
     await harness.hooks.event?.({ event: createSessionCreatedEvent("session-tool-b") });
     await flushMicrotasks();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toEqual({
       status: "empty",
@@ -485,14 +490,14 @@ describe("product memory OpenCode plugin contract", () => {
     await harness.hooks.event?.({ event: createSessionCreatedEvent("session-two") });
     await flushMicrotasks();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-one",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -544,14 +549,14 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
 
-    const whilePending = await harness.hooks.tool?.memory_context?.execute?.(
+    const whilePending = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-turn",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(whilePending).toMatchObject({
       status: "ready",
@@ -580,14 +585,14 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.wakeUpMemory).not.toHaveBeenCalled();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-turn",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -639,14 +644,14 @@ describe("product memory OpenCode plugin contract", () => {
     firstTurn.resolve(createPrepareTurnResult("turn context: first draft"));
     await flushMicrotasks();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-stale",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -681,14 +686,14 @@ describe("product memory OpenCode plugin contract", () => {
 
     await advanceFakeTimeBy(25);
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-turn-error",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -736,14 +741,14 @@ describe("product memory OpenCode plugin contract", () => {
       userId: undefined,
     });
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-idle",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -837,14 +842,14 @@ describe("product memory OpenCode plugin contract", () => {
       userId: undefined,
     });
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-empty-turn",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -900,14 +905,14 @@ describe("product memory OpenCode plugin contract", () => {
       }),
     );
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-idle-error",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",
@@ -1124,14 +1129,14 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.wakeUpMemory).toHaveBeenCalledTimes(1);
 
-    const whilePending = await harness.hooks.tool?.memory_context?.execute?.(
+    const whilePending = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-pending",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(whilePending).toMatchObject({
       status: "ready",
@@ -1174,14 +1179,14 @@ describe("product memory OpenCode plugin contract", () => {
     ).resolves.toBeUndefined();
     await flushMicrotasks();
 
-    const result = await harness.hooks.tool?.memory_context?.execute?.(
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-error",
         directory: repoRoot,
         worktree: repoRoot,
       },
-    );
+    ));
 
     expect(result).toMatchObject({
       status: "ready",

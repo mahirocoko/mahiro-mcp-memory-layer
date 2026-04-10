@@ -14,7 +14,7 @@ Then use `README.md` for command, install, and interface reference.
 - Orchestration MCP tools: `src/features/orchestration/mcp/register-tools.ts`
 - Primary verification commands: `bun run typecheck`, `bun run test`, `bun run build`
 - OpenCode plugin entrypoint: `src/features/opencode-plugin/index.ts`
-- Standard OpenCode install path is plugin-only via the package name (`mahiro-mcp-memory-layer` in `opencode.json`); plugin overrides resolve from plugin config files plus environment variables, while the standalone MCP CLI/server remains a separate advanced/manual fallback.
+- Standard OpenCode install path is plugin-only via the package name (`mahiro-mcp-memory-layer` in `opencode.json`); plugin overrides resolve from plugin config files plus environment variables. A local `file://` source-checkout plugin path also injects this repo's standalone MCP server through the plugin `config` hook, while the standalone MCP CLI/server remains the separate advanced/manual fallback.
 
 ## Public Contract
 

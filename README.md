@@ -35,6 +35,10 @@ Local development path:
 
 Use the `file://` variant when you want OpenCode to load the plugin directly from your local checkout while debugging or iterating on the source.
 
+When the plugin is loaded from a real source checkout like the `file://` path above, it also injects a local MCP entry for this repo's standalone server through the plugin `config` hook. That makes MCP-backed tools such as `orchestrate_workflow`, `get_orchestration_result`, and `list_orchestration_traces` available without adding a manual `mcp` block yourself.
+
+That MCP injection is intentionally source-checkout only. The standard package-name install should be treated as the plugin-native memory path first.
+
 Plugin override path:
 
 - user config: `~/.config/opencode/mahiro-mcp-memory-layer.jsonc`

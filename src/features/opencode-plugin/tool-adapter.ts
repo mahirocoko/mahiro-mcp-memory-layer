@@ -16,7 +16,7 @@ export function createOpenCodePluginTools(
         args: tool.inputSchema,
         execute: async (args: Record<string, unknown>) => {
           const backend = await runtime.ensureBackend();
-          return await tool.execute(backend, args);
+          return serializeOpenCodeToolResult(await tool.execute(backend, args));
         },
       },
     ]),
@@ -28,8 +28,16 @@ export function createOpenCodePluginTools(
       description: "Read cached memory context for the active OpenCode session.",
       args: {},
       execute: async (_args, toolContext) => {
-        return await runtime.readMemoryContext(toolContext);
+        return serializeOpenCodeToolResult(await runtime.readMemoryContext(toolContext));
       },
     },
   };
+}
+
+function serializeOpenCodeToolResult(result: unknown): string {
+  if (typeof result === "string") {
+    return result;
+  }
+
+  return JSON.stringify(result, null, 2);
 }

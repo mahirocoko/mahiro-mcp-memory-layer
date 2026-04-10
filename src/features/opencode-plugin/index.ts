@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { loadOpenCodePluginConfig } from "./config-loader.js";
+import { applyOpenCodePluginMcpConfig } from "./mcp-config-adapter.js";
 import type { OpenCodePluginEvent } from "./resolve-scope.js";
 import { createOpenCodePluginTools } from "./tool-adapter.js";
 import {
@@ -23,6 +24,9 @@ export async function server(
   );
 
   return {
+    config: async (config) => {
+      await applyOpenCodePluginMcpConfig(config);
+    },
     event: async ({ event }) => {
       await runtime.handleEvent(event);
     },
