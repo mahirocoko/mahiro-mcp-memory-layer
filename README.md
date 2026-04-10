@@ -608,6 +608,13 @@ Direct worker MCP tools:
 - `run_gemini_worker` / `run_cursor_worker` are synchronous and best for short direct calls; their MCP responses now include sync guidance fields such as `executionMode: "sync"`, `preferredAsyncTool`, `resultTool`, and `warning`
 - for long-running jobs, prefer the async start/poll pairs below instead of holding one MCP call open
 
+When to use sync vs async:
+
+- use sync tools when you expect a short, direct worker response and want the full result in one MCP call
+- use async tools when the worker may take noticeable time, when you want explicit polling, or when the host should avoid keeping one MCP request open
+- use `orchestrate_workflow` when you need multiple jobs/steps, workflow-level traces, or mixed Gemini/Cursor execution
+- if a sync response includes `warning`, treat it as a hint that the same task shape is a better fit for the async start/poll pair
+
 Direct async worker MCP tools:
 
 - `run_gemini_worker_async` / `run_cursor_worker_async` start a single worker job asynchronously and return a `workflow_*` request ID immediately
@@ -660,6 +667,31 @@ Cursor async MCP example:
 ```
 
 Then poll with `get_cursor_worker_result` using the returned `workflow_*` request ID. The final result shape comes from the same orchestration result store as `get_orchestration_result`, so status transitions like `running`, `completed`, and `runner_failed` stay consistent across workflow-level and single-worker async polling.
+
+Typical polling outcomes:
+
+```json
+{
+  "requestId": "workflow_123",
+  "status": "completed",
+  "result": {
+    "requestId": "workflow_123",
+    "status": "completed"
+  }
+}
+```
+
+```json
+{
+  "requestId": "workflow_123",
+  "status": "runner_failed",
+  "error": {
+    "message": "worker process exited unexpectedly"
+  }
+}
+```
+
+For orchestration polling, `completed` means the workflow result is ready, while `runner_failed` means the control-plane run itself failed before a normal completed payload could be written.
 
 Trace inspection CLI:
 
