@@ -45,6 +45,7 @@
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@opencode-ai/plugin": "^1.4.3",
     "apache-arrow": "^18.1.0",
+    "jsonc-parser": "^3.3.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {

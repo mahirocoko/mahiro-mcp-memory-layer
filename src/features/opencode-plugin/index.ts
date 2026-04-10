@@ -1,8 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 
-import { getOpenCodePluginConfig } from "./config.js";
-import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
+import { loadOpenCodePluginConfig } from "./config-loader.js";
 import type { OpenCodePluginEvent } from "./resolve-scope.js";
+import { createOpenCodePluginTools } from "./tool-adapter.js";
 import {
   createOpenCodePluginRuntime,
   type OpenCodePluginHooks,
@@ -13,24 +13,13 @@ export async function server(
   context: PluginInput,
   options: OpenCodePluginServerOptions = {},
 ): Promise<OpenCodePluginHooks> {
-  const runtimeConfig = getOpenCodePluginConfig();
+  const runtimeConfig = await loadOpenCodePluginConfig({
+    contextDirectory: context.directory,
+  });
   const runtime = createOpenCodePluginRuntime(
     context,
     options,
     options.__test?.messageDebounceMs ?? runtimeConfig.runtime.messageDebounceMs,
-  );
-  const memoryTools = Object.fromEntries(
-    getMemoryToolDefinitions().map((tool) => [
-      tool.name,
-      {
-        description: tool.description,
-        args: tool.inputSchema,
-        execute: async (args: Record<string, unknown>) => {
-          const backend = await runtime.ensureBackend();
-          return await tool.execute(backend, args);
-        },
-      },
-    ]),
   );
 
   return {
@@ -49,15 +38,6 @@ export async function server(
     "experimental.session.compacting": async (input, output) => {
       await runtime.handleExperimentalSessionCompacting(input, output);
     },
-    tool: {
-      ...memoryTools,
-      memory_context: {
-        description: "Read cached memory context for the active OpenCode session.",
-        args: {},
-        execute: async (_args, toolContext) => {
-          return await runtime.readMemoryContext(toolContext);
-        },
-      },
-    },
+    tool: createOpenCodePluginTools(runtime),
   };
 }

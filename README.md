@@ -37,7 +37,21 @@ Use the `file://` variant when you want OpenCode to load the plugin directly fro
 
 Plugin override path:
 
-- `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's debounce window without adding extra `opencode.json` fields.
+- user config: `~/.config/opencode/mahiro-mcp-memory-layer.jsonc`
+- project config: `.opencode/mahiro-mcp-memory-layer.jsonc`
+- environment override: `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS`
+
+Example plugin config:
+
+```jsonc
+{
+  "runtime": {
+    "messageDebounceMs": 150
+  }
+}
+```
+
+Precedence is: environment override > project plugin config > user plugin config > built-in defaults.
 
 Manual MCP fallback:
 

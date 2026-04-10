@@ -14,12 +14,13 @@ Then use `README.md` for command, install, and interface reference.
 - Orchestration MCP tools: `src/features/orchestration/mcp/register-tools.ts`
 - Primary verification commands: `bun run typecheck`, `bun run test`, `bun run build`
 - OpenCode plugin entrypoint: `src/features/opencode-plugin/index.ts`
-- Standard OpenCode install path is plugin-only via the package name (`mahiro-mcp-memory-layer` in `opencode.json`); plugin overrides stay environment-variable based, while the standalone MCP CLI/server remains a separate advanced/manual fallback.
+- Standard OpenCode install path is plugin-only via the package name (`mahiro-mcp-memory-layer` in `opencode.json`); plugin overrides resolve from plugin config files plus environment variables, while the standalone MCP CLI/server remains a separate advanced/manual fallback.
 
 ## Public Contract
 
 - MCP server name: `mahiro-mcp-memory-layer`
 - Primary memory tools: `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory` (alias), `wake_up_memory`
+- Plugin-only diagnostic tool: `memory_context`
 - Orchestration tools: `orchestrate_workflow`, `get_orchestration_result`, `list_orchestration_traces`
 - Default orchestration posture: async
 - Omit `waitForCompletion` to start work in background and get `{ requestId, status: "running", autoAsync: true }`

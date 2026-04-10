@@ -1,28 +1,32 @@
-import { MemoryService } from "../memory/memory-service.js";
 import type { ZodRawShape } from "zod";
 import type { Hooks, PluginOptions } from "@opencode-ai/plugin";
 import type { ToolContext } from "@opencode-ai/plugin/tool";
-import type { MemoryToolBackend } from "../memory/lib/tool-definitions.js";
-import type {
-  PrepareHostTurnMemoryResult,
-  PrepareTurnMemoryResult,
-  WakeUpMemoryResult,
-} from "../memory/types.js";
-import { resolveOpenCodeScope, type OpenCodeScopeResolution } from "./resolve-scope.js";
+
 import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
-
-export type OpenCodePluginMemoryBackend = MemoryToolBackend;
-
-export interface OpenCodePluginCompactionInput {
-  readonly sessionID?: unknown;
-  readonly info?: unknown;
-  readonly properties?: Record<string, unknown>;
-}
-
-export interface OpenCodePluginCompactionOutput {
-  context?: unknown;
-  prompt?: unknown;
-}
+import {
+  applyCompactionContinuity,
+  createCompactionEvent,
+  type OpenCodePluginCompactionInput,
+  type OpenCodePluginCompactionOutput,
+} from "./runtime-compaction.js";
+import {
+  getOpenCodePluginMemoryBackend,
+  resetOpenCodePluginMemoryBackendSingletonForTests as resetMemoryBackendSingletonForTests,
+  type OpenCodePluginMemoryBackend,
+  type OpenCodePluginTestOptions,
+} from "./runtime-backend.js";
+import { logPluginLifecycle, toErrorMessage } from "./runtime-logging.js";
+import {
+  buildMemoryContextResult,
+  buildPrepareHostTurnKey,
+  extractRecentConversation,
+  getOrCreateSingletonRuntimeState,
+  resetOpenCodePluginRuntimeStateForTests,
+  resolveSessionIdFromUnknown,
+  syncSessionStateFromEvent,
+  type OpenCodePluginMemoryContextResult,
+  type OpenCodePluginSessionState,
+} from "./runtime-state.js";
 
 export interface OpenCodePluginToolExecutionContext {
   readonly sessionID?: ToolContext["sessionID"];
@@ -58,69 +62,6 @@ export interface OpenCodePluginHooks extends Omit<Hooks, "event" | "tool" | "exp
   readonly tool: Record<string, OpenCodePluginToolDefinition>;
 }
 
-export interface OpenCodePluginCachedSession {
-  readonly sessionId: string;
-  readonly scopeResolution: OpenCodeScopeResolution;
-  readonly lastEventType?: string;
-  readonly lastUpdatedAt: string;
-  readonly lastMessageId?: string;
-  readonly coordination: {
-    readonly messageDebounceMs: number;
-    readonly messageVersion: number;
-    readonly hasPendingMessageDebounce: boolean;
-  };
-  readonly cached: {
-    readonly wakeUp?: WakeUpMemoryResult;
-    readonly prepareTurn?: PrepareTurnMemoryResult;
-    readonly prepareHostTurn?: PrepareHostTurnMemoryResult;
-  };
-}
-
-export interface OpenCodePluginReadyMemoryContextResult {
-  readonly status: "ready";
-  readonly latestSessionId?: string;
-  readonly session: OpenCodePluginCachedSession;
-}
-
-export interface OpenCodePluginEmptyMemoryContextResult {
-  readonly status: "empty";
-  readonly latestSessionId?: string;
-}
-
-export type OpenCodePluginMemoryContextResult =
-  | OpenCodePluginReadyMemoryContextResult
-  | OpenCodePluginEmptyMemoryContextResult;
-
-interface OpenCodePluginSessionState {
-  readonly sessionId: string;
-  scopeResolution: OpenCodeScopeResolution;
-  lastEventType?: string;
-  lastUpdatedAt: string;
-  lastMessageId?: string;
-  recentConversation?: string;
-  messageVersion: number;
-  messageDebounceMs: number;
-  hasStartedWakeUp: boolean;
-  pendingMessageDebounce?: ReturnType<typeof setTimeout>;
-  pendingWakeUp?: Promise<void>;
-  pendingPrepareHostTurnKey?: string;
-  lastHandledPrepareHostTurnKey?: string;
-  wakeUp?: WakeUpMemoryResult;
-  prepareTurn?: PrepareTurnMemoryResult;
-  prepareHostTurn?: PrepareHostTurnMemoryResult;
-}
-
-interface OpenCodePluginRuntimeState {
-  readonly sessions: Map<string, OpenCodePluginSessionState>;
-  latestSessionId?: string;
-}
-
-export interface OpenCodePluginTestOptions {
-  readonly memory?: OpenCodePluginMemoryBackend;
-  readonly createMemoryBackend?: () => Promise<OpenCodePluginMemoryBackend>;
-  readonly messageDebounceMs?: number;
-}
-
 export interface OpenCodePluginServerOptions {
   readonly [key: string]: PluginOptions[string];
   readonly __test?: OpenCodePluginTestOptions;
@@ -142,9 +83,6 @@ export interface OpenCodePluginRuntime {
   ) => Promise<OpenCodePluginMemoryContextResult>;
 }
 
-let singletonMemoryBackendPromise: Promise<OpenCodePluginMemoryBackend> | undefined;
-let singletonRuntimeState: OpenCodePluginRuntimeState | undefined;
-
 export function createOpenCodePluginRuntime(
   context: OpenCodePluginContext,
   options: OpenCodePluginServerOptions,
@@ -156,7 +94,7 @@ export function createOpenCodePluginRuntime(
     event: OpenCodePluginEvent,
     sourceHook: "event" | "session.created" | "message.updated" | "session.idle" | "experimental.session.compacting",
   ): Promise<OpenCodePluginSessionState | undefined> => {
-    void getOpenCodePluginMemoryBackend(options).catch((error) =>
+    void getOpenCodePluginMemoryBackend(options.__test).catch((error) =>
       logPluginLifecycle(context, {
         service: "opencode-memory-plugin",
         level: "warn",
@@ -193,7 +131,7 @@ export function createOpenCodePluginRuntime(
     let pendingWakeUp: Promise<void>;
 
     sessionState.hasStartedWakeUp = true;
-    pendingWakeUp = getOpenCodePluginMemoryBackend(options)
+    pendingWakeUp = getOpenCodePluginMemoryBackend(options.__test)
       .then((backend) =>
         backend.wakeUpMemory({
           userId: wakeUpScope.userId,
@@ -260,7 +198,7 @@ export function createOpenCodePluginRuntime(
     const scope = currentSessionState.scopeResolution.scope;
 
     try {
-      const backend = await getOpenCodePluginMemoryBackend(options);
+      const backend = await getOpenCodePluginMemoryBackend(options.__test);
       const prepareTurn = await backend.prepareTurnMemory({
         task: "Summarize relevant memory context for the latest OpenCode turn.",
         mode: "query",
@@ -363,7 +301,7 @@ export function createOpenCodePluginRuntime(
     const scope = sessionState.scopeResolution.scope;
     sessionState.pendingPrepareHostTurnKey = turnKey;
 
-    void getOpenCodePluginMemoryBackend(options)
+    void getOpenCodePluginMemoryBackend(options.__test)
       .then((backend) =>
         backend.prepareHostTurnMemory({
           task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -410,7 +348,7 @@ export function createOpenCodePluginRuntime(
 
   return {
     messageDebounceMs,
-    ensureBackend: () => getOpenCodePluginMemoryBackend(options),
+    ensureBackend: () => getOpenCodePluginMemoryBackend(options.__test),
     handleEvent: async (event) => {
       switch (event.type) {
         case "session.created": {
@@ -436,58 +374,10 @@ export function createOpenCodePluginRuntime(
     handleSessionCreated: (event) => handleSessionCreatedEvent(event, "session.created"),
     handleMessageUpdated: (event) => handleMessageUpdatedEvent(event, "message.updated"),
     handleSessionIdle: (event) => handleSessionIdleEvent(event, "session.idle"),
-    handleExperimentalSessionCompacting: async (input, _output) => {
+    handleExperimentalSessionCompacting: async (input, output) => {
       const event = createCompactionEvent(input);
       const sessionState = await routeEvent(event, "experimental.session.compacting");
-
-      if (!sessionState) {
-        await logCompactionOutcome(context, "skipped", {
-          reason: "missing_session_state",
-        });
-        return;
-      }
-
-      const continuityBlock = buildCompactionContinuityBlock(sessionState);
-
-      if (!continuityBlock) {
-        await logCompactionOutcome(context, "skipped", {
-          sessionId: sessionState.sessionId,
-          reason: "missing_cached_session_state",
-        });
-        return;
-      }
-
-      if (toNonEmptyString(_output.prompt)) {
-        await logCompactionOutcome(context, "degraded", {
-          sessionId: sessionState.sessionId,
-          reason: "output_prompt_already_set",
-        });
-        return;
-      }
-
-      const contextAppender = asCompactionContextAppender(_output.context);
-
-      if (!contextAppender) {
-        await logCompactionOutcome(context, "degraded", {
-          sessionId: sessionState.sessionId,
-          reason: "output_context_not_appendable",
-        });
-        return;
-      }
-
-      try {
-        contextAppender.push(continuityBlock);
-        await logCompactionOutcome(context, "invoked", {
-          sessionId: sessionState.sessionId,
-          reason: "cached_session_state_appended",
-        });
-      } catch (error) {
-        await logCompactionOutcome(context, "error", {
-          sessionId: sessionState.sessionId,
-          reason: "context_append_failed",
-          error: toErrorMessage(error),
-        });
-      }
+      await applyCompactionContinuity(context, sessionState, output);
     },
     readMemoryContext: async (toolContext) => {
       const sessionId =
@@ -499,331 +389,7 @@ export function createOpenCodePluginRuntime(
   };
 }
 
-export function getOpenCodePluginMemoryBackend(
-  options: OpenCodePluginServerOptions = {},
-): Promise<OpenCodePluginMemoryBackend> {
-  if (options.__test?.memory) {
-    return Promise.resolve(options.__test.memory);
-  }
-
-  return getOrCreateSingletonMemoryBackend(options.__test?.createMemoryBackend ?? createDefaultMemoryBackend);
-}
-
 export function resetOpenCodePluginMemoryBackendSingletonForTests(): void {
-  singletonMemoryBackendPromise = undefined;
-
-  if (singletonRuntimeState) {
-    for (const sessionState of singletonRuntimeState.sessions.values()) {
-      if (sessionState.pendingMessageDebounce) {
-        clearTimeout(sessionState.pendingMessageDebounce);
-      }
-    }
-  }
-
-  singletonRuntimeState = undefined;
-}
-
-async function createDefaultMemoryBackend(): Promise<OpenCodePluginMemoryBackend> {
-  return await MemoryService.create();
-}
-
-function getOrCreateSingletonMemoryBackend(
-  createMemoryBackend: () => Promise<OpenCodePluginMemoryBackend>,
-): Promise<OpenCodePluginMemoryBackend> {
-  if (!singletonMemoryBackendPromise) {
-    singletonMemoryBackendPromise = createMemoryBackend().catch((error) => {
-      singletonMemoryBackendPromise = undefined;
-      throw error;
-    });
-  }
-
-  return singletonMemoryBackendPromise;
-}
-
-function getOrCreateSingletonRuntimeState(): OpenCodePluginRuntimeState {
-  if (!singletonRuntimeState) {
-    singletonRuntimeState = {
-      sessions: new Map<string, OpenCodePluginSessionState>(),
-    };
-  }
-
-  return singletonRuntimeState;
-}
-
-function syncSessionStateFromEvent(
-  runtimeState: OpenCodePluginRuntimeState,
-  context: OpenCodePluginContext,
-  event: OpenCodePluginEvent,
-  messageDebounceMs: number,
-): OpenCodePluginSessionState | undefined {
-  const scopeResolution = resolveOpenCodeScope({
-    context,
-    event,
-  });
-  const sessionId = scopeResolution.scope.sessionId;
-
-  if (!sessionId) {
-    return undefined;
-  }
-
-  const existingState = runtimeState.sessions.get(sessionId);
-  const nextMessageId = resolveMessageId(event) ?? existingState?.lastMessageId;
-  const nextState: OpenCodePluginSessionState = {
-    sessionId,
-    scopeResolution,
-    lastEventType: event.type,
-    lastUpdatedAt: new Date().toISOString(),
-    lastMessageId: nextMessageId,
-    recentConversation: resolveRecentConversationForEvent(event, existingState, nextMessageId),
-    messageVersion:
-      event.type === "message.updated"
-        ? (existingState?.messageVersion ?? 0) + 1
-        : (existingState?.messageVersion ?? 0),
-    messageDebounceMs,
-    hasStartedWakeUp: existingState?.hasStartedWakeUp ?? false,
-    pendingMessageDebounce: existingState?.pendingMessageDebounce,
-    pendingWakeUp: existingState?.pendingWakeUp,
-    pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
-    lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
-    wakeUp: existingState?.wakeUp,
-    prepareTurn: event.type === "message.updated" ? undefined : existingState?.prepareTurn,
-    prepareHostTurn: existingState?.prepareHostTurn,
-  };
-
-  runtimeState.sessions.set(sessionId, nextState);
-  runtimeState.latestSessionId = sessionId;
-
-  return nextState;
-}
-
-function buildMemoryContextResult(
-  runtimeState: OpenCodePluginRuntimeState,
-  sessionId: string | undefined,
-): OpenCodePluginMemoryContextResult {
-  if (!sessionId) {
-    return {
-      status: "empty",
-      latestSessionId: runtimeState.latestSessionId,
-    };
-  }
-
-  const sessionState = runtimeState.sessions.get(sessionId);
-
-  if (!sessionState) {
-    return {
-      status: "empty",
-      latestSessionId: runtimeState.latestSessionId,
-    };
-  }
-
-  return {
-    status: "ready",
-    latestSessionId: runtimeState.latestSessionId,
-    session: {
-      sessionId: sessionState.sessionId,
-      scopeResolution: sessionState.scopeResolution,
-      lastEventType: sessionState.lastEventType,
-      lastUpdatedAt: sessionState.lastUpdatedAt,
-      lastMessageId: sessionState.lastMessageId,
-      coordination: {
-        messageDebounceMs: sessionState.messageDebounceMs,
-        messageVersion: sessionState.messageVersion,
-        hasPendingMessageDebounce: Boolean(sessionState.pendingMessageDebounce),
-      },
-      cached: {
-        ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
-        ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
-        ...(sessionState.prepareHostTurn ? { prepareHostTurn: sessionState.prepareHostTurn } : {}),
-      },
-    },
-  };
-}
-
-function createCompactionEvent(input: OpenCodePluginCompactionInput): OpenCodePluginEvent {
-  const properties = asRecord(input.properties);
-  const sessionId =
-    toNonEmptyString(input.sessionID) ??
-    toNonEmptyString(asRecord(input.info)?.id) ??
-    toNonEmptyString(properties?.sessionID) ??
-    toNonEmptyString(asRecord(properties?.info)?.id);
-
-  return {
-    type: "experimental.session.compacting",
-    properties: {
-      ...(sessionId ? { sessionID: sessionId } : {}),
-    },
-  };
-}
-
-function resolveSessionIdFromUnknown(value: unknown): string | undefined {
-  const record = asRecord(value);
-
-  return (
-    toNonEmptyString(record?.sessionID) ??
-    toNonEmptyString(asRecord(record?.info)?.id) ??
-    toNonEmptyString(asRecord(record?.properties)?.sessionID) ??
-    toNonEmptyString(asRecord(asRecord(record?.properties)?.info)?.id)
-  );
-}
-
-function resolveMessageId(event: OpenCodePluginEvent): string | undefined {
-  return toNonEmptyString(asRecord(event.properties)?.messageID);
-}
-
-function resolveRecentConversationForEvent(
-  event: OpenCodePluginEvent,
-  existingState: OpenCodePluginSessionState | undefined,
-  nextMessageId: string | undefined,
-): string | undefined {
-  if (event.type !== "message.updated") {
-    return existingState?.recentConversation;
-  }
-
-  const recentConversation = extractRecentConversation(event);
-
-  if (recentConversation) {
-    return recentConversation;
-  }
-
-  if (nextMessageId && nextMessageId === existingState?.lastMessageId) {
-    return existingState?.recentConversation;
-  }
-
-  return undefined;
-}
-
-function extractRecentConversation(event: OpenCodePluginEvent): string | undefined {
-  const properties = asRecord(event.properties);
-  const parts = Array.isArray(properties?.parts) ? properties.parts : [];
-  const textParts = parts
-    .map((part) => {
-      const record = asRecord(part);
-      return toNonEmptyString(record?.text);
-    })
-    .filter((part): part is string => Boolean(part));
-
-  if (textParts.length > 0) {
-    return textParts.join("\n\n");
-  }
-
-  return toNonEmptyString(properties?.message);
-}
-
-function buildPrepareHostTurnKey(sessionState: OpenCodePluginSessionState): string | undefined {
-  if (sessionState.lastMessageId) {
-    return `message:${sessionState.lastMessageId}`;
-  }
-
-  if (sessionState.messageVersion > 0) {
-    return `version:${sessionState.messageVersion}`;
-  }
-
-  return undefined;
-}
-
-function buildCompactionContinuityBlock(sessionState: OpenCodePluginSessionState): string | undefined {
-  const sections = [
-    sessionState.wakeUp
-      ? `### Session wake-up\n${sessionState.wakeUp.wakeUpContext}`
-      : undefined,
-    sessionState.prepareTurn
-      ? `### Latest turn precompute\n${sessionState.prepareTurn.context}`
-      : undefined,
-    sessionState.prepareHostTurn
-      ? `### Latest idle persistence\n${sessionState.prepareHostTurn.context}`
-      : undefined,
-  ].filter((section): section is string => Boolean(section));
-
-  if (sections.length === 0) {
-    return undefined;
-  }
-
-  return [`## Cached memory continuity`, ...sections].join("\n\n");
-}
-
-function asCompactionContextAppender(value: unknown): { push: (entry: string) => void } | undefined {
-  if (Array.isArray(value)) {
-    return {
-      push: (entry) => {
-        value.push(entry);
-      },
-    };
-  }
-
-  const record = asRecord(value);
-  const push = record?.push;
-
-  if (typeof push !== "function") {
-    return undefined;
-  }
-
-  return {
-    push: (entry) => {
-      push.call(value, entry);
-    },
-  };
-}
-
-async function logCompactionOutcome(
-  context: OpenCodePluginContext,
-  outcome: "invoked" | "skipped" | "degraded" | "error",
-  extra: Record<string, unknown>,
-): Promise<void> {
-  await logPluginLifecycle(context, {
-    service: "opencode-memory-plugin",
-    level: outcome === "error" ? "warn" : "info",
-    message: `OpenCode plugin experimental.session.compacting ${outcome}.`,
-    extra,
-  });
-}
-
-async function logPluginLifecycle(
-  context: OpenCodePluginContext,
-  entry: {
-    readonly service: string;
-    readonly level: "debug" | "info" | "warn" | "error";
-    readonly message: string;
-    readonly extra?: Record<string, unknown>;
-  },
-): Promise<void> {
-  const appClient = asRecord(context.client)?.app;
-  const log = asRecord(appClient)?.log;
-
-  if (typeof log !== "function") {
-    return;
-  }
-
-  await log({
-    body: entry,
-  });
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toNonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const normalizedValue = value.trim();
-
-  if (normalizedValue.length === 0) {
-    return undefined;
-  }
-
-  return normalizedValue;
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
+  resetMemoryBackendSingletonForTests();
+  resetOpenCodePluginRuntimeStateForTests();
 }
