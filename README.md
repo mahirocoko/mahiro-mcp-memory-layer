@@ -569,8 +569,8 @@ MCP tool:
 
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
 - input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
-- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with `{ requestId, status: "running" }` instead of waiting for the full worker response
-- when `waitForCompletion` is omitted, workflows auto-start in background and return `{ requestId, status: "running", autoAsync: true }`
+- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, and `nextArgs`
+- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"` and `autoAsync: true`
 - `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
 - `get_orchestration_result` reads the stored workflow state/result by `requestId`
 - `list_orchestration_traces` lists persisted orchestration trace entries with optional filters like `source`, `mode`, `status`, `requestId`, `taskId`, and `limit` (each entry may include `jobModels` with per-job `requestedModel` / optional `reportedModel` when written by a current package version)
@@ -603,12 +603,63 @@ Then fetch the result later with:
 }
 ```
 
+Direct worker MCP tools:
+
+- `run_gemini_worker` / `run_cursor_worker` are synchronous and best for short direct calls; their MCP responses now include sync guidance fields such as `executionMode: "sync"`, `preferredAsyncTool`, `resultTool`, and `warning`
+- for long-running jobs, prefer the async start/poll pairs below instead of holding one MCP call open
+
 Direct async worker MCP tools:
 
 - `run_gemini_worker_async` / `run_cursor_worker_async` start a single worker job asynchronously and return a `workflow_*` request ID immediately
 - `get_gemini_worker_result` / `get_cursor_worker_result` poll the latest stored result for that async worker request
 - these tools are thin aliases over the same orchestration result store used by `orchestrate_workflow`, so they avoid holding one MCP tool call open for the full worker duration
 - the synchronous `run_gemini_worker` / `run_cursor_worker` tools still exist for short direct calls, but long-running callers should prefer the async variants
+
+Gemini async MCP example:
+
+```json
+{
+  "taskId": "gemini-task-1",
+  "prompt": "Summarize this repo",
+  "model": "gemini-3-flash-preview",
+  "taskKind": "summarize",
+  "timeoutMs": 30000,
+  "cwd": "/path/to/project"
+}
+```
+
+Typical start response:
+
+```json
+{
+  "requestId": "workflow_123",
+  "status": "running"
+}
+```
+
+Then poll with `get_gemini_worker_result`:
+
+```json
+{
+  "requestId": "workflow_123"
+}
+```
+
+Cursor async MCP example:
+
+```json
+{
+  "taskId": "cursor-task-1",
+  "prompt": "Review this diff",
+  "model": "composer-2",
+  "mode": "ask",
+  "timeoutMs": 30000,
+  "cwd": "/path/to/project",
+  "trust": true
+}
+```
+
+Then poll with `get_cursor_worker_result` using the returned `workflow_*` request ID. The final result shape comes from the same orchestration result store as `get_orchestration_result`, so status transitions like `running`, `completed`, and `runner_failed` stay consistent across workflow-level and single-worker async polling.
 
 Trace inspection CLI:
 

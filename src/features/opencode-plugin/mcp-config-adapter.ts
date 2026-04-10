@@ -9,6 +9,9 @@ const orchestrationMcpToolsPath = fileURLToPath(new URL("../orchestration/mcp/re
 const standaloneMcpServerName = "mahiro-mcp-memory-layer";
 
 export async function applyOpenCodePluginMcpConfig(config: Config): Promise<void> {
+  // This fallback is intentionally source-checkout-only in practice: the standalone server
+  // and MCP implementation files exist in local source trees, but the published plugin package
+  // does not ship them.
   if (!(await standaloneMcpServerExists())) {
     return;
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { applyOpenCodePluginMcpConfig } from "../src/features/opencode-plugin/mcp-config-adapter.js";
 
@@ -58,5 +58,28 @@ describe("applyOpenCodePluginMcpConfig", () => {
         command: ["bun", "run", expect.stringContaining("/src/index.ts")],
       },
     });
+  });
+
+  it("does not inject MCP config when the standalone source artifacts are unavailable", async () => {
+    vi.resetModules();
+    vi.doMock("node:fs/promises", () => ({
+      access: vi.fn(async () => {
+        throw new Error("missing source artifact");
+      }),
+    }));
+
+    try {
+      const { applyOpenCodePluginMcpConfig: applyWithoutArtifacts } = await import(
+        "../src/features/opencode-plugin/mcp-config-adapter.js"
+      );
+      const config = {} as Parameters<typeof applyWithoutArtifacts>[0];
+
+      await applyWithoutArtifacts(config);
+
+      expect(config.mcp).toBeUndefined();
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
   });
 });

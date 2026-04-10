@@ -87,10 +87,18 @@ describe("getRegisteredGeminiWorkerTools", () => {
       expect.arrayContaining(["taskId", "prompt", "model"]),
     );
 
-    await tool?.execute({
+    const result = await tool?.execute({
       taskId: "t1",
       prompt: "ping",
       model: "gemini-3-flash-preview",
+    });
+
+    expect(result).toMatchObject({
+      executionMode: "sync",
+      preferredAsyncTool: "run_gemini_worker_async",
+      resultTool: "get_gemini_worker_result",
+      warning:
+        "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId.",
     });
 
     expect(shellGeminiRuntime.run).toHaveBeenCalledWith(

@@ -60,14 +60,14 @@ export const orchestrateToolInputSchema = z.object({
   }
 
   if (!isMcpSyncEligibleWorkflowSpec(input.spec)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["waitForCompletion"],
-      message:
-        "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job with no retries. Omit waitForCompletion or set it false and poll get_orchestration_result.",
-    });
-  }
-});
+     ctx.addIssue({
+       code: z.ZodIssueCode.custom,
+       path: ["waitForCompletion"],
+       message:
+         "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is async-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then poll get_orchestration_result.",
+     });
+   }
+ });
 
 export type WorkflowSpecInput = z.infer<typeof workflowSpecSchema>;
 

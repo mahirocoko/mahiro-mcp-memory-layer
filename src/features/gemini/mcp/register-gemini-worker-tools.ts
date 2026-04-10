@@ -25,11 +25,20 @@ export function getRegisteredGeminiWorkerTools(): readonly RegisteredTool[] {
     {
       name: "run_gemini_worker",
       description:
-        "Run a Gemini worker job via the local shell runtime (gemini CLI). Intended for MCP stdio clients; orchestration defaults still use shell directly unless runtime selection opts into MCP.",
+        "Run a Gemini worker job synchronously via the local shell runtime (gemini CLI). Intended for MCP stdio clients and short calls; long-running callers should prefer run_gemini_worker_async plus get_gemini_worker_result.",
       inputSchema: geminiWorkerInputSchema.shape,
       execute: async (input) => {
         const parsed = geminiWorkerInputSchema.parse(input);
-        return shellGeminiRuntime.run(parsed);
+        const result = await shellGeminiRuntime.run(parsed);
+
+        return {
+          ...result,
+          executionMode: "sync",
+          preferredAsyncTool: "run_gemini_worker_async",
+          resultTool: "get_gemini_worker_result",
+          warning:
+            "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId.",
+        };
       },
     },
   ];

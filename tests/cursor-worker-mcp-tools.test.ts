@@ -87,10 +87,18 @@ describe("getRegisteredCursorWorkerTools", () => {
       expect.arrayContaining(["taskId", "prompt", "model"]),
     );
 
-    await tool?.execute({
+    const result = await tool?.execute({
       taskId: "t1",
       prompt: "ping",
       model: "composer-2",
+    });
+
+    expect(result).toMatchObject({
+      executionMode: "sync",
+      preferredAsyncTool: "run_cursor_worker_async",
+      resultTool: "get_cursor_worker_result",
+      warning:
+        "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId.",
     });
 
     expect(shellCursorRuntime.run).toHaveBeenCalledWith(

@@ -97,6 +97,7 @@ describe("getRegisteredOrchestrationTools", () => {
 
     expect(tool).toBeDefined();
     expect(tool?.description).toContain("parallel or sequential worker workflow");
+    expect(tool?.description).toContain("async-first");
     expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["spec", "cwd", "waitForCompletion"]),
     );
@@ -267,7 +268,17 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
       status: "running",
+      executionMode: "async",
+      waitMode: "explicit_async",
+      pollWith: "get_orchestration_result",
+      nextArgs: {
+        requestId: expect.stringMatching(/^workflow_/),
+      },
     });
+    expect(result).toHaveProperty(
+      "message",
+      "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status.",
+    );
     expect(result).not.toHaveProperty("autoAsync");
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
@@ -325,8 +336,18 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
       status: "running",
+      executionMode: "async",
+      waitMode: "auto_async",
+      pollWith: "get_orchestration_result",
+      nextArgs: {
+        requestId: expect.stringMatching(/^workflow_/),
+      },
       autoAsync: true,
     });
+    expect(result).toHaveProperty(
+      "message",
+      "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status.",
+    );
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
 
@@ -373,7 +394,9 @@ describe("getRegisteredOrchestrationTools", () => {
         },
         waitForCompletion: true,
       }),
-    ).rejects.toThrowError(/Synchronous wait/);
+    ).rejects.toThrowError(
+      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is async-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then poll get_orchestration_result.",
+    );
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
   });
@@ -400,7 +423,7 @@ describe("getRegisteredOrchestrationTools", () => {
         },
         waitForCompletion: true,
       }),
-    ).rejects.toThrowError(/Synchronous wait/);
+    ).rejects.toThrowError(/explicit_async/);
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
   });

@@ -26,7 +26,8 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
   return [
     {
       name: "orchestrate_workflow",
-      description: "Run a static parallel or sequential worker workflow. Synchronous wait is limited to a single Gemini job with no retries.",
+      description:
+        "Run a static parallel or sequential worker workflow. Default MCP behavior is async-first and returns polling guidance; synchronous wait is limited to a single Gemini job or step with no retries.",
       inputSchema: orchestrateToolInputSchema.shape,
       execute: async (input) => {
         const parsed = orchestrateToolInputSchema.parse(input);
@@ -47,6 +48,8 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
         });
 
         if (shouldRunAsync) {
+          const waitMode = parsed.waitForCompletion === false ? "explicit_async" : "auto_async";
+
           void runOrchestrationWorkflow(spec, options)
             .then(async (result) => {
               await orchestrationLifecycle.markCompleted({
@@ -71,7 +74,17 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
           return {
             requestId,
             status: "running",
-            ...(parsed.waitForCompletion === undefined ? { autoAsync: true } : {}),
+            executionMode: "async",
+            waitMode,
+            pollWith: "get_orchestration_result",
+            nextArgs: {
+              requestId,
+            },
+            message:
+              waitMode === "auto_async"
+                ? "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status."
+                : "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status.",
+            ...(waitMode === "auto_async" ? { autoAsync: true } : {}),
           };
         }
 

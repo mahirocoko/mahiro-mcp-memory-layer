@@ -25,11 +25,20 @@ export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
     {
       name: "run_cursor_worker",
       description:
-        "Run a Cursor-family worker job via the local shell runtime (agent CLI). Intended for MCP stdio clients; orchestration defaults still use shell directly unless MAHIRO_CURSOR_RUNTIME=mcp or workerRuntime is set.",
+        "Run a Cursor-family worker job synchronously via the local shell runtime (agent CLI). Intended for MCP stdio clients and short calls; long-running callers should prefer run_cursor_worker_async plus get_cursor_worker_result.",
       inputSchema: cursorWorkerInputSchema.shape,
       execute: async (input) => {
         const parsed = cursorWorkerInputSchema.parse(input);
-        return shellCursorRuntime.run(parsed);
+        const result = await shellCursorRuntime.run(parsed);
+
+        return {
+          ...result,
+          executionMode: "sync",
+          preferredAsyncTool: "run_cursor_worker_async",
+          resultTool: "get_cursor_worker_result",
+          warning:
+            "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId.",
+        };
       },
     },
   ];
