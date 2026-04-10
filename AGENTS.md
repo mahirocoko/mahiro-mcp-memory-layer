@@ -83,6 +83,21 @@ Sticky-mode notes:
 - Workers do execution, extraction, review, planning, and synthesis support.
 - Final architectural judgment and completion claims stay with the orchestrator.
 
+## Control Plane vs Execution Plane
+
+- Treat the main agent as the **control plane**: intent understanding, planning, worker selection, verification, and final synthesis.
+- Treat delegated agents as the **execution plane**: implementation, refactoring, search, extraction, focused review, planning, and specialized reasoning.
+- Keep judgment centralized and execution distributed. The orchestrator decides; workers do.
+- Do not let multiple agents behave like competing orchestrators on the same unit of work.
+
+## Token-Saving Posture
+
+- The main agent should stay smart, not bloated. Offload execution and broad discovery before the orchestrator absorbs large amounts of context.
+- Prefer cheap search/retrieval layers first: `explore`, `librarian`, and lighter worker models should narrow the problem before expensive reasoning runs.
+- Do not broad-read locally if a worker can summarize, search, or extract first.
+- After delegation, the orchestrator should re-read only what is necessary to verify the result: executable checks, targeted diffs, and a small number of spot-checks.
+- Avoid duplicate context burn: do not manually repeat the same search or full-file reading that a delegated worker already performed unless verification proves it necessary.
+
 ## Golden Rules
 
 - Never `git push --force`
