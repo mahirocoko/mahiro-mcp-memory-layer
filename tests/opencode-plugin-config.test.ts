@@ -38,11 +38,23 @@ describe("loadOpenCodePluginConfig", () => {
       },
       runtime: {
         messageDebounceMs: defaultOpenCodePluginMessageDebounceMs,
+        userId: expect.stringMatching(/^local:/),
       },
       env: {
         messageDebounceMs: opencodePluginConfigEnv.messageDebounceMs,
+        userId: opencodePluginConfigEnv.userId,
       },
     });
+  });
+
+  it("prefers explicit user id overrides from environment variables", async () => {
+    await expect(
+      loadOpenCodePluginConfig({
+        env: {
+          [opencodePluginConfigEnv.userId]: "project-user",
+        },
+      }).then((config) => config.runtime.userId),
+    ).resolves.toBe("project-user");
   });
 
   it("parses message debounce overrides from environment variables", async () => {
@@ -69,6 +81,7 @@ describe("loadOpenCodePluginConfig", () => {
         // user default
         "runtime": {
           "messageDebounceMs": 320,
+          "userId": "user-scope"
         },
       }
       `,
@@ -83,8 +96,11 @@ describe("loadOpenCodePluginConfig", () => {
         env: {},
         homeDirectory,
         contextDirectory,
-      }).then((config) => config.runtime.messageDebounceMs),
-    ).resolves.toBe(120);
+      }).then((config) => config.runtime),
+    ).resolves.toEqual({
+      messageDebounceMs: 120,
+      userId: "user-scope",
+    });
   });
 
   it("lets environment overrides win over config files", async () => {

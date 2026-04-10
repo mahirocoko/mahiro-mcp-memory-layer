@@ -91,10 +91,12 @@ export function syncSessionStateFromEvent(
   context: OpenCodePluginContext,
   event: OpenCodePluginEvent,
   messageDebounceMs: number,
+  providedUserId: string,
 ): OpenCodePluginSessionState | undefined {
   const scopeResolution = resolveOpenCodeScope({
     context,
     event,
+    providedUserId,
   });
   const sessionId = scopeResolution.scope.sessionId;
 

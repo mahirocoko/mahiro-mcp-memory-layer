@@ -87,6 +87,7 @@ export function createOpenCodePluginRuntime(
   context: OpenCodePluginContext,
   options: OpenCodePluginServerOptions,
   messageDebounceMs: number,
+  providedUserId: string,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
 
@@ -106,7 +107,13 @@ export function createOpenCodePluginRuntime(
         },
       }),
     );
-    const sessionState = syncSessionStateFromEvent(runtimeState, context, event, messageDebounceMs);
+    const sessionState = syncSessionStateFromEvent(
+      runtimeState,
+      context,
+      event,
+      messageDebounceMs,
+      providedUserId,
+    );
     await logPluginLifecycle(context, {
       service: "opencode-memory-plugin",
       level: "debug",

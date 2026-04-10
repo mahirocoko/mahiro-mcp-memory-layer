@@ -22,6 +22,7 @@ export async function server(
     context,
     options,
     options.__test?.messageDebounceMs ?? runtimeConfig.runtime.messageDebounceMs,
+    runtimeConfig.runtime.userId,
   );
 
   return {

@@ -1,4 +1,5 @@
 import * as childProcess from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +15,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const expectedLocalUserId = `local:${os.userInfo().username}`;
 
 const pluginModulePath = "../src/features/opencode-plugin/index.js";
 
@@ -422,6 +424,12 @@ describe("product memory OpenCode plugin contract", () => {
       latestSessionId: "session-tool",
       session: {
         sessionId: "session-tool",
+        scopeResolution: {
+          status: "complete",
+          scope: {
+            userId: expectedLocalUserId,
+          },
+        },
         lastEventType: "session.created",
         coordination: {
           messageDebounceMs: 25,
@@ -524,7 +532,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-a",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
     expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.prepareHostTurnMemory).toHaveBeenCalledTimes(1);
@@ -580,7 +588,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-turn",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
     expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.wakeUpMemory).not.toHaveBeenCalled();
@@ -738,7 +746,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-idle",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
 
     const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
@@ -759,7 +767,6 @@ describe("product memory OpenCode plugin contract", () => {
             context: "host context: latest turn",
             conservativePolicy: {
               autoSaved: [],
-              autoSaveSkipped: [{ candidateIndex: 0, reason: "incomplete_scope_ids" }],
             },
           },
         },
@@ -795,7 +802,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-next-turn",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
     expect(prepareHostTurnMemory).toHaveBeenNthCalledWith(2, {
       task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -804,7 +811,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-next-turn",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
     expectNoSelfSpawn(harness);
   });
@@ -839,7 +846,7 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-empty-turn",
-      userId: undefined,
+      userId: expectedLocalUserId,
     });
 
     const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
