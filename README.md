@@ -603,6 +603,13 @@ Then fetch the result later with:
 }
 ```
 
+Direct async worker MCP tools:
+
+- `run_gemini_worker_async` / `run_cursor_worker_async` start a single worker job asynchronously and return a `workflow_*` request ID immediately
+- `get_gemini_worker_result` / `get_cursor_worker_result` poll the latest stored result for that async worker request
+- these tools are thin aliases over the same orchestration result store used by `orchestrate_workflow`, so they avoid holding one MCP tool call open for the full worker duration
+- the synchronous `run_gemini_worker` / `run_cursor_worker` tools still exist for short direct calls, but long-running callers should prefer the async variants
+
 Trace inspection CLI:
 
 ```bash

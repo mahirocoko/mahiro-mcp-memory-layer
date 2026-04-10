@@ -1,4 +1,5 @@
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
+import { createAsyncWorkerTools } from "../../orchestration/mcp/async-worker-tools.js";
 import { cursorWorkerInputSchema } from "../schemas.js";
 import { shellCursorRuntime } from "../runtime/shell/shell-cursor-runtime.js";
 
@@ -8,6 +9,19 @@ import { shellCursorRuntime } from "../runtime/shell/shell-cursor-runtime.js";
  */
 export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
   return [
+    ...createAsyncWorkerTools({
+      kind: "cursor",
+      inputSchema: cursorWorkerInputSchema,
+      startToolName: "run_cursor_worker_async",
+      getToolName: "get_cursor_worker_result",
+      startDescription:
+        "Start a Cursor-family worker job asynchronously via the local shell runtime and return a workflow requestId for polling.",
+      getDescription: "Get the latest stored Cursor async worker result by workflow requestId.",
+      buildJob: (input) => ({
+        kind: "cursor",
+        input,
+      }),
+    }),
     {
       name: "run_cursor_worker",
       description:
