@@ -1,5 +1,7 @@
 import { MemoryService } from "../memory/memory-service.js";
 import type { ZodRawShape } from "zod";
+import type { Hooks, PluginOptions } from "@opencode-ai/plugin";
+import type { ToolContext } from "@opencode-ai/plugin/tool";
 import type { MemoryToolBackend } from "../memory/lib/tool-definitions.js";
 import type {
   PrepareHostTurnMemoryResult,
@@ -23,11 +25,16 @@ export interface OpenCodePluginCompactionOutput {
 }
 
 export interface OpenCodePluginToolExecutionContext {
-  readonly sessionID?: unknown;
+  readonly sessionID?: ToolContext["sessionID"];
+  readonly messageID?: ToolContext["messageID"];
+  readonly agent?: ToolContext["agent"];
+  readonly directory?: ToolContext["directory"];
+  readonly worktree?: ToolContext["worktree"];
+  readonly abort?: ToolContext["abort"];
+  readonly metadata?: ToolContext["metadata"];
+  readonly ask?: ToolContext["ask"];
   readonly info?: unknown;
   readonly properties?: Record<string, unknown>;
-  readonly directory?: unknown;
-  readonly worktree?: unknown;
 }
 
 export interface OpenCodePluginToolDefinition {
@@ -39,7 +46,7 @@ export interface OpenCodePluginToolDefinition {
   ) => Promise<unknown>;
 }
 
-export interface OpenCodePluginHooks {
+export interface OpenCodePluginHooks extends Omit<Hooks, "event" | "tool" | "experimental.session.compacting"> {
   readonly event: (input: { readonly event: OpenCodePluginEvent }) => Promise<void>;
   readonly "session.created": (input: { readonly event: OpenCodePluginEvent }) => Promise<void>;
   readonly "message.updated": (input: { readonly event: OpenCodePluginEvent }) => Promise<void>;
@@ -115,6 +122,7 @@ export interface OpenCodePluginTestOptions {
 }
 
 export interface OpenCodePluginServerOptions {
+  readonly [key: string]: PluginOptions[string];
   readonly __test?: OpenCodePluginTestOptions;
 }
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import type { PluginInput, PluginModule } from "@opencode-ai/plugin";
 import { describe, expect, it, vi } from "vitest";
 
 import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
@@ -233,6 +234,12 @@ describe("OpenCode plugin package", () => {
     expect(pluginModule.server).toEqual(expect.any(Function));
   });
 
+  it("depends on the official OpenCode plugin package for the published plugin contract", async () => {
+    const packageJson = await import("../package.json", { with: { type: "json" } });
+
+    expect(packageJson.default.dependencies["@opencode-ai/plugin"]).toBeDefined();
+  });
+
   it("publishes a plugin-first package surface without unrelated worker or orchestration sources", async () => {
     const { stdout } = await execFileAsync("npm", ["pack", "--json", "--dry-run"], {
       cwd: repoRoot,
@@ -268,14 +275,7 @@ describe("OpenCode plugin package", () => {
 
       const pluginModule = (await import("mahiro-mcp-memory-layer")) as {
         readonly server: (
-          context: {
-            readonly project: { readonly id: string; readonly name: string; readonly directory: string };
-            readonly directory: string;
-            readonly worktree: string;
-            readonly serverUrl: URL;
-            readonly client: { readonly app: { readonly log: (entry: unknown) => Promise<void> } };
-            readonly $: (...args: unknown[]) => Promise<unknown>;
-          },
+          context: PluginInput,
           options?: {
             readonly __test?: {
               readonly memory?: MemoryToolBackend;
@@ -294,7 +294,7 @@ describe("OpenCode plugin package", () => {
             };
           };
         }>;
-      };
+      } & Pick<PluginModule, "id">;
 
       const pluginHooks = await pluginModule.server(
         {

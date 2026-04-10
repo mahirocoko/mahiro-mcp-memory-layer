@@ -2,6 +2,7 @@ import * as childProcess from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { PluginInput, PluginModule } from "@opencode-ai/plugin";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
@@ -47,19 +48,9 @@ interface OpenCodePluginHooks {
   };
 }
 
-interface OpenCodePluginModule {
-  readonly server: (
-    input: {
-      readonly project: unknown;
-      readonly directory: string;
-      readonly worktree: string;
-      readonly serverUrl: URL;
-      readonly client: unknown;
-      readonly $: (...args: unknown[]) => Promise<unknown>;
-    },
-    options?: Record<string, unknown>,
-  ) => Promise<OpenCodePluginHooks>;
-}
+type OpenCodePluginModule = Pick<PluginModule, "id"> & {
+  readonly server: (input: PluginInput, options?: Record<string, unknown>) => Promise<OpenCodePluginHooks>;
+};
 
 function createSessionCreatedEvent(sessionId = "session-1"): PluginEvent {
   return {

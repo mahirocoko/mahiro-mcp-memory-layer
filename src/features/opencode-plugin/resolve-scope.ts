@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import type { PluginInput } from "@opencode-ai/plugin";
+
 export const openCodeScopeFieldNames = ["userId", "projectId", "containerId", "sessionId"] as const;
 
 export type OpenCodeScopeField = (typeof openCodeScopeFieldNames)[number];
@@ -14,20 +16,12 @@ export type OpenCodeScopeSource =
   | "event.properties.sessionID"
   | "event.properties.info.id";
 
-export interface OpenCodeProjectContext {
-  readonly id?: unknown;
-  readonly name?: unknown;
-  readonly directory?: unknown;
-}
-
-export interface OpenCodePluginContext {
-  readonly project?: OpenCodeProjectContext | null;
-  readonly directory?: unknown;
-  readonly worktree?: unknown;
-  readonly client?: unknown;
-  readonly serverUrl?: unknown;
-  readonly $?: unknown;
-}
+export type OpenCodePluginContext = PluginInput & {
+  readonly project: PluginInput["project"] & {
+    readonly name?: unknown;
+    readonly directory?: unknown;
+  };
+};
 
 export interface OpenCodePluginEvent {
   readonly type: string;

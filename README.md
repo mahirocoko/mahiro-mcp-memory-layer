@@ -24,6 +24,17 @@ OpenCode installs npm plugins with Bun at startup, so this is the only step for 
 
 With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, or `wake_up_memory`.
 
+Local development path:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file:///Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer"]
+}
+```
+
+Use the `file://` variant when you want OpenCode to load the plugin directly from your local checkout while debugging or iterating on the source.
+
 Plugin override path:
 
 - `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's debounce window without adding extra `opencode.json` fields.

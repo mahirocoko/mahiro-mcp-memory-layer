@@ -1,6 +1,8 @@
+import type { PluginInput } from "@opencode-ai/plugin";
+
 import { getOpenCodePluginConfig } from "./config.js";
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
-import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
+import type { OpenCodePluginEvent } from "./resolve-scope.js";
 import {
   createOpenCodePluginRuntime,
   type OpenCodePluginHooks,
@@ -8,7 +10,7 @@ import {
 } from "./runtime-shell.js";
 
 export async function server(
-  context: OpenCodePluginContext,
+  context: PluginInput,
   options: OpenCodePluginServerOptions = {},
 ): Promise<OpenCodePluginHooks> {
   const runtimeConfig = getOpenCodePluginConfig();
