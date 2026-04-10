@@ -24,6 +24,8 @@ OpenCode installs npm plugins with Bun at startup, so this is the only step for 
 
 With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, or `wake_up_memory`.
 
+The plugin also appends the packaged `AGENTS.md` file to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
+
 Local development path:
 
 ```json
