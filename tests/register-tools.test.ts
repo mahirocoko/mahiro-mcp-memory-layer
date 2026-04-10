@@ -134,7 +134,6 @@ describe("getRegisteredOrchestrationTools", () => {
       jobs: [
         {
           kind: "gemini",
-          workerRuntime: "mcp",
           input: {
             prompt: "Summarize this repo.",
             model: "gemini-3-flash-preview",
@@ -173,7 +172,7 @@ describe("getRegisteredOrchestrationTools", () => {
     });
   });
 
-  it("forces shell requests onto the mcp control plane for orchestrate_workflow", async () => {
+  it("preserves explicit worker runtimes for orchestrate_workflow over mcp", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
     const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
@@ -202,7 +201,7 @@ describe("getRegisteredOrchestrationTools", () => {
       jobs: [
         {
           kind: "cursor",
-          workerRuntime: "mcp",
+          workerRuntime: "shell",
         },
       ],
     });

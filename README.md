@@ -443,6 +443,7 @@ Worker runtime (Cursor / Gemini):
 - default remains **shell** (spawn the local `agent` / `gemini` CLIs in-process) when nothing selects MCP
 - `MAHIRO_CURSOR_RUNTIME=mcp` and `MAHIRO_GEMINI_RUNTIME=mcp` opt into the MCP stdio client path for that worker family (out-of-process: connect to this server and call `run_cursor_worker` / `run_gemini_worker`)
 - per-job `workerRuntime`: `shell` or `mcp` on `cursor` and `gemini` jobs (parallel) or steps (sequential); explicit job-level selection overrides the env for that job
+- the MCP orchestration path preserves each workflow job's requested `workerRuntime`; omit it to keep the default shell worker behavior, or set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime
 
 Parallel example:
 

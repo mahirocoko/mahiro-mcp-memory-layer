@@ -266,7 +266,7 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 - The `orchestrate_workflow` MCP tool accepts the same static workflow spec as the CLI.
 - When the MCP tool is available, prefer `orchestrate_workflow` over shelling out to `bun run orchestrate` for `orch:` delegation flows.
 - Treat the MCP tool as the default orchestration entrypoint for new delegated sessions in this repo unless the user explicitly asked for CLI behavior.
-- The MCP orchestration path now normalizes workflow jobs onto `workerRuntime: "mcp"`, so the AI-facing control plane does not directly request shell runtimes through workflow specs.
+- The MCP orchestration path preserves each workflow job's requested `workerRuntime`; omit it to keep the default shell worker behavior, or set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime.
 - Prefer `waitForCompletion: false` for long-running workflows.
 - If `waitForCompletion` is omitted, workflows may auto-start in background and return `{ requestId, status: "running", autoAsync: true }`.
 - `waitForCompletion: true` is limited to a single Gemini job with no retries; Cursor or multi-job workflows must use async mode and `get_orchestration_result`.

@@ -116,9 +116,9 @@ function normalizeJob(
   job: z.infer<typeof workflowJobSchema>,
   defaultCwd: string | undefined,
   defaultTrust: boolean | undefined,
-  controlPlane: WorkflowControlPlane,
+  _controlPlane: WorkflowControlPlane,
 ): WorkerJob {
-  const workerRuntime = controlPlane === "mcp" ? "mcp" : job.workerRuntime;
+  const workerRuntime = job.workerRuntime;
 
   if (job.kind === "gemini") {
     return {

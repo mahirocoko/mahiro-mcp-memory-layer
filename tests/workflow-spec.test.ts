@@ -126,7 +126,7 @@ describe("normalizeWorkflowSpec - workerRuntime", () => {
     expect("workerRuntime" in step).toBe(false);
   });
 
-  it("forces mcp workerRuntime for every job when normalized for the mcp control plane", () => {
+  it("preserves requested worker runtimes when normalized for the mcp control plane", () => {
     const spec: WorkflowSpecInput = {
       mode: "parallel",
       jobs: [
@@ -138,7 +138,7 @@ describe("normalizeWorkflowSpec - workerRuntime", () => {
     const result = normalizeWorkflowSpec(spec, undefined, "mcp");
 
     if (result.mode !== "parallel") throw new Error("expected parallel");
-    expect(result.jobs[0]?.kind === "gemini" && result.jobs[0].workerRuntime).toBe("mcp");
-    expect(result.jobs[1]?.kind === "cursor" && result.jobs[1].workerRuntime).toBe("mcp");
+    expect("workerRuntime" in (result.jobs[0] ?? {})).toBe(false);
+    expect(result.jobs[1]?.kind === "cursor" && result.jobs[1].workerRuntime).toBe("shell");
   });
 });

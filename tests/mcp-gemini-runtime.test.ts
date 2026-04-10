@@ -83,6 +83,34 @@ describe("mcpGeminiRuntime", () => {
     expect(result.stderr).toContain("bad input");
   });
 
+  it("forwards MCP request timeout options when timeoutMs is set", async () => {
+    mockCallTool.mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify(sampleCommandResult()) }],
+    });
+
+    await mcpGeminiRuntime.run({
+      ...baseInput,
+      timeoutMs: 300_000,
+    });
+
+    expect(mockCallTool).toHaveBeenCalledWith(
+      {
+        name: "run_gemini_worker",
+        arguments: {
+          taskId: baseInput.taskId,
+          prompt: baseInput.prompt,
+          model: baseInput.model,
+          timeoutMs: 300_000,
+        },
+      },
+      undefined,
+      {
+        timeout: 300_000,
+        maxTotalTimeout: 300_000,
+      },
+    );
+  });
+
   it("returns spawn_error when connect throws", async () => {
     mockCallTool.mockRejectedValue(new Error("never"));
     mockConnect.mockRejectedValue(new Error("connect failed"));
