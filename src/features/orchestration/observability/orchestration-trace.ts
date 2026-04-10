@@ -25,6 +25,14 @@ interface RunnerFailedTraceOptions {
   readonly finishedAt?: string;
 }
 
+function buildWorkerRuntimes(spec: OrchestrateWorkflowSpec): readonly ("shell" | "mcp")[] | undefined {
+  const workerRuntimes = getConcreteJobs(spec)
+    .map((job) => job.workerRuntime)
+    .filter((runtime): runtime is "shell" | "mcp" => runtime === "shell" || runtime === "mcp");
+
+  return workerRuntimes.length > 0 ? workerRuntimes : undefined;
+}
+
 function buildJobModelsFromWorkerResults(
   results: readonly WorkerJobResult[],
 ): readonly OrchestrationJobModelTelemetry[] {
@@ -72,6 +80,7 @@ export function buildOrchestrationTraceEntry(
   return {
     requestId,
     source,
+    ...(buildWorkerRuntimes(spec) ? { workerRuntimes: buildWorkerRuntimes(spec) } : {}),
     mode: spec.mode,
     status: getEffectiveOrchestrationTraceStatus({
       status: result.status,
@@ -107,6 +116,7 @@ export function buildRunnerFailedOrchestrationTraceEntry(
   return {
     requestId: options.requestId,
     source: options.source,
+    ...(buildWorkerRuntimes(options.spec) ? { workerRuntimes: buildWorkerRuntimes(options.spec) } : {}),
     mode: options.spec.mode,
     status: "runner_failed",
     maxConcurrency: options.spec.mode === "parallel" ? options.spec.maxConcurrency : undefined,

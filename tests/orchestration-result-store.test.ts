@@ -42,6 +42,7 @@ describe("OrchestrationResultStore", () => {
 
     const readBack = await store.read(VALID_WORKFLOW_REQUEST_ID);
     expect(readBack?.requestId).toBe(VALID_WORKFLOW_REQUEST_ID);
+    expect(readBack?.metadata.workerRuntimes).toBeUndefined();
 
     const onDisk = path.join(workDir, `${VALID_WORKFLOW_REQUEST_ID}.json`);
     await expect(readFile(onDisk, "utf8")).resolves.toContain(VALID_WORKFLOW_REQUEST_ID);

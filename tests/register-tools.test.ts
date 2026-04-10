@@ -134,6 +134,7 @@ describe("getRegisteredOrchestrationTools", () => {
       jobs: [
         {
           kind: "gemini",
+          workerRuntime: "mcp",
           input: {
             prompt: "Summarize this repo.",
             model: "gemini-3-flash-preview",
@@ -169,6 +170,41 @@ describe("getRegisteredOrchestrationTools", () => {
         finishedAt: "2026-04-05T00:00:00.000Z",
         durationMs: 0,
       },
+    });
+  });
+
+  it("forces shell requests onto the mcp control plane for orchestrate_workflow", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "orchestrate_workflow");
+    const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
+
+    await tool?.execute({
+      spec: {
+        mode: "parallel",
+        jobs: [
+          {
+            kind: "cursor",
+            workerRuntime: "shell",
+            input: {
+              prompt: "Review this repo.",
+              model: "composer-2",
+            },
+          },
+        ],
+      },
+      waitForCompletion: false,
+    });
+
+    const forwardedSpec = runOrchestrationWorkflowMock.mock.calls.at(-1)?.[0];
+
+    expect(forwardedSpec).toMatchObject({
+      mode: "parallel",
+      jobs: [
+        {
+          kind: "cursor",
+          workerRuntime: "mcp",
+        },
+      ],
     });
   });
 

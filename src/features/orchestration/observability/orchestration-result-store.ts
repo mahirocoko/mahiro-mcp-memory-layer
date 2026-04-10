@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { isWorkflowRequestId } from "../../../lib/ids.js";
 import type { OrchestrationRunResult } from "../run-orchestration-workflow.js";
+import type { WorkerJob } from "../types.js";
 import type { OrchestrateWorkflowSpec } from "../workflow-spec.js";
 
 interface OrchestrationResultMetadata {
@@ -10,6 +11,7 @@ interface OrchestrationResultMetadata {
   readonly maxConcurrency?: number;
   readonly timeoutMs?: number;
   readonly taskIds: readonly string[];
+  readonly workerRuntimes?: readonly ("shell" | "mcp")[];
 }
 
 interface BaseOrchestrationResultRecord {
@@ -138,12 +140,17 @@ export class OrchestrationResultStore {
 }
 
 function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetadata {
+  const workerRuntimes = getConcreteJobs(spec)
+    .map((job) => job.workerRuntime)
+    .filter((runtime): runtime is "shell" | "mcp" => runtime === "shell" || runtime === "mcp");
+
   if (spec.mode === "parallel") {
     return {
       mode: spec.mode,
       maxConcurrency: spec.maxConcurrency,
       timeoutMs: spec.timeoutMs,
       taskIds: spec.jobs.map((job) => job.input.taskId),
+      ...(workerRuntimes.length > 0 ? { workerRuntimes } : {}),
     };
   }
 
@@ -151,7 +158,16 @@ function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetada
     mode: spec.mode,
     timeoutMs: spec.timeoutMs,
     taskIds: spec.steps.flatMap((step) => (typeof step === "function" ? [] : [step.input.taskId])),
+    ...(workerRuntimes.length > 0 ? { workerRuntimes } : {}),
   };
+}
+
+function getConcreteJobs(spec: OrchestrateWorkflowSpec): readonly WorkerJob[] {
+  if (spec.mode === "parallel") {
+    return spec.jobs;
+  }
+
+  return spec.steps.flatMap((step) => (typeof step === "function" ? [] : [step]));
 }
 
 function isFileNotFoundError(error: unknown): error is NodeJS.ErrnoException {

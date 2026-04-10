@@ -31,7 +31,7 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
       execute: async (input) => {
         const parsed = orchestrateToolInputSchema.parse(input);
         const requestId = newId("workflow");
-        const spec = normalizeWorkflowSpec(parsed.spec, parsed.cwd);
+        const spec = normalizeWorkflowSpec(parsed.spec, parsed.cwd, "mcp");
         const startedAt = new Date().toISOString();
         const shouldRunAsync = parsed.waitForCompletion !== true;
         const options = {

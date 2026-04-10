@@ -115,6 +115,7 @@ export interface OrchestrationJobModelTelemetry {
 export interface OrchestrationTraceEntry {
   readonly requestId: string;
   readonly source: "cli" | "mcp";
+  readonly workerRuntimes?: readonly WorkerRuntimeSelection[];
   readonly mode: "parallel" | "sequential";
   readonly status: "completed" | "failed" | "step_failed" | "timed_out" | "runner_failed";
   readonly maxConcurrency?: number;

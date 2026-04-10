@@ -45,10 +45,12 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
       summary: { ...sampleSummary, completedJobs: 0, failedJobs: 1 },
     };
 
-    expect(buildOrchestrationTraceEntry("r1", "cli", spec, result).jobModels).toEqual([
+    const trace = buildOrchestrationTraceEntry("r1", "cli", spec, result);
+
+    expect(trace.jobModels).toEqual([
       { kind: "cursor", taskId: "t1", status: "runner_failed", retryCount: 1, errorClass: "infra_failure", requestedModel: "composer-2" },
     ]);
-    expect(buildOrchestrationTraceEntry("r1", "cli", spec, result).status).toBe("failed");
+    expect(trace.status).toBe("failed");
   });
 
   it("records requested and reported model from worker results", () => {
@@ -58,6 +60,7 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
       jobs: [
         {
           kind: "gemini" as const,
+          workerRuntime: "mcp" as const,
           input: { taskId: "g1", prompt: "p", model: "gemini-3-flash-preview" },
         },
       ],
@@ -86,7 +89,10 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
       summary: sampleSummary,
     };
 
-    expect(buildOrchestrationTraceEntry("r2", "mcp", spec, result).jobModels).toEqual([
+    const trace = buildOrchestrationTraceEntry("r2", "mcp", spec, result);
+
+    expect(trace.workerRuntimes).toEqual(["mcp"]);
+    expect(trace.jobModels).toEqual([
       {
         kind: "gemini",
         taskId: "g1",
@@ -178,6 +184,7 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
       summary: { ...sampleSummary, completedJobs: 0, failedJobs: 1 },
     });
 
+    expect(trace.workerRuntimes).toBeUndefined();
     expect(trace.status).toBe("timed_out");
   });
 });

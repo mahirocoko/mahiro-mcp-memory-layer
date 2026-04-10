@@ -125,4 +125,20 @@ describe("normalizeWorkflowSpec - workerRuntime", () => {
     if (typeof step === "function" || !step || step.kind !== "gemini") throw new Error("expected gemini step");
     expect("workerRuntime" in step).toBe(false);
   });
+
+  it("forces mcp workerRuntime for every job when normalized for the mcp control plane", () => {
+    const spec: WorkflowSpecInput = {
+      mode: "parallel",
+      jobs: [
+        { ...baseGeminiJob },
+        { ...baseCursorJob, workerRuntime: "shell" },
+      ],
+    };
+
+    const result = normalizeWorkflowSpec(spec, undefined, "mcp");
+
+    if (result.mode !== "parallel") throw new Error("expected parallel");
+    expect(result.jobs[0]?.kind === "gemini" && result.jobs[0].workerRuntime).toBe("mcp");
+    expect(result.jobs[1]?.kind === "cursor" && result.jobs[1].workerRuntime).toBe("mcp");
+  });
 });

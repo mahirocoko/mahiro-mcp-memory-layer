@@ -75,6 +75,8 @@ export type OrchestrateWorkflowSpec =
   | { readonly mode: "parallel"; readonly maxConcurrency?: number; readonly timeoutMs?: number; readonly defaultTrust?: boolean; readonly jobs: readonly WorkerJob[] }
   | { readonly mode: "sequential"; readonly timeoutMs?: number; readonly defaultTrust?: boolean; readonly steps: readonly SequentialWorkerStep[] };
 
+export type WorkflowControlPlane = "shell" | "mcp";
+
 export function isMcpSyncEligibleWorkflowSpec(spec: WorkflowSpecInput): boolean {
   const units = spec.mode === "parallel" ? spec.jobs : spec.steps;
 
@@ -90,6 +92,7 @@ export function isMcpSyncEligibleWorkflowSpec(spec: WorkflowSpecInput): boolean 
 export function normalizeWorkflowSpec(
   spec: WorkflowSpecInput,
   defaultCwd: string | undefined,
+  controlPlane: WorkflowControlPlane = "shell",
 ): OrchestrateWorkflowSpec {
   if (spec.mode === "parallel") {
     return {
@@ -97,7 +100,7 @@ export function normalizeWorkflowSpec(
       maxConcurrency: spec.maxConcurrency,
       timeoutMs: spec.timeoutMs,
       defaultTrust: spec.defaultTrust,
-      jobs: spec.jobs.map((job) => normalizeJob(job, defaultCwd, spec.defaultTrust)),
+      jobs: spec.jobs.map((job) => normalizeJob(job, defaultCwd, spec.defaultTrust, controlPlane)),
     };
   }
 
@@ -105,7 +108,7 @@ export function normalizeWorkflowSpec(
     mode: spec.mode,
     timeoutMs: spec.timeoutMs,
     defaultTrust: spec.defaultTrust,
-    steps: spec.steps.map((step) => normalizeJob(step, defaultCwd, spec.defaultTrust)),
+    steps: spec.steps.map((step) => normalizeJob(step, defaultCwd, spec.defaultTrust, controlPlane)),
   };
 }
 
@@ -113,7 +116,10 @@ function normalizeJob(
   job: z.infer<typeof workflowJobSchema>,
   defaultCwd: string | undefined,
   defaultTrust: boolean | undefined,
+  controlPlane: WorkflowControlPlane,
 ): WorkerJob {
+  const workerRuntime = controlPlane === "mcp" ? "mcp" : job.workerRuntime;
+
   if (job.kind === "gemini") {
     return {
       kind: job.kind,
@@ -122,7 +128,7 @@ function normalizeJob(
         taskId: job.input.taskId ?? newId("gemini"),
         cwd: job.input.cwd ?? defaultCwd,
       },
-      ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
+      ...(workerRuntime !== undefined ? { workerRuntime } : {}),
       retries: job.retries,
       retryDelayMs: job.retryDelayMs,
       continueOnFailure: job.continueOnFailure,
@@ -134,12 +140,12 @@ function normalizeJob(
     input: {
       ...job.input,
       taskId: job.input.taskId ?? newId("cursor"),
-      cwd: job.input.cwd ?? defaultCwd,
-      trust: job.input.trust !== undefined ? job.input.trust : defaultTrust,
-    },
-    ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
-    retries: job.retries,
-    retryDelayMs: job.retryDelayMs,
-    continueOnFailure: job.continueOnFailure,
-  };
-}
+        cwd: job.input.cwd ?? defaultCwd,
+        trust: job.input.trust !== undefined ? job.input.trust : defaultTrust,
+      },
+      ...(workerRuntime !== undefined ? { workerRuntime } : {}),
+      retries: job.retries,
+      retryDelayMs: job.retryDelayMs,
+      continueOnFailure: job.continueOnFailure,
+    };
+  }
