@@ -314,6 +314,13 @@ Task routing:
 - `--task timeline` -> JSON overview + timeline items
 - `--task extract-facts` -> JSON summary + facts + warnings
 
+CLI control flags:
+
+- `--approval-mode <default|auto_edit|yolo|plan>` forwards Gemini CLI approval behavior directly
+- `--allowed-mcp-server-names <name1,name2,...|none>` forwards a session MCP allowlist; this repo accepts `none` as a local convenience for zero MCP servers
+- `--binary-path <path>` overrides which local `gemini` binary the wrapper spawns
+- MCP server names must not contain commas, and `none` cannot be mixed with named servers
+
 Caching:
 
 - completed Gemini results are cached locally by routed prompt + task kind + model + cwd
@@ -327,6 +334,7 @@ bun run gemini -- --model gemini-3.1-pro-preview "Review this architecture and p
 bun run gemini -- --model gemini-3-flash-preview --task summarize "Summarize the latest meeting notes"
 bun run gemini -- --model gemini-3-flash-preview --task timeline "Summarize the project timeline from these notes"
 bun run gemini -- --model gemini-3.1-pro-preview --timeout-ms 30000 --cwd /path/to/project "Review the current diff"
+bun run gemini -- --model gemini-3.1-pro-preview --approval-mode plan --allowed-mcp-server-names none "Draft a grounded UI patch"
 ```
 
 ## Gemini worker
@@ -344,11 +352,21 @@ Input shape:
   "taskId": "task-1",
   "prompt": "Summarize this repo",
   "model": "gemini-3-flash-preview",
+  "approvalMode": "plan",
+  "allowedMcpServerNames": "none",
+  "binaryPath": "/usr/local/bin/gemini",
   "taskKind": "summarize",
   "timeoutMs": 30000,
   "cwd": "/path/to/project"
 }
 ```
+
+`allowedMcpServerNames` accepts either:
+
+- `"none"` as a repo-local convenience for zero MCP servers
+- an array of server names such as `["docs", "repo-tools"]`
+
+Server names must not contain commas, and the array form must not include `"none"`.
 
 Result shape includes:
 
@@ -635,6 +653,8 @@ Gemini async MCP example:
   "taskId": "gemini-task-1",
   "prompt": "Summarize this repo",
   "model": "gemini-3-flash-preview",
+  "approvalMode": "plan",
+  "allowedMcpServerNames": "none",
   "retries": 2,
   "retryDelayMs": 500,
   "taskKind": "summarize",
@@ -664,6 +684,7 @@ Gemini failure note:
 
 - errors such as unauthorized tool calls, `MODEL_CAPACITY_EXHAUSTED`, `429 RESOURCE_EXHAUSTED`, `ECONNRESET`, or `socket hang up` originate upstream in the Gemini CLI/runtime or provider path rather than in this repo’s orchestration code
 - the local mitigations in this repo are configured retries/backoff on the async start tool plus shell-pinned direct async execution; this repo does not currently persist full per-attempt history
+- Gemini inputs now also support typed CLI control fields like `approvalMode` and `allowedMcpServerNames`; this repo accepts `"none"` as a local convenience for zero MCP servers in authoring-style Gemini jobs
 
 Cursor async MCP example:
 

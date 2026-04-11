@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 export const geminiTaskKinds = ["general", "summarize", "timeline", "extract-facts"] as const;
+export const geminiApprovalModes = ["default", "auto_edit", "yolo", "plan"] as const;
+const trimmedNonEmptyStringSchema = z.string().trim().min(1);
+const geminiAllowedMcpServerNameSchema = trimmedNonEmptyStringSchema.refine(
+  (value) => value !== "none" && !value.includes(","),
+  "allowed MCP server names must not be 'none' or contain commas.",
+);
 
 export const geminiWorkerInputSchema = z.object({
   taskId: z.string().trim().min(1),
@@ -10,6 +16,22 @@ export const geminiWorkerInputSchema = z.object({
   cwd: z.string().trim().min(1).optional(),
   binaryPath: z.string().trim().min(1).optional(),
   taskKind: z.enum(geminiTaskKinds).optional(),
+  approvalMode: z.enum(geminiApprovalModes).optional(),
+  allowedMcpServerNames: z.union([
+    trimmedNonEmptyStringSchema.transform((value, ctx) => {
+      if (value === "none") {
+        return "none" as const;
+      }
+
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "allowedMcpServerNames string form only supports 'none'.",
+      });
+
+      return z.NEVER;
+    }),
+    z.array(geminiAllowedMcpServerNameSchema).min(1).transform((value) => value as [string, ...string[]]),
+  ]).optional(),
 });
 
 export const geminiJsonResponseSchema = z.object({

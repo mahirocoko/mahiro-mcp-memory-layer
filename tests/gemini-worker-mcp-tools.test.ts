@@ -100,6 +100,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t1",
       prompt: "ping",
       model: "gemini-3-flash-preview",
+      approvalMode: "plan",
+      allowedMcpServerNames: "none",
     });
 
     expect(result).toMatchObject({
@@ -115,6 +117,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
         taskId: "t1",
         prompt: "ping",
         model: "gemini-3-flash-preview",
+        approvalMode: "plan",
+        allowedMcpServerNames: "none",
       }),
     );
   });
@@ -127,6 +131,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t1",
       prompt: "ping",
       model: "gemini-3-flash-preview",
+      approvalMode: "plan",
+      allowedMcpServerNames: "none",
       retries: 2,
       retryDelayMs: 500,
     });
@@ -150,6 +156,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
               taskId: "t1",
               prompt: "ping",
               model: "gemini-3-flash-preview",
+              approvalMode: "plan",
+              allowedMcpServerNames: "none",
             }),
           }),
         ],
@@ -168,6 +176,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t2",
       prompt: "ping",
       model: "gemini-3-flash-preview",
+      approvalMode: "plan",
+      allowedMcpServerNames: ["docs", "repo-tools"],
       retries: 1,
       retryDelayMs: 250,
     });
@@ -180,6 +190,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
               taskId: "t2",
               prompt: "ping",
               model: "gemini-3-flash-preview",
+              approvalMode: "plan",
+              allowedMcpServerNames: ["docs", "repo-tools"],
             },
             retries: 1,
             retryDelayMs: 250,

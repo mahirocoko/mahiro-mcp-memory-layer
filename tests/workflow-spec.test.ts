@@ -141,4 +141,29 @@ describe("normalizeWorkflowSpec - workerRuntime", () => {
     expect("workerRuntime" in (result.jobs[0] ?? {})).toBe(false);
     expect(result.jobs[1]?.kind === "cursor" && result.jobs[1].workerRuntime).toBe("shell");
   });
+
+  it("preserves Gemini approval mode and MCP allowlist fields", () => {
+    const spec: WorkflowSpecInput = {
+      mode: "parallel",
+      jobs: [
+        {
+          ...baseGeminiJob,
+          input: {
+            ...baseGeminiJob.input,
+            approvalMode: "plan",
+            allowedMcpServerNames: ["docs", "repo-tools"],
+          },
+        },
+      ],
+    };
+
+    const result = normalizeWorkflowSpec(spec, "/tmp/default-cwd");
+
+    if (result.mode !== "parallel") throw new Error("expected parallel");
+    const job = result.jobs[0];
+    if (!job || job.kind !== "gemini") throw new Error("expected gemini job");
+    expect(job.input.approvalMode).toBe("plan");
+    expect(job.input.allowedMcpServerNames).toEqual(["docs", "repo-tools"]);
+    expect(job.input.cwd).toBe("/tmp/default-cwd");
+  });
 });

@@ -1,4 +1,6 @@
 export type GeminiTaskKind = "general" | "summarize" | "timeline" | "extract-facts";
+export type GeminiApprovalMode = "default" | "auto_edit" | "yolo" | "plan";
+export type GeminiAllowedMcpServerNames = readonly [string, ...string[]] | "none";
 
 export interface GeminiWorkerInput {
   readonly taskId: string;
@@ -8,6 +10,8 @@ export interface GeminiWorkerInput {
   readonly cwd?: string;
   readonly binaryPath?: string;
   readonly taskKind?: GeminiTaskKind;
+  readonly approvalMode?: GeminiApprovalMode;
+  readonly allowedMcpServerNames?: GeminiAllowedMcpServerNames;
 }
 
 export interface GeminiCommandRunResult {

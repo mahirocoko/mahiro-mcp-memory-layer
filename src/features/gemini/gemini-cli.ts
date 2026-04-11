@@ -8,6 +8,8 @@ interface GeminiCliOptions {
   timeoutMs?: number;
   binaryPath?: string;
   taskKind?: GeminiWorkerInput["taskKind"];
+  approvalMode?: GeminiWorkerInput["approvalMode"];
+  allowedMcpServerNames?: GeminiWorkerInput["allowedMcpServerNames"];
 }
 
 export function parseGeminiCliArgs(argv: readonly string[]): GeminiWorkerInput {
@@ -60,6 +62,14 @@ export function parseGeminiCliArgs(argv: readonly string[]): GeminiWorkerInput {
         options.taskKind = readTaskKind(readFlagValue(token, nextValue));
         index += 1;
         break;
+      case "--approval-mode":
+        options.approvalMode = readApprovalMode(readFlagValue(token, nextValue));
+        index += 1;
+        break;
+      case "--allowed-mcp-server-names":
+        options.allowedMcpServerNames = readAllowedMcpServerNames(readFlagValue(token, nextValue));
+        index += 1;
+        break;
       default:
         throw new Error(`Unknown flag: ${token}`);
     }
@@ -85,7 +95,44 @@ export function parseGeminiCliArgs(argv: readonly string[]): GeminiWorkerInput {
     cwd: options.cwd,
     binaryPath: options.binaryPath,
     taskKind: options.taskKind,
+    approvalMode: options.approvalMode,
+    allowedMcpServerNames: options.allowedMcpServerNames,
   };
+}
+
+function readApprovalMode(value: string): GeminiWorkerInput["approvalMode"] {
+  switch (value) {
+    case "default":
+    case "auto_edit":
+    case "yolo":
+    case "plan":
+      return value;
+    default:
+      throw new Error(`Unknown approval mode: ${value}`);
+  }
+}
+
+function readAllowedMcpServerNames(value: string): GeminiWorkerInput["allowedMcpServerNames"] {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue === "none") {
+    return "none";
+  }
+
+  const serverNames = trimmedValue
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (serverNames.length === 0) {
+    throw new Error("--allowed-mcp-server-names must include at least one server name or 'none'.");
+  }
+
+  if (serverNames.some((item) => item === "none")) {
+    throw new Error("--allowed-mcp-server-names cannot mix 'none' with named MCP servers.");
+  }
+
+  return serverNames as [string, ...string[]];
 }
 
 function readTaskKind(value: string): GeminiWorkerInput["taskKind"] {

@@ -28,6 +28,10 @@ describe("parseGeminiCliArgs", () => {
       "30000",
       "--binary-path",
       "/usr/local/bin/gemini",
+      "--approval-mode",
+      "plan",
+      "--allowed-mcp-server-names",
+      "none",
       "Explain",
       "the",
       "diff",
@@ -37,7 +41,55 @@ describe("parseGeminiCliArgs", () => {
     expect(input.cwd).toBe("/tmp/project");
     expect(input.timeoutMs).toBe(30000);
     expect(input.binaryPath).toBe("/usr/local/bin/gemini");
+    expect(input.approvalMode).toBe("plan");
+    expect(input.allowedMcpServerNames).toBe("none");
     expect(input.prompt).toBe("Explain the diff");
+  });
+
+  it("parses a comma-separated MCP server allowlist", () => {
+    const input = parseGeminiCliArgs([
+      "--model",
+      "gemini-3-flash-preview",
+      "--allowed-mcp-server-names",
+      "docs, repo-tools ,design",
+      "Review",
+      "this",
+      "prompt",
+    ]);
+
+    expect(input.allowedMcpServerNames).toEqual(["docs", "repo-tools", "design"]);
+  });
+
+  it("fails for unknown approval modes", () => {
+    expect(() => parseGeminiCliArgs(["--model", "gemini-3-flash-preview", "--approval-mode", "mystery", "hello"]))
+      .toThrowError("Unknown approval mode: mystery");
+  });
+
+  it("fails when allowed MCP server names is empty", () => {
+    expect(() => parseGeminiCliArgs(["--model", "gemini-3-flash-preview", "--allowed-mcp-server-names", " , ", "hello"]))
+      .toThrowError("--allowed-mcp-server-names must include at least one server name or 'none'.");
+  });
+
+  it("treats a trimmed none MCP sentinel as none", () => {
+    const input = parseGeminiCliArgs([
+      "--model",
+      "gemini-3-flash-preview",
+      "--allowed-mcp-server-names",
+      "  none  ",
+      "hello",
+    ]);
+
+    expect(input.allowedMcpServerNames).toBe("none");
+  });
+
+  it("fails when none is mixed with named MCP servers", () => {
+    expect(() => parseGeminiCliArgs([
+      "--model",
+      "gemini-3-flash-preview",
+      "--allowed-mcp-server-names",
+      "none,docs",
+      "hello",
+    ])).toThrowError("--allowed-mcp-server-names cannot mix 'none' with named MCP servers.");
   });
 
   it("keeps explicit model values trimmed", () => {

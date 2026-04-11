@@ -26,6 +26,8 @@ function toolArgumentsFromInput(input: GeminiWorkerInput): Record<string, unknow
     ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
     ...(input.binaryPath !== undefined ? { binaryPath: input.binaryPath } : {}),
     ...(input.taskKind !== undefined ? { taskKind: input.taskKind } : {}),
+    ...(input.approvalMode !== undefined ? { approvalMode: input.approvalMode } : {}),
+    ...(input.allowedMcpServerNames !== undefined ? { allowedMcpServerNames: input.allowedMcpServerNames } : {}),
   };
 }
 

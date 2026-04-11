@@ -3,12 +3,30 @@ import { spawn } from "node:child_process";
 import type { GeminiWorkerRuntime } from "../gemini-worker-runtime.js";
 import type { GeminiCommandRunResult, GeminiWorkerInput } from "../../types.js";
 
+export function buildGeminiShellArgs(input: GeminiWorkerInput): string[] {
+  return [
+    "-m",
+    input.model,
+    ...(input.approvalMode !== undefined ? ["--approval-mode", input.approvalMode] : []),
+    ...(input.allowedMcpServerNames !== undefined
+      ? [
+          "--allowed-mcp-server-names",
+          input.allowedMcpServerNames === "none" ? "none" : input.allowedMcpServerNames.join(","),
+        ]
+      : []),
+    "-p",
+    input.prompt,
+    "--output-format",
+    "json",
+  ];
+}
+
 async function runGeminiShell(input: GeminiWorkerInput): Promise<GeminiCommandRunResult> {
   return new Promise((resolve) => {
     const startedAtDate = new Date();
     const startedAt = startedAtDate.toISOString();
     const command = input.binaryPath ?? "gemini";
-    const args = ["-m", input.model, "-p", input.prompt, "--output-format", "json"];
+    const args = buildGeminiShellArgs(input);
 
     const child = spawn(command, args, {
       cwd: input.cwd,
