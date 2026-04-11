@@ -36,7 +36,16 @@ const orchestrationResultStoreMock = {
   writeRunning: vi.fn(async ({ requestId, source, spec }) => ({
     requestId,
     source,
-    metadata: { mode: spec.mode, taskIds: spec.jobs?.map((job: { input: { taskId: string } }) => job.input.taskId) ?? [] },
+    metadata: {
+      mode: spec.mode,
+      taskIds: spec.jobs?.map((job: { input: { taskId: string } }) => job.input.taskId) ?? [],
+      jobs: spec.jobs?.map((job: { input: { taskId: string }, retries?: number, retryDelayMs?: number, workerRuntime?: "shell" | "mcp" }) => ({
+        taskId: job.input.taskId,
+        ...(typeof job.retries === "number" ? { configuredRetries: job.retries } : {}),
+        ...(typeof job.retryDelayMs === "number" ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
+        ...(job.workerRuntime ? { workerRuntime: job.workerRuntime } : {}),
+      })) ?? [],
+    },
     status: "running",
     createdAt: "2026-04-10T00:00:00.000Z",
     updatedAt: "2026-04-10T00:00:00.000Z",
@@ -118,6 +127,8 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t1",
       prompt: "ping",
       model: "gemini-3-flash-preview",
+      retries: 2,
+      retryDelayMs: 500,
     });
 
     expect(result).toMatchObject({
@@ -132,6 +143,9 @@ describe("getRegisteredGeminiWorkerTools", () => {
         jobs: [
           expect.objectContaining({
             kind: "gemini",
+            workerRuntime: "shell",
+            retries: 2,
+            retryDelayMs: 500,
             input: expect.objectContaining({
               taskId: "t1",
               prompt: "ping",
@@ -146,6 +160,37 @@ describe("getRegisteredGeminiWorkerTools", () => {
     );
   });
 
+  it("keeps retry controls on the async job envelope", async () => {
+    const tools = getRegisteredGeminiWorkerTools();
+    const tool = tools.find((item) => item.name === "run_gemini_worker_async");
+
+    await tool?.execute({
+      taskId: "t2",
+      prompt: "ping",
+      model: "gemini-3-flash-preview",
+      retries: 1,
+      retryDelayMs: 250,
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jobs: [
+          expect.objectContaining({
+            input: {
+              taskId: "t2",
+              prompt: "ping",
+              model: "gemini-3-flash-preview",
+            },
+            retries: 1,
+            retryDelayMs: 250,
+            workerRuntime: "shell",
+          }),
+        ],
+      }),
+      expect.anything(),
+    );
+  });
+
   it("maps async Gemini worker polling to the first orchestration job result", async () => {
     const tools = getRegisteredGeminiWorkerTools();
     const tool = tools.find((item) => item.name === "get_gemini_worker_result");
@@ -156,6 +201,7 @@ describe("getRegisteredGeminiWorkerTools", () => {
       metadata: {
         mode: "parallel",
         taskIds: ["t1"],
+        jobs: [{ taskId: "t1", configuredRetries: 2, configuredRetryDelayMs: 500, workerRuntime: "shell" }],
       },
       status: "completed",
       createdAt: "2026-04-10T00:00:00.000Z",
@@ -208,9 +254,78 @@ describe("getRegisteredGeminiWorkerTools", () => {
       kind: "gemini",
       status: "completed",
       workflowStatus: "completed",
+      configuredRetries: 2,
+      configuredRetryDelayMs: 500,
       result: {
         response: "ok",
       },
+    });
+  });
+
+  it("maps async Gemini worker polling while still running", async () => {
+    const tools = getRegisteredGeminiWorkerTools();
+    const tool = tools.find((item) => item.name === "get_gemini_worker_result");
+
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["t-running"],
+        jobs: [{ taskId: "t-running", configuredRetries: 3, configuredRetryDelayMs: 750, workerRuntime: "shell" }],
+      },
+      status: "running",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:02.000Z",
+    } satisfies OrchestrationResultRecord);
+
+    const result = await tool?.execute({
+      requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+
+    expect(result).toMatchObject({
+      requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      taskId: "t-running",
+      kind: "gemini",
+      status: "running",
+      workflowStatus: "running",
+      pollIntervalMs: 1000,
+      configuredRetries: 3,
+      configuredRetryDelayMs: 750,
+    });
+  });
+
+  it("maps async Gemini worker polling when orchestration runner fails before a job result", async () => {
+    const tools = getRegisteredGeminiWorkerTools();
+    const tool = tools.find((item) => item.name === "get_gemini_worker_result");
+
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId: "workflow_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["t-runner-failed"],
+        jobs: [{ taskId: "t-runner-failed", configuredRetries: 1, configuredRetryDelayMs: 250, workerRuntime: "shell" }],
+      },
+      status: "runner_failed",
+      error: "worker process exited unexpectedly",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:03.000Z",
+    } satisfies OrchestrationResultRecord);
+
+    const result = await tool?.execute({
+      requestId: "workflow_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    });
+
+    expect(result).toMatchObject({
+      requestId: "workflow_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      taskId: "t-runner-failed",
+      kind: "gemini",
+      status: "runner_failed",
+      workflowStatus: "runner_failed",
+      error: "worker process exited unexpectedly",
+      configuredRetries: 1,
+      configuredRetryDelayMs: 250,
     });
   });
 });

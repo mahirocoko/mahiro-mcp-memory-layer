@@ -132,6 +132,7 @@ describe("getRegisteredCursorWorkerTools", () => {
         jobs: [
           expect.objectContaining({
             kind: "cursor",
+            workerRuntime: "shell",
             input: expect.objectContaining({
               taskId: "t1",
               prompt: "ping",
@@ -144,5 +145,68 @@ describe("getRegisteredCursorWorkerTools", () => {
         traceSource: "mcp",
       }),
     );
+  });
+
+  it("maps async Cursor worker polling while still running", async () => {
+    const tools = getRegisteredCursorWorkerTools();
+    const tool = tools.find((item) => item.name === "get_cursor_worker_result");
+
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId: "workflow_cccccccccccccccccccccccccccccccc",
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["c-running"],
+        jobs: [{ taskId: "c-running", workerRuntime: "shell" }],
+      },
+      status: "running",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:02.000Z",
+    } satisfies OrchestrationResultRecord);
+
+    const result = await tool?.execute({
+      requestId: "workflow_cccccccccccccccccccccccccccccccc",
+    });
+
+    expect(result).toMatchObject({
+      requestId: "workflow_cccccccccccccccccccccccccccccccc",
+      taskId: "c-running",
+      kind: "cursor",
+      status: "running",
+      workflowStatus: "running",
+      pollIntervalMs: 1000,
+    });
+  });
+
+  it("maps async Cursor worker polling when orchestration runner fails before a job result", async () => {
+    const tools = getRegisteredCursorWorkerTools();
+    const tool = tools.find((item) => item.name === "get_cursor_worker_result");
+
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId: "workflow_dddddddddddddddddddddddddddddddd",
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["c-runner-failed"],
+        jobs: [{ taskId: "c-runner-failed", workerRuntime: "shell" }],
+      },
+      status: "runner_failed",
+      error: "worker process exited unexpectedly",
+      createdAt: "2026-04-10T00:00:00.000Z",
+      updatedAt: "2026-04-10T00:00:03.000Z",
+    } satisfies OrchestrationResultRecord);
+
+    const result = await tool?.execute({
+      requestId: "workflow_dddddddddddddddddddddddddddddddd",
+    });
+
+    expect(result).toMatchObject({
+      requestId: "workflow_dddddddddddddddddddddddddddddddd",
+      taskId: "c-runner-failed",
+      kind: "cursor",
+      status: "runner_failed",
+      workflowStatus: "runner_failed",
+      error: "worker process exited unexpectedly",
+    });
   });
 });

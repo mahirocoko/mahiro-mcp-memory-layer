@@ -25,6 +25,8 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
       jobs: [
         {
           kind: "cursor" as const,
+          retries: 1,
+          retryDelayMs: 250,
           input: { taskId: "t1", prompt: "x", model: "composer-2" },
         },
       ],
@@ -48,7 +50,16 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
     const trace = buildOrchestrationTraceEntry("r1", "cli", spec, result);
 
     expect(trace.jobModels).toEqual([
-      { kind: "cursor", taskId: "t1", status: "runner_failed", retryCount: 1, errorClass: "infra_failure", requestedModel: "composer-2" },
+      {
+        kind: "cursor",
+        taskId: "t1",
+        status: "runner_failed",
+        configuredRetries: 1,
+        configuredRetryDelayMs: 250,
+        retryCount: 1,
+        errorClass: "infra_failure",
+        requestedModel: "composer-2",
+      },
     ]);
     expect(trace.status).toBe("failed");
   });
@@ -61,6 +72,8 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
         {
           kind: "gemini" as const,
           workerRuntime: "mcp" as const,
+          retries: 3,
+          retryDelayMs: 400,
           input: { taskId: "g1", prompt: "p", model: "gemini-3-flash-preview" },
         },
       ],
@@ -97,6 +110,8 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
         kind: "gemini",
         taskId: "g1",
         status: "completed",
+        configuredRetries: 3,
+        configuredRetryDelayMs: 400,
         retryCount: 2,
         durationMs: 1,
         cached: true,
@@ -117,6 +132,8 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
         jobs: [
           {
             kind: "cursor",
+            retries: 2,
+            retryDelayMs: 300,
             input: { taskId: "c1", prompt: "review", model: "composer-2" },
           },
         ],
@@ -146,6 +163,8 @@ describe("buildOrchestrationTraceEntry jobModels", () => {
         kind: "cursor",
         taskId: "c1",
         status: "runner_failed",
+        configuredRetries: 2,
+        configuredRetryDelayMs: 300,
         retryCount: 0,
         errorClass: "infra_failure",
         requestedModel: "composer-2",

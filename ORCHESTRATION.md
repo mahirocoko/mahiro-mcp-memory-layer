@@ -250,6 +250,7 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 - Poll with backoff and wait for a terminal state. Do not switch to synchronous tools merely because an async workflow is still `running` after the first poll.
 - When using direct async worker tools (`run_cursor_worker_async`, `run_gemini_worker_async`), keep the returned `requestId` and poll the matching `get_*_result` tool until completion.
 - Direct async worker polling and `orchestrate_workflow` polling both use the same result-store model: `running` first, terminal state later.
+- That shared result-store path now carries configured retry policy metadata alongside terminal retry outcomes, so async polling can show both what was configured and what actually happened.
 - Use `list_orchestration_traces` or the CLI trace reader for execution forensics.
 - Trace and result metadata now record normalized `workerRuntimes` when present, so MCP-only control-plane runs are visible in persisted observability data.
 - Worker output is never the final truth.

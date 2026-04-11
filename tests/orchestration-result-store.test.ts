@@ -15,7 +15,10 @@ const minimalParallelSpec = {
   jobs: [
     {
       kind: "gemini" as const,
-      input: { prompt: "p", model: "gemini-3-flash-preview" },
+      workerRuntime: "shell" as const,
+      retries: 2,
+      retryDelayMs: 500,
+      input: { taskId: "g1", prompt: "p", model: "gemini-3-flash-preview" },
     },
   ],
 } satisfies OrchestrateWorkflowSpec;
@@ -42,7 +45,15 @@ describe("OrchestrationResultStore", () => {
 
     const readBack = await store.read(VALID_WORKFLOW_REQUEST_ID);
     expect(readBack?.requestId).toBe(VALID_WORKFLOW_REQUEST_ID);
-    expect(readBack?.metadata.workerRuntimes).toBeUndefined();
+    expect(readBack?.metadata.workerRuntimes).toEqual(["shell"]);
+    expect(readBack?.metadata.jobs).toEqual([
+      {
+        taskId: "g1",
+        workerRuntime: "shell",
+        configuredRetries: 2,
+        configuredRetryDelayMs: 500,
+      },
+    ]);
 
     const onDisk = path.join(workDir, `${VALID_WORKFLOW_REQUEST_ID}.json`);
     await expect(readFile(onDisk, "utf8")).resolves.toContain(VALID_WORKFLOW_REQUEST_ID);

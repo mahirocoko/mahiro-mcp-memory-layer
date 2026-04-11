@@ -36,6 +36,8 @@ export interface AsyncWorkerRunningResponse {
   readonly kind: WorkerJob["kind"];
   readonly status: "running";
   readonly pollIntervalMs: number;
+  readonly configuredRetries?: number;
+  readonly configuredRetryDelayMs?: number;
   readonly workflowStatus: "running";
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -48,6 +50,8 @@ export interface AsyncWorkerFailedResponse {
   readonly status: "runner_failed";
   readonly workflowStatus: Exclude<OrchestrationResultRecord["status"], "running">;
   readonly error: string;
+  readonly configuredRetries?: number;
+  readonly configuredRetryDelayMs?: number;
   readonly retryCount?: number;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -59,6 +63,8 @@ export interface AsyncWorkerCompletedResponse<TResult extends GeminiWorkerResult
   readonly kind: WorkerJob["kind"];
   readonly status: TResult["status"];
   readonly workflowStatus: Exclude<OrchestrationResultRecord["status"], "running" | "runner_failed">;
+  readonly configuredRetries?: number;
+  readonly configuredRetryDelayMs?: number;
   readonly retryCount: number;
   readonly result: TResult;
   readonly summary: OrchestrationRunSummary;
@@ -71,18 +77,18 @@ export type AsyncWorkerResultResponse<TResult extends GeminiWorkerResult | Curso
   | AsyncWorkerFailedResponse
   | AsyncWorkerCompletedResponse<TResult>;
 
-interface CreateAsyncWorkerToolsOptions<TShape extends ZodRawShape & { taskId: z.ZodString }> {
+interface CreateAsyncWorkerToolsOptions<TStartShape extends ZodRawShape, TJob extends WorkerJob> {
   readonly kind: WorkerJob["kind"];
-  readonly inputSchema: ZodObject<TShape>;
+  readonly startInputSchema: ZodObject<TStartShape>;
   readonly startToolName: string;
   readonly getToolName: string;
   readonly startDescription: string;
   readonly getDescription: string;
-  readonly buildJob: (input: z.infer<ZodObject<TShape>>) => WorkerJob;
+  readonly buildJob: (input: z.infer<ZodObject<TStartShape>>) => TJob;
 }
 
-export function createAsyncWorkerTools<TShape extends ZodRawShape & { taskId: z.ZodString }>(
-  options: CreateAsyncWorkerToolsOptions<TShape>,
+export function createAsyncWorkerTools<TStartShape extends ZodRawShape, TJob extends WorkerJob>(
+  options: CreateAsyncWorkerToolsOptions<TStartShape, TJob>,
 ): readonly RegisteredTool[] {
   const env = getAppEnv();
   const orchestrationTraceStore = new OrchestrationTraceStore(env.dataPaths.orchestrationTraceFilePath);
@@ -93,9 +99,9 @@ export function createAsyncWorkerTools<TShape extends ZodRawShape & { taskId: z.
     {
       name: options.startToolName,
       description: options.startDescription,
-      inputSchema: options.inputSchema.shape,
+      inputSchema: options.startInputSchema.shape,
       execute: async (input) => {
-        const parsed = options.inputSchema.parse(input);
+        const parsed = options.startInputSchema.parse(input);
         const requestId = newId("workflow");
         const job = options.buildJob(parsed);
         const spec: OrchestrateWorkflowSpec = {
@@ -170,6 +176,7 @@ function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorW
   expectedKind: WorkerJob["kind"],
 ): AsyncWorkerResultResponse<TResult> {
   const taskIdFromMetadata = record.metadata.taskIds[0] ?? "";
+  const primaryJobMetadata = record.metadata.jobs?.find((job) => job.taskId === taskIdFromMetadata);
 
   if (record.status === "running") {
     return {
@@ -178,6 +185,12 @@ function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorW
       kind: expectedKind,
       status: "running",
       pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
+      ...(typeof primaryJobMetadata?.configuredRetries === "number"
+        ? { configuredRetries: primaryJobMetadata.configuredRetries }
+        : {}),
+      ...(typeof primaryJobMetadata?.configuredRetryDelayMs === "number"
+        ? { configuredRetryDelayMs: primaryJobMetadata.configuredRetryDelayMs }
+        : {}),
       workflowStatus: record.status,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -192,6 +205,12 @@ function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorW
       status: "runner_failed",
       workflowStatus: record.status,
       error: record.error,
+      ...(typeof primaryJobMetadata?.configuredRetries === "number"
+        ? { configuredRetries: primaryJobMetadata.configuredRetries }
+        : {}),
+      ...(typeof primaryJobMetadata?.configuredRetryDelayMs === "number"
+        ? { configuredRetryDelayMs: primaryJobMetadata.configuredRetryDelayMs }
+        : {}),
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
@@ -224,6 +243,7 @@ function mapWorkerJobResult<TResult extends GeminiWorkerResult | CursorWorkerRes
   workerResult: WorkerJobResult,
 ): AsyncWorkerResultResponse<TResult> {
   const taskId = workerResult.input.taskId;
+  const jobMetadata = record.metadata.jobs?.find((job) => job.taskId === taskId);
 
   if ("result" in workerResult) {
     return {
@@ -232,6 +252,10 @@ function mapWorkerJobResult<TResult extends GeminiWorkerResult | CursorWorkerRes
       kind: workerResult.kind,
       status: workerResult.result.status,
       workflowStatus: record.status,
+      ...(typeof jobMetadata?.configuredRetries === "number" ? { configuredRetries: jobMetadata.configuredRetries } : {}),
+      ...(typeof jobMetadata?.configuredRetryDelayMs === "number"
+        ? { configuredRetryDelayMs: jobMetadata.configuredRetryDelayMs }
+        : {}),
       retryCount: workerResult.retryCount,
       result: workerResult.result as TResult,
       summary: record.result.summary,
@@ -243,12 +267,16 @@ function mapWorkerJobResult<TResult extends GeminiWorkerResult | CursorWorkerRes
   return {
     requestId: record.requestId,
     taskId,
-    kind: workerResult.kind,
-    status: "runner_failed",
-    workflowStatus: record.status,
-    error: workerResult.error,
-    retryCount: workerResult.retryCount,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
+      kind: workerResult.kind,
+      status: "runner_failed",
+      workflowStatus: record.status,
+      error: workerResult.error,
+      ...(typeof jobMetadata?.configuredRetries === "number" ? { configuredRetries: jobMetadata.configuredRetries } : {}),
+      ...(typeof jobMetadata?.configuredRetryDelayMs === "number"
+        ? { configuredRetryDelayMs: jobMetadata.configuredRetryDelayMs }
+        : {}),
+      retryCount: workerResult.retryCount,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
   };
 }

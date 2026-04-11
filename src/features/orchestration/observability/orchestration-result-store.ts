@@ -12,6 +12,14 @@ interface OrchestrationResultMetadata {
   readonly timeoutMs?: number;
   readonly taskIds: readonly string[];
   readonly workerRuntimes?: readonly ("shell" | "mcp")[];
+  readonly jobs?: readonly OrchestrationResultJobMetadata[];
+}
+
+interface OrchestrationResultJobMetadata {
+  readonly taskId: string;
+  readonly workerRuntime?: "shell" | "mcp";
+  readonly configuredRetries?: number;
+  readonly configuredRetryDelayMs?: number;
 }
 
 interface BaseOrchestrationResultRecord {
@@ -140,9 +148,16 @@ export class OrchestrationResultStore {
 }
 
 function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetadata {
-  const workerRuntimes = getConcreteJobs(spec)
+  const concreteJobs = getConcreteJobs(spec);
+  const workerRuntimes = concreteJobs
     .map((job) => job.workerRuntime)
     .filter((runtime): runtime is "shell" | "mcp" => runtime === "shell" || runtime === "mcp");
+  const jobs = concreteJobs.map((job) => ({
+    taskId: job.input.taskId,
+    ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
+    ...(typeof job.retries === "number" ? { configuredRetries: job.retries } : {}),
+    ...(typeof job.retryDelayMs === "number" ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
+  }));
 
   if (spec.mode === "parallel") {
     return {
@@ -151,6 +166,7 @@ function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetada
       timeoutMs: spec.timeoutMs,
       taskIds: spec.jobs.map((job) => job.input.taskId),
       ...(workerRuntimes.length > 0 ? { workerRuntimes } : {}),
+      ...(jobs.length > 0 ? { jobs } : {}),
     };
   }
 
@@ -159,6 +175,7 @@ function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetada
     timeoutMs: spec.timeoutMs,
     taskIds: spec.steps.flatMap((step) => (typeof step === "function" ? [] : [step.input.taskId])),
     ...(workerRuntimes.length > 0 ? { workerRuntimes } : {}),
+    ...(jobs.length > 0 ? { jobs } : {}),
   };
 }
 

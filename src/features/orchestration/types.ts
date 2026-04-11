@@ -96,6 +96,10 @@ export interface OrchestrationJobModelTelemetry {
   readonly taskId: string;
   /** Normalized per-job execution status for later telemetry analysis. */
   readonly status: OrchestrationJobStatus;
+  /** Configured max retry attempts for the job when explicitly set. */
+  readonly configuredRetries?: number;
+  /** Configured base retry delay in milliseconds when explicitly set. */
+  readonly configuredRetryDelayMs?: number;
   /** Number of retries before the terminal result. */
   readonly retryCount?: number;
   /** Worker-observed execution duration in milliseconds when available. */

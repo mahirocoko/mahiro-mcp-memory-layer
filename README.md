@@ -430,7 +430,9 @@ Trace artifact:
 Result store vs trace store:
 
 - `data/traces/orchestration-results/*.json` is the request-scoped result store used by `get_orchestration_result` and keeps the latest polling state for a single `requestId`
+- result-store metadata now also persists per-job configured retry policy (`configuredRetries`, `configuredRetryDelayMs`) when present, alongside task IDs and explicit worker runtimes
 - `data/traces/orchestration-trace.jsonl` is the append-only telemetry log used by `list_orchestration_traces` and usage summaries
+- trace telemetry keeps both configured retry policy and terminal retry outcomes (`retryCount`) when current package versions write `jobModels`
 - the stores stay separate on purpose: polling needs mutable latest-state records, while observability needs historical append-only entries for forensic inspection and aggregation
 
 Parallel workflow fields:
@@ -622,7 +624,8 @@ Direct async worker MCP tools:
 
 - `run_gemini_worker_async` / `run_cursor_worker_async` start a single worker job asynchronously and return a `workflow_*` request ID immediately
 - `get_gemini_worker_result` / `get_cursor_worker_result` poll the latest stored result for that async worker request
-- these tools are thin aliases over the same orchestration result store used by `orchestrate_workflow`, so they avoid holding one MCP tool call open for the full worker duration
+- these tools are thin aliases over the same orchestration result store used by `orchestrate_workflow`, so they avoid holding one MCP tool call open for the full worker duration and expose configured retry policy plus terminal retry outcomes from that shared store
+- direct async worker tools are shell-pinned internally today, so they stay on the local `agent` / `gemini` CLI path even when `MAHIRO_CURSOR_RUNTIME` or `MAHIRO_GEMINI_RUNTIME` selects MCP for other entrypoints
 - the synchronous `run_gemini_worker` / `run_cursor_worker` tools still exist for short direct calls, but long-running callers should prefer the async variants
 
 Gemini async MCP example:
@@ -632,6 +635,8 @@ Gemini async MCP example:
   "taskId": "gemini-task-1",
   "prompt": "Summarize this repo",
   "model": "gemini-3-flash-preview",
+  "retries": 2,
+  "retryDelayMs": 500,
   "taskKind": "summarize",
   "timeoutMs": 30000,
   "cwd": "/path/to/project"
@@ -655,6 +660,11 @@ Then poll with `get_gemini_worker_result`:
 }
 ```
 
+Gemini failure note:
+
+- errors such as unauthorized tool calls, `MODEL_CAPACITY_EXHAUSTED`, `429 RESOURCE_EXHAUSTED`, `ECONNRESET`, or `socket hang up` originate upstream in the Gemini CLI/runtime or provider path rather than in this repo’s orchestration code
+- the local mitigations in this repo are configured retries/backoff on the async start tool plus shell-pinned direct async execution; this repo does not currently persist full per-attempt history
+
 Cursor async MCP example:
 
 ```json
@@ -669,17 +679,33 @@ Cursor async MCP example:
 }
 ```
 
-Then poll with `get_cursor_worker_result` using the returned `workflow_*` request ID. The final result shape comes from the same orchestration result store as `get_orchestration_result`, so status transitions like `running`, `completed`, and `runner_failed` stay consistent across workflow-level and single-worker async polling.
+Then poll with `get_cursor_worker_result` using the returned `workflow_*` request ID. These direct async polling tools read from the same orchestration result store as `get_orchestration_result`, but they return a flattened worker-specific payload rather than the full workflow envelope. Status transitions like `running`, `completed`, and `runner_failed` stay consistent across workflow-level and single-worker async polling.
 
 Typical polling outcomes:
 
 ```json
 {
   "requestId": "workflow_123",
+  "taskId": "cursor-task-1",
+  "kind": "cursor",
   "status": "completed",
+  "workflowStatus": "completed",
+  "configuredRetries": 2,
+  "configuredRetryDelayMs": 500,
+  "retryCount": 1,
   "result": {
-    "requestId": "workflow_123",
+    "taskId": "cursor-task-1",
     "status": "completed"
+  },
+  "summary": {
+    "totalJobs": 1,
+    "finishedJobs": 1,
+    "completedJobs": 1,
+    "failedJobs": 0,
+    "skippedJobs": 0,
+    "startedAt": "2026-04-08T00:00:00.000Z",
+    "finishedAt": "2026-04-08T00:00:01.000Z",
+    "durationMs": 1000
   }
 }
 ```
@@ -688,13 +714,14 @@ Typical polling outcomes:
 {
   "requestId": "workflow_123",
   "status": "runner_failed",
-  "error": {
-    "message": "worker process exited unexpectedly"
-  }
+  "taskId": "cursor-task-1",
+  "kind": "cursor",
+  "workflowStatus": "runner_failed",
+  "error": "worker process exited unexpectedly"
 }
 ```
 
-For orchestration polling, `completed` means the workflow result is ready, while `runner_failed` means the control-plane run itself failed before a normal completed payload could be written.
+For workflow-level orchestration polling, `completed` means the workflow result is ready, while `runner_failed` means the control-plane run itself failed before a normal completed payload could be written. For direct async worker polling, the same status vocabulary is preserved, but the payload is flattened around the first job instead of returning the full workflow envelope.
 
 Trace inspection CLI:
 

@@ -34,9 +34,14 @@ function buildWorkerRuntimes(spec: OrchestrateWorkflowSpec): readonly ("shell" |
 }
 
 function buildJobModelsFromWorkerResults(
+  spec: OrchestrateWorkflowSpec,
   results: readonly WorkerJobResult[],
 ): readonly OrchestrationJobModelTelemetry[] {
+  const jobTelemetryByTaskId = buildJobTelemetryByTaskId(spec);
+
   return results.map((item) => {
+    const configuredTelemetry = jobTelemetryByTaskId.get(item.input.taskId);
+
     if ("result" in item) {
       const requestedModel = item.result.requestedModel ?? item.input.model;
       const reportedModel = item.result.reportedModel;
@@ -48,6 +53,7 @@ function buildJobModelsFromWorkerResults(
         kind: item.kind,
         taskId: item.input.taskId,
         status: item.result.status,
+        ...(configuredTelemetry ?? {}),
         retryCount: item.retryCount,
         durationMs: item.result.durationMs,
         ...(cached !== undefined ? { cached } : {}),
@@ -62,6 +68,7 @@ function buildJobModelsFromWorkerResults(
       kind: item.kind,
       taskId: item.input.taskId,
       status: item.status,
+      ...(configuredTelemetry ?? {}),
       retryCount: item.retryCount,
       errorClass: classifyWorkerJobError(item),
       requestedModel: item.input.model,
@@ -75,7 +82,7 @@ export function buildOrchestrationTraceEntry(
   spec: OrchestrateWorkflowSpec,
   result: OrchestrationRunResult,
 ): OrchestrationTraceEntry {
-  const jobModels = buildJobModelsFromWorkerResults(result.results);
+  const jobModels = buildJobModelsFromWorkerResults(spec, result.results);
 
   return {
     requestId,
@@ -110,6 +117,7 @@ export function buildRunnerFailedOrchestrationTraceEntry(
   options: RunnerFailedTraceOptions,
 ): OrchestrationTraceEntry {
   const jobs = getConcreteJobs(options.spec);
+  const jobTelemetryByTaskId = buildJobTelemetryByTaskId(options.spec);
   const finishedAt = options.finishedAt ?? new Date().toISOString();
   const durationMs = Math.max(Date.parse(finishedAt) - Date.parse(options.startedAt), 0);
 
@@ -127,6 +135,7 @@ export function buildRunnerFailedOrchestrationTraceEntry(
       kind: job.kind,
       taskId: job.input.taskId,
       status: "runner_failed",
+      ...(jobTelemetryByTaskId.get(job.input.taskId) ?? {}),
       retryCount: 0,
       errorClass: "infra_failure",
       requestedModel: job.input.model,
@@ -142,6 +151,20 @@ export function buildRunnerFailedOrchestrationTraceEntry(
     durationMs,
     createdAt: finishedAt,
   };
+}
+
+function buildJobTelemetryByTaskId(
+  spec: OrchestrateWorkflowSpec,
+): Map<string, Pick<OrchestrationJobModelTelemetry, "configuredRetries" | "configuredRetryDelayMs">> {
+  return new Map(
+    getConcreteJobs(spec).map((job) => [
+      job.input.taskId,
+      {
+        ...(typeof job.retries === "number" ? { configuredRetries: job.retries } : {}),
+        ...(typeof job.retryDelayMs === "number" ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
+      },
+    ]),
+  );
 }
 
 function getConcreteJobs(spec: OrchestrateWorkflowSpec): readonly WorkerJob[] {

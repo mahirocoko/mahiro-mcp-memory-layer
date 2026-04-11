@@ -67,6 +67,8 @@ export function formatOrchestrationTracesAsDetail(
             .map(
               (job) =>
                 `${job.taskId} (${job.kind}) status=${typeof job.status === "string" ? job.status : "-"} requested=${job.requestedModel}` +
+                (typeof job.configuredRetries === "number" ? ` configuredRetries=${job.configuredRetries}` : "") +
+                (typeof job.configuredRetryDelayMs === "number" ? ` configuredRetryDelayMs=${job.configuredRetryDelayMs}` : "") +
                 (typeof job.retryCount === "number" ? ` retries=${job.retryCount}` : "") +
                 (typeof job.durationMs === "number" ? ` duration=${job.durationMs}ms` : "") +
                 (typeof job.cached === "boolean" ? ` cached=${job.cached}` : "") +

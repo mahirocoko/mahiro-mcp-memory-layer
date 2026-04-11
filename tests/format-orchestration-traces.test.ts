@@ -74,6 +74,8 @@ describe("formatOrchestrationTracesAsText", () => {
             kind: "gemini",
             taskId: "g1",
             status: "completed",
+            configuredRetries: 2,
+            configuredRetryDelayMs: 500,
             retryCount: 0,
             durationMs: 800,
             cached: true,
@@ -86,6 +88,8 @@ describe("formatOrchestrationTracesAsText", () => {
             kind: "cursor",
             taskId: "c1",
             status: "command_failed",
+            configuredRetries: 3,
+            configuredRetryDelayMs: 750,
             retryCount: 2,
             durationMs: 1400,
             errorClass: "rate_limited",
@@ -106,8 +110,8 @@ describe("formatOrchestrationTracesAsText", () => {
     ]);
     
     expect(detail).toContain("Job models:");
-    expect(detail).toContain("g1 (gemini) status=completed requested=gemini-3-flash-preview retries=0 duration=800ms cached=true cachedTokens=300 errorClass=none reported=gemini-3-flash-preview");
-    expect(detail).toContain("c1 (cursor) status=command_failed requested=composer-2 retries=2 duration=1400ms errorClass=rate_limited reported=composer-2");
+    expect(detail).toContain("g1 (gemini) status=completed requested=gemini-3-flash-preview configuredRetries=2 configuredRetryDelayMs=500 retries=0 duration=800ms cached=true cachedTokens=300 errorClass=none reported=gemini-3-flash-preview");
+    expect(detail).toContain("c1 (cursor) status=command_failed requested=composer-2 configuredRetries=3 configuredRetryDelayMs=750 retries=2 duration=1400ms errorClass=rate_limited reported=composer-2");
   });
 
   it("shows effective status for stale completed traces with failed jobs", () => {

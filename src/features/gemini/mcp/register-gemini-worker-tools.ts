@@ -1,7 +1,14 @@
+import { z } from "zod";
+
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
 import { createAsyncWorkerTools } from "../../orchestration/mcp/async-worker-tools.js";
 import { geminiWorkerInputSchema } from "../schemas.js";
 import { shellGeminiRuntime } from "../runtime/shell/shell-gemini-runtime.js";
+
+const geminiAsyncWorkerStartSchema = geminiWorkerInputSchema.extend({
+  retries: z.number().int().min(0).max(5).optional(),
+  retryDelayMs: z.number().int().positive().max(30_000).optional(),
+});
 
 /**
  * MCP tools that execute Gemini workers via the shell-backed runtime inside the server process.
@@ -11,15 +18,18 @@ export function getRegisteredGeminiWorkerTools(): readonly RegisteredTool[] {
   return [
     ...createAsyncWorkerTools({
       kind: "gemini",
-      inputSchema: geminiWorkerInputSchema,
+      startInputSchema: geminiAsyncWorkerStartSchema,
       startToolName: "run_gemini_worker_async",
       getToolName: "get_gemini_worker_result",
       startDescription:
         "Start a Gemini worker job asynchronously via the local shell runtime and return a workflow requestId for polling.",
       getDescription: "Get the latest stored Gemini async worker result by workflow requestId.",
-      buildJob: (input) => ({
+      buildJob: ({ retries, retryDelayMs, ...input }) => ({
         kind: "gemini",
         input,
+        retries,
+        retryDelayMs,
+        workerRuntime: "shell",
       }),
     }),
     {

@@ -11,7 +11,7 @@ export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
   return [
     ...createAsyncWorkerTools({
       kind: "cursor",
-      inputSchema: cursorWorkerInputSchema,
+      startInputSchema: cursorWorkerInputSchema,
       startToolName: "run_cursor_worker_async",
       getToolName: "get_cursor_worker_result",
       startDescription:
@@ -20,6 +20,7 @@ export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
       buildJob: (input) => ({
         kind: "cursor",
         input,
+        workerRuntime: "shell",
       }),
     }),
     {
