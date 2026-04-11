@@ -24,6 +24,8 @@ OpenCode installs npm plugins with Bun at startup, so this is the only step for 
 
 With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, or `wake_up_memory`.
 
+The plugin's session-start memory bootstrap now tolerates live OpenCode runs that emit generic message events before a dedicated `session.created` hook. In practice, that means wake-up can start from the first session-scoped generic event as a fallback, so `memory_context` still gets a cached `wakeUp` payload even when `opencode run` does not surface `session.created` early enough for the plugin.
+
 The plugin also appends the packaged `AGENTS.md` file to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
 
 Local development path:
@@ -90,6 +92,7 @@ The memory side now has two distinct loops:
 Plugin override knob:
 
 - `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's message debounce window.
+- `MAHIRO_OPENCODE_PLUGIN_DEBUG_STDERR=1` mirrors plugin lifecycle logging to stderr when the OpenCode app logger is unavailable or failing, which is useful for debugging live hook delivery and wake-up caching.
 
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 

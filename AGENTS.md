@@ -15,6 +15,7 @@ Then use `README.md` for command, install, and interface reference.
 - Primary verification commands: `bun run typecheck`, `bun run test`, `bun run build`
 - OpenCode plugin entrypoint: `src/features/opencode-plugin/index.ts`
 - Standard OpenCode install path is plugin-only via the package name (`mahiro-mcp-memory-layer` in `opencode.json`); plugin overrides resolve from plugin config files plus environment variables. A local `file://` source-checkout plugin path also injects this repo's standalone MCP server through the plugin `config` hook, while the standalone MCP CLI/server remains the separate advanced/manual fallback.
+- OpenCode memory wake-up is session-start oriented, but live `opencode run` can surface generic message events before a dedicated `session.created` hook. The plugin therefore keeps a generic-event fallback so cached wake-up context still materializes in `memory_context` for fresh live sessions.
 
 ## Public Contract
 
@@ -24,7 +25,9 @@ Then use `README.md` for command, install, and interface reference.
 - Orchestration tools: `orchestrate_workflow`, `get_orchestration_result`, `list_orchestration_traces`
 - Default orchestration posture: async
 - Omit `waitForCompletion` to start work in background and get `{ requestId, status: "running", autoAsync: true }`
-- Use `get_orchestration_result` to poll by `requestId`
+- Set `waitForCompletion: false` when you want explicit async mode instead of auto-async
+- Use `get_orchestration_result` to poll by `requestId` until a terminal state (`completed`, `failed`, `step_failed`, `timed_out`, or `runner_failed`)
+- Treat `running` as normal async state, not as failure or proof that fallback is required
 - `waitForCompletion: true` is allowed only for a single Gemini job or step with no retries
 
 ## Cursor Trust Defaults
@@ -89,6 +92,7 @@ Sticky-mode notes:
 - Treat delegated agents as the **execution plane**: implementation, refactoring, search, extraction, focused review, planning, and specialized reasoning.
 - Keep judgment centralized and execution distributed. The orchestrator decides; workers do.
 - Do not let multiple agents behave like competing orchestrators on the same unit of work.
+- A single workflow may still contain multiple worker jobs; the thing to avoid is multiple orchestrators competing on one decision surface, not multiple execution workers in one workflow.
 
 ## Token-Saving Posture
 
@@ -155,6 +159,13 @@ After a worker returns:
 If the task decomposes into 2+ independent subtasks, run workers in parallel.
 
 Do not serialize independent work just because it is easier to think about locally.
+
+For workflow composition:
+
+- use one parallel workflow when multiple worker jobs are independent and belong to the same delegated batch
+- use one sequential workflow when later steps depend on earlier worker output
+- use separate workflows only when the batches are materially distinct or should be observed independently
+- multiple worker jobs in one workflow are normal; multiple orchestrators for the same unit of work are not
 
 ## Verification Budget
 
@@ -281,11 +292,15 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 - The `orchestrate_workflow` MCP tool accepts the same static workflow spec as the CLI.
 - When the MCP tool is available, prefer `orchestrate_workflow` over shelling out to `bun run orchestrate` for `orch:` delegation flows.
 - Treat the MCP tool as the default orchestration entrypoint for new delegated sessions in this repo unless the user explicitly asked for CLI behavior.
+- Choose the entrypoint by task shape: `orchestrate_workflow` for multi-job or traced delegation, direct async worker tools for one long-running worker job, sync tools only for short direct calls.
 - The MCP orchestration path preserves each workflow job's requested `workerRuntime`; omit it to keep the default shell worker behavior, or set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime.
 - Prefer `waitForCompletion: false` for long-running workflows.
 - If `waitForCompletion` is omitted, workflows may auto-start in background and return `{ requestId, status: "running", autoAsync: true }`.
 - `waitForCompletion: true` is limited to a single Gemini job with no retries; Cursor or multi-job workflows must use async mode and `get_orchestration_result`.
 - Use `get_orchestration_result` to poll background orchestration runs by `requestId`.
+- Poll with backoff and wait for a terminal state. Do not switch to synchronous tools merely because an async workflow is still `running` after the first poll.
+- When using direct async worker tools (`run_cursor_worker_async`, `run_gemini_worker_async`), keep the returned `requestId` and poll the matching `get_*_result` tool until completion.
+- Direct async worker polling and `orchestrate_workflow` polling both use the same result-store model: `running` first, terminal state later.
 - Use `list_orchestration_traces` or the CLI trace reader for execution forensics.
 - Trace and result metadata now record normalized `workerRuntimes` when present, so MCP-only control-plane runs are visible in persisted observability data.
 - Worker output is never the final truth.
@@ -298,18 +313,22 @@ A good turn:
 
 1. Read <=50 lines for orientation.
 2. Classify the task.
-3. Delegate.
-4. Run typecheck/test/build.
-5. Spot-check <=3 locations.
-6. Synthesize the result.
+3. Choose the right async entrypoint.
+4. Delegate and keep the `requestId`.
+5. Poll until terminal state.
+6. Run typecheck/test/build.
+7. Spot-check <=3 locations.
+8. Synthesize the result.
 
 A bad turn:
 
 1. Read several files "to understand context."
 2. Read more files "to be thorough."
-3. Edit multiple files directly.
-4. Run tests.
-5. Never delegate.
+3. Start async work, see `running`, and treat that as a blocker or failure.
+4. Fall back to sync before the async run reaches terminal state.
+5. Edit multiple files directly.
+6. Run tests.
+7. Never delegate.
 
 ## Stop Rule
 

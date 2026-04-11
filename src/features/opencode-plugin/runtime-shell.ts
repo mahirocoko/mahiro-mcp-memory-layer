@@ -114,18 +114,6 @@ export function createOpenCodePluginRuntime(
       messageDebounceMs,
       providedUserId,
     );
-    await logPluginLifecycle(context, {
-      service: "opencode-memory-plugin",
-      level: "debug",
-      message: "OpenCode plugin runtime shell ready.",
-      extra: {
-        eventType: event.type,
-        sourceHook,
-        messageDebounceMs,
-        sessionId: sessionState?.sessionId,
-      },
-    });
-
     return sessionState;
   };
 
@@ -138,6 +126,19 @@ export function createOpenCodePluginRuntime(
     let pendingWakeUp: Promise<void>;
 
     sessionState.hasStartedWakeUp = true;
+    void logPluginLifecycle(context, {
+      service: "opencode-memory-plugin",
+      level: "debug",
+      message: "OpenCode plugin session-start wake-up started.",
+      extra: {
+        sessionId: sessionState.sessionId,
+        userId: wakeUpScope.userId,
+        projectId: wakeUpScope.projectId,
+        containerId: wakeUpScope.containerId,
+        scopeSessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
+        hasStartedWakeUpBeforeStart: false,
+      },
+    });
     pendingWakeUp = getOpenCodePluginMemoryBackend(options.__test)
       .then((backend) =>
         backend.wakeUpMemory({
@@ -151,16 +152,37 @@ export function createOpenCodePluginRuntime(
         const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
 
         if (!latestSessionState) {
+          void logPluginLifecycle(context, {
+            service: "opencode-memory-plugin",
+            level: "debug",
+            message: "OpenCode plugin session-start wake-up dropped before cache write.",
+            extra: {
+              sessionId: sessionState.sessionId,
+              sessionStillPresent: false,
+            },
+          });
           return;
         }
 
+        const hadCachedWakeUpBeforeWrite = Boolean(latestSessionState.wakeUp);
         latestSessionState.wakeUp = wakeUp;
+        void logPluginLifecycle(context, {
+          service: "opencode-memory-plugin",
+          level: "debug",
+          message: "OpenCode plugin session-start wake-up cached.",
+          extra: {
+            sessionId: sessionState.sessionId,
+            sessionStillPresent: true,
+            hadCachedWakeUpBeforeWrite,
+            hasCachedWakeUpAfterWrite: Boolean(latestSessionState.wakeUp),
+          },
+        });
       })
       .catch((error) =>
         logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
           level: "warn",
-          message: "OpenCode plugin session.created wake-up failed open.",
+          message: "OpenCode plugin session-start wake-up failed open.",
           extra: {
             sessionId: sessionState.sessionId,
             error: toErrorMessage(error),
@@ -374,7 +396,8 @@ export function createOpenCodePluginRuntime(
         }
 
         default: {
-          await routeEvent(event, "event");
+          const sessionState = await routeEvent(event, "event");
+          startSessionWakeUp(sessionState);
         }
       }
     },

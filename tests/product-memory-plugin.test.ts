@@ -20,7 +20,7 @@ const expectedLocalUserId = `local:${os.userInfo().username}`;
 const pluginModulePath = "../src/features/opencode-plugin/index.js";
 
 interface PluginEvent {
-  readonly type: "session.created" | "message.updated" | "session.idle";
+  readonly type: "session.created" | "message.updated" | "message.part.updated" | "session.idle";
   readonly properties: Record<string, unknown>;
 }
 
@@ -100,6 +100,23 @@ function createMessageUpdatedEventWithoutText(
       sessionID: sessionId,
       messageID: messageId,
       parts: [],
+    },
+  };
+}
+
+function createMessagePartUpdatedEvent(
+  sessionId = "session-1",
+  messageId = `${sessionId}-message-1`,
+): PluginEvent {
+  return {
+    type: "message.part.updated",
+    properties: {
+      sessionID: sessionId,
+      messageID: messageId,
+      part: {
+        type: "text",
+        text: "partial turn",
+      },
     },
   };
 }
@@ -537,6 +554,121 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.prepareHostTurnMemory).toHaveBeenCalledTimes(1);
     expect(harness.log).toHaveBeenCalled();
+    expectNoSelfSpawn(harness);
+  });
+
+  it("logs session-start lifecycle breadcrumbs for wake-up diagnostics", async () => {
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "profile\n\n---\n\nrecent",
+          profile: {
+            context: "profile",
+            items: ["profile-item"],
+            truncated: false,
+            degraded: false,
+          },
+          recent: {
+            context: "recent",
+            items: ["recent-item"],
+            truncated: false,
+            degraded: false,
+          },
+          truncated: false,
+          degraded: false,
+        }),
+      },
+    });
+
+    await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent("session-debug") });
+    await flushMicrotasks();
+
+    expect(harness.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          level: "debug",
+          message: "OpenCode plugin session-start wake-up started.",
+          extra: expect.objectContaining({
+            sessionId: "session-debug",
+            userId: expectedLocalUserId,
+            projectId: "mahiro-mcp-memory-layer",
+            containerId: `worktree:${repoRoot}`,
+            scopeSessionId: "session-debug",
+          }),
+        }),
+      }),
+    );
+    expect(harness.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          level: "debug",
+          message: "OpenCode plugin session-start wake-up cached.",
+          extra: expect.objectContaining({
+            sessionId: "session-debug",
+            sessionStillPresent: true,
+            hadCachedWakeUpBeforeWrite: false,
+            hasCachedWakeUpAfterWrite: true,
+          }),
+        }),
+      }),
+    );
+    expectNoSelfSpawn(harness);
+  });
+
+  it("starts wake-up from the generic event hook when session.created is absent", async () => {
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        wakeUpMemory: vi.fn().mockResolvedValue({
+          wakeUpContext: "profile\n\n---\n\nrecent",
+          profile: {
+            context: "profile",
+            items: ["profile-item"],
+            truncated: false,
+            degraded: false,
+          },
+          recent: {
+            context: "recent",
+            items: ["recent-item"],
+            truncated: false,
+            degraded: false,
+          },
+          truncated: false,
+          degraded: false,
+        }),
+      },
+    });
+
+    await harness.hooks.event?.({ event: createMessagePartUpdatedEvent("session-fallback") });
+    await flushMicrotasks();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-fallback",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(harness.memory.wakeUpMemory).toHaveBeenCalledTimes(1);
+    expect(harness.memory.wakeUpMemory).toHaveBeenCalledWith({
+      userId: expectedLocalUserId,
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-fallback",
+    });
+    expect(result).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-fallback",
+        lastEventType: "message.part.updated",
+        cached: {
+          wakeUp: {
+            wakeUpContext: "profile\n\n---\n\nrecent",
+          },
+        },
+      },
+    });
     expectNoSelfSpawn(harness);
   });
 
@@ -1207,7 +1339,7 @@ describe("product memory OpenCode plugin contract", () => {
       expect.objectContaining({
         body: expect.objectContaining({
           level: "warn",
-          message: "OpenCode plugin session.created wake-up failed open.",
+          message: "OpenCode plugin session-start wake-up failed open.",
         }),
       }),
     );
