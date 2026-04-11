@@ -23,6 +23,7 @@
     "src/features/opencode-plugin",
     "README.md",
     "AGENTS.md",
+    "ORCHESTRATION.md",
     "package.json"
   ],
   "scripts": {

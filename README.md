@@ -26,7 +26,7 @@ With that plugin-only install, OpenCode gets the native memory tool surface dire
 
 The plugin's session-start memory bootstrap now tolerates live OpenCode runs that emit generic message events before a dedicated `session.created` hook. In practice, that means wake-up can start from the first session-scoped generic event as a fallback, so `memory_context` still gets a cached `wakeUp` payload even when `opencode run` does not surface `session.created` early enough for the plugin.
 
-The plugin also appends the packaged `AGENTS.md` file to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
+The plugin also appends the packaged `AGENTS.md` and `ORCHESTRATION.md` files to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
 
 Local development path:
 
@@ -200,7 +200,7 @@ Result:
 Use `orch:` at the start of a request when you want strict orchestrator behavior.
 
 - `orch:` means classify first, choose the worker/model explicitly, and delegate before local code work.
-- In `orch:` mode, local implementation is restricted to the narrow escape hatch in `AGENTS.md`.
+- In `orch:` mode, local implementation is restricted to the narrow escape hatch in `ORCHESTRATION.md`.
 - Verification, synthesis, and final judgment still stay with the orchestrator.
 
 Example:
@@ -215,9 +215,9 @@ The native headless Cursor-family entrypoint in this repo is `agent -p --output-
 
 `bun run cursor` is a repo-local wrapper around that `agent` command. Use it when you want this package's normalized JSON envelope and defaults, but do not confuse it with the native headless command itself.
 
-`AGENTS.md` is the primary entrypoint for AI agents in this repo.
+`AGENTS.md` is the primary repo instruction entrypoint for AI agents in this repo, with `ORCHESTRATION.md` extending it for orchestration-specific posture.
 
-`README.md` is the canonical command/reference document for this package. `AGENTS.md` owns worker-selection posture, orchestration behavior, and verification discipline.
+`README.md` is the canonical command/reference document for this package. `AGENTS.md` stays lean, while `ORCHESTRATION.md` owns worker-selection posture and orchestration behavior.
 
 Trust behavior:
 
@@ -374,7 +374,7 @@ Runtime selection:
 
 Run workers in parallel only when their inputs are fully independent — neither worker's output is needed to form the other's prompt.
 
-This section documents the command shapes. `AGENTS.md` defines the orchestration posture for when to parallelize, when to sequence, and how to verify the result.
+This section documents the command shapes. `ORCHESTRATION.md` defines the orchestration posture for when to parallelize, when to sequence, and how to verify the result.
 
 - **Safe:** Gemini designs one frontend surface while Cursor reviews an unrelated backend diff.
 - **Safe:** Two Gemini jobs analyze separate visual/frontend areas in parallel.
@@ -391,7 +391,7 @@ wait
 
 `orchestrate` is the package-level workflow runner for static JSON-defined parallel or sequential job specs.
 
-This section is the canonical reference for CLI flags, workflow JSON fields, async MCP usage, and trace inspection examples. `AGENTS.md` covers the higher-level worker protocol.
+This section is the canonical reference for CLI flags, workflow JSON fields, async MCP usage, and trace inspection examples. `AGENTS.md` and `ORCHESTRATION.md` cover the higher-level agent and worker protocol.
 
 Flags:
 
