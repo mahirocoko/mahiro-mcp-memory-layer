@@ -15,14 +15,14 @@ async function loadApplyOpenCodePluginInstructionsConfig() {
 }
 
 describe("applyOpenCodePluginInstructionsConfig", () => {
-  it("injects the packaged AGENTS and ORCHESTRATION instruction paths in order", async () => {
+  it("injects the packaged MCP_USAGE and ORCHESTRATION instruction paths in order", async () => {
     const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
     await applyOpenCodePluginInstructionsConfig(config);
 
     expect(config.instructions).toEqual([
-      expect.stringContaining("/AGENTS.md"),
+      expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
     ]);
   });
@@ -37,7 +37,7 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
 
     expect(config.instructions).toEqual([
       "/tmp/user-instructions.md",
-      expect.stringContaining("/AGENTS.md"),
+      expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
     ]);
   });
@@ -50,16 +50,16 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
     await applyOpenCodePluginInstructionsConfig(config);
 
     expect(config.instructions).toEqual([
-      expect.stringContaining("/AGENTS.md"),
+      expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
     ]);
   });
 
-  it("does not append ORCHESTRATION when AGENTS is missing", async () => {
+  it("does not append packaged instructions when both docs are missing", async () => {
     vi.doMock("node:fs/promises", () => ({
       access: async (path: string) => {
-        if (path.endsWith("/AGENTS.md")) {
-          throw new Error("missing AGENTS");
+        if (path.endsWith("/MCP_USAGE.md") || path.endsWith("/ORCHESTRATION.md")) {
+          throw new Error("missing packaged doc");
         }
       },
     }));
@@ -72,7 +72,7 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
     expect(config.instructions).toBeUndefined();
   });
 
-  it("appends AGENTS when ORCHESTRATION is missing", async () => {
+  it("does not append packaged instructions when ORCHESTRATION is missing", async () => {
     vi.doMock("node:fs/promises", () => ({
       access: async (path: string) => {
         if (path.endsWith("/ORCHESTRATION.md")) {
@@ -86,7 +86,24 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
 
     await applyOpenCodePluginInstructionsConfig(config);
 
-    expect(config.instructions).toEqual([expect.stringContaining("/AGENTS.md")]);
+    expect(config.instructions).toBeUndefined();
+  });
+
+  it("does not append packaged instructions when MCP_USAGE is missing", async () => {
+    vi.doMock("node:fs/promises", () => ({
+      access: async (path: string) => {
+        if (path.endsWith("/MCP_USAGE.md")) {
+          throw new Error("missing MCP_USAGE");
+        }
+      },
+    }));
+
+    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
+    const config = {} as Config;
+
+    await applyOpenCodePluginInstructionsConfig(config);
+
+    expect(config.instructions).toBeUndefined();
   });
 
 });

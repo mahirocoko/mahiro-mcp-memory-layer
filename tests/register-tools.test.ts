@@ -271,13 +271,14 @@ describe("getRegisteredOrchestrationTools", () => {
       executionMode: "async",
       waitMode: "explicit_async",
       pollWith: "get_orchestration_result",
+      waitWith: "wait_for_orchestration_result",
       nextArgs: {
         requestId: expect.stringMatching(/^workflow_/),
       },
     });
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status.",
+      "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal.",
     );
     expect(result).not.toHaveProperty("autoAsync");
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
@@ -339,6 +340,7 @@ describe("getRegisteredOrchestrationTools", () => {
       executionMode: "async",
       waitMode: "auto_async",
       pollWith: "get_orchestration_result",
+      waitWith: "wait_for_orchestration_result",
       nextArgs: {
         requestId: expect.stringMatching(/^workflow_/),
       },
@@ -346,7 +348,7 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status.",
+      "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal.",
     );
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
@@ -601,6 +603,68 @@ describe("getRegisteredOrchestrationTools", () => {
           completedJobs: 0,
         }),
       }),
+    });
+  });
+
+  it("waits for orchestration completion through the dedicated wait tool", async () => {
+    const requestId = "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    orchestrationResultStoreMock.read
+      .mockResolvedValueOnce({
+        requestId,
+        source: "mcp",
+        metadata: {
+          mode: "parallel",
+          taskIds: ["g1"],
+        },
+        status: "running",
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        requestId,
+        source: "mcp",
+        metadata: {
+          mode: "parallel",
+          taskIds: ["g1"],
+        },
+        status: "completed",
+        result: {
+          requestId,
+          mode: "parallel",
+          status: "completed",
+          results: [],
+          summary: {
+            totalJobs: 1,
+            finishedJobs: 1,
+            completedJobs: 1,
+            failedJobs: 0,
+            skippedJobs: 0,
+            startedAt: "2026-04-05T00:00:00.000Z",
+            finishedAt: "2026-04-05T00:00:01.000Z",
+            durationMs: 1000,
+          },
+        },
+        createdAt: "2026-04-05T00:00:00.000Z",
+        updatedAt: "2026-04-05T00:00:01.000Z",
+      });
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "wait_for_orchestration_result");
+
+    const result = await tool?.execute({
+      requestId,
+      pollIntervalMs: 1,
+      includeCompletionSummary: true,
+    });
+
+    expect(orchestrationResultStoreMock.read).toHaveBeenCalledWith(requestId);
+    expect(result).toMatchObject({
+      requestId,
+      status: "completed",
+      completionSummary: "completed — 1/1 jobs succeeded, 0 failed, 0 skipped in 1000ms",
+      record: {
+        status: "completed",
+      },
     });
   });
 

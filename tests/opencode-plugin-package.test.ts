@@ -256,6 +256,8 @@ describe("OpenCode plugin package", () => {
 
     expect(packagedPaths).toContain("src/features/opencode-plugin/index.ts");
     expect(packagedPaths).toContain("src/features/memory/memory-service.ts");
+    expect(packagedPaths).toContain("MCP_USAGE.md");
+    expect(packagedPaths).toContain("ORCHESTRATION.md");
     expect(packagedPaths).not.toContain("src/index.ts");
     expect(packagedPaths).not.toContain("src/cursor.ts");
     expect(packagedPaths).not.toContain("src/cursor-worker.ts");

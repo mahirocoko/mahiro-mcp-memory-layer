@@ -22,11 +22,11 @@ Standard path:
 
 OpenCode installs npm plugins with Bun at startup, so this is the only step for the normal plugin path.
 
-With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, or `wake_up_memory`.
+With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, `wake_up_memory`, or the plugin-only diagnostic tool `memory_context`.
 
 The plugin's session-start memory bootstrap now tolerates live OpenCode runs that emit generic message events before a dedicated `session.created` hook. In practice, that means wake-up can start from the first session-scoped generic event as a fallback, so `memory_context` still gets a cached `wakeUp` payload even when `opencode run` does not surface `session.created` early enough for the plugin.
 
-The plugin also appends the packaged `AGENTS.md` and `ORCHESTRATION.md` files to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
+The plugin also appends the packaged `MCP_USAGE.md` and `ORCHESTRATION.md` files to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
 
 Local development path:
 
@@ -79,6 +79,13 @@ bun run typecheck
 bun run test
 bun run reindex
 ```
+
+## Docs map
+
+- `README.md` — package overview, install, and command/reference material
+- `MCP_USAGE.md` — practical MCP/runtime guide, tool surface, async waiting, and trace/result flows
+- `ORCHESTRATION.md` — orchestrator posture, routing, delegation, and verification rules
+- `AGENTS.md` — thin entrypoint that points agents to the right narrower doc
 
 ## Memory tools
 
@@ -197,6 +204,8 @@ Result:
 
 ## Operator Shortcut
 
+For strict orchestrator behavior and routing posture, use `ORCHESTRATION.md`. For concrete MCP payloads and async waiting flows, use `MCP_USAGE.md`.
+
 Use `orch:` at the start of a request when you want strict orchestrator behavior.
 
 - `orch:` means classify first, choose the worker/model explicitly, and delegate before local code work.
@@ -215,9 +224,9 @@ The native headless Cursor-family entrypoint in this repo is `agent -p --output-
 
 `bun run cursor` is a repo-local wrapper around that `agent` command. Use it when you want this package's normalized JSON envelope and defaults, but do not confuse it with the native headless command itself.
 
-`AGENTS.md` is the primary repo instruction entrypoint for AI agents in this repo, with `ORCHESTRATION.md` extending it for orchestration-specific posture.
+`AGENTS.md` is the thin repo instruction entrypoint for AI agents in this repo. `MCP_USAGE.md` owns practical MCP/runtime guidance, and `ORCHESTRATION.md` extends the agent posture with orchestration-specific policy.
 
-`README.md` is the canonical command/reference document for this package. `AGENTS.md` stays lean, while `ORCHESTRATION.md` owns worker-selection posture and orchestration behavior.
+`README.md` is the canonical command/reference document for this package. `AGENTS.md` stays lean, `MCP_USAGE.md` owns MCP/runtime usage guidance, and `ORCHESTRATION.md` owns worker-selection posture and orchestration behavior.
 
 Trust behavior:
 
@@ -590,12 +599,15 @@ echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summariz
 
 MCP tool:
 
+Use `MCP_USAGE.md` as the shorter AI-facing runtime guide for this section. `README.md` remains the full human-facing reference.
+
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
 - input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
-- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, and `nextArgs`
-- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"` and `autoAsync: true`
+- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, and `nextArgs`
+- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `waitWith: "wait_for_orchestration_result"`, and `autoAsync: true`
 - `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
 - `get_orchestration_result` reads the stored workflow state/result by `requestId`
+- `wait_for_orchestration_result` blocks until the stored workflow reaches a terminal state, then returns the final record plus an optional completion summary
 - `list_orchestration_traces` lists persisted orchestration trace entries with optional filters like `source`, `mode`, `status`, `requestId`, `taskId`, and `limit` (each entry may include `jobModels` with per-job `requestedModel` / optional `reportedModel` when written by a current package version)
 
 Async MCP example:
@@ -623,6 +635,17 @@ Then fetch the result later with:
 ```json
 {
   "requestId": "workflow_123"
+}
+```
+
+Or block until the workflow finishes with:
+
+```json
+{
+  "requestId": "workflow_123",
+  "pollIntervalMs": 1000,
+  "timeoutMs": 300000,
+  "includeCompletionSummary": true
 }
 ```
 

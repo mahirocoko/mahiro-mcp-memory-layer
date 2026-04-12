@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const waitForOrchestrationResultInputSchema = z.object({
+  requestId: z.string().trim().regex(/^workflow_[0-9a-f]{32}$/, "requestId must be the workflow_* id returned by orchestrate_workflow"),
+  pollIntervalMs: z.number().int().positive().max(60_000).optional(),
+  timeoutMs: z.number().int().positive().max(600_000).optional(),
+  includeCompletionSummary: z.boolean().optional(),
+});
+
 export const listOrchestrationTracesInputSchema = z.object({
   source: z.enum(["cli", "mcp"]).optional(),
   mode: z.enum(["parallel", "sequential"]).optional(),

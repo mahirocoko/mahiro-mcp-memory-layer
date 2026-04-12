@@ -7,7 +7,8 @@ import { OrchestrationLifecycle } from "../observability/orchestration-lifecycle
 import { OrchestrationResultStore } from "../observability/orchestration-result-store.js";
 import { OrchestrationTraceStore } from "../observability/orchestration-trace.js";
 import { runOrchestrationWorkflow } from "../run-orchestration-workflow.js";
-import { listOrchestrationTracesInputSchema } from "../schemas.js";
+import { listOrchestrationTracesInputSchema, waitForOrchestrationResultInputSchema } from "../schemas.js";
+import { waitForOrchestrationResult } from "../wait-for-orchestration-result.js";
 import { normalizeWorkflowSpec, orchestrateToolInputSchema } from "../workflow-spec.js";
 
 const getOrchestrationResultInputSchema = z.object({
@@ -77,13 +78,14 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
             executionMode: "async",
             waitMode,
             pollWith: "get_orchestration_result",
+            waitWith: "wait_for_orchestration_result",
             nextArgs: {
               requestId,
             },
             message:
               waitMode === "auto_async"
-                ? "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status."
-                : "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status.",
+                ? "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal."
+                : "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal.",
             ...(waitMode === "auto_async" ? { autoAsync: true } : {}),
           };
         }
@@ -121,6 +123,20 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
       execute: async (input) => {
         const parsed = getOrchestrationResultInputSchema.parse(input);
         return orchestrationResultStore.read(parsed.requestId);
+      },
+    },
+    {
+      name: "wait_for_orchestration_result",
+      description:
+        "Block until an orchestration workflow reaches a terminal state, then return the final stored result and an optional completion summary.",
+      inputSchema: waitForOrchestrationResultInputSchema.shape,
+      execute: async (input) => {
+        const parsed = waitForOrchestrationResultInputSchema.parse(input);
+        return waitForOrchestrationResult(orchestrationResultStore, parsed.requestId, {
+          pollIntervalMs: parsed.pollIntervalMs,
+          timeoutMs: parsed.timeoutMs,
+          includeCompletionSummary: parsed.includeCompletionSummary,
+        });
       },
     },
     {

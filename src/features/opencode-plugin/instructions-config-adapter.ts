@@ -3,9 +3,9 @@ import { fileURLToPath } from "node:url";
 
 import type { Config } from "@opencode-ai/plugin";
 
-const packagedAgentsInstructionPath = fileURLToPath(new URL("../../../AGENTS.md", import.meta.url));
+const packagedMcpUsageInstructionPath = fileURLToPath(new URL("../../../MCP_USAGE.md", import.meta.url));
 const packagedOrchestrationInstructionPath = fileURLToPath(new URL("../../../ORCHESTRATION.md", import.meta.url));
-const packagedInstructionPaths = [packagedAgentsInstructionPath, packagedOrchestrationInstructionPath];
+const packagedInstructionPaths = [packagedMcpUsageInstructionPath, packagedOrchestrationInstructionPath];
 
 export async function applyOpenCodePluginInstructionsConfig(config: Config): Promise<void> {
   const availablePackagedInstructionPaths = await getAvailablePackagedInstructionPaths();
@@ -32,18 +32,16 @@ async function getAvailablePackagedInstructionPaths(): Promise<string[]> {
   const availableInstructionPathEntries = await Promise.all(
     packagedInstructionPaths.map(async (instructionPath) => [instructionPath, await instructionExists(instructionPath)] as const),
   );
-  const hasAgentsInstruction = availableInstructionPathEntries.some(
-    ([instructionPath, exists]) => instructionPath === packagedAgentsInstructionPath && exists,
-  );
+  const hasCompleteInstructionPair = availableInstructionPathEntries.every(([, exists]) => exists);
+
+  if (!hasCompleteInstructionPair) {
+    return [];
+  }
 
   return availableInstructionPathEntries
-    .filter(([instructionPath, exists]) => {
+    .filter(([, exists]) => {
       if (!exists) {
         return false;
-      }
-
-      if (instructionPath === packagedOrchestrationInstructionPath) {
-        return hasAgentsInstruction;
       }
 
       return true;

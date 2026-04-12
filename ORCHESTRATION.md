@@ -2,6 +2,8 @@
 
 This file extends `AGENTS.md` with the repo's orchestration-specific posture.
 
+Use `MCP_USAGE.md` for concrete MCP tool contracts, async waiting, polling payloads, and runtime-mode differences.
+
 ## Cursor Trust Defaults
 
 - Current workspace paths are trusted by default for Cursor-family runs in this repo.
@@ -234,28 +236,14 @@ Dependent and must sequence:
 - Gemini extracts facts -> you use those facts to write the Cursor prompt
 - Cursor produces a plan -> you send that plan to Gemini for critique
 
-For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `README.md`.
+For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `MCP_USAGE.md` and `README.md`.
 
-## MCP Workflow Reminders
+## MCP Workflow Posture
 
-- The `orchestrate_workflow` MCP tool accepts the same static workflow spec as the CLI.
-- When the MCP tool is available, prefer `orchestrate_workflow` over shelling out to `bun run orchestrate` for `orch:` delegation flows.
-- Treat the MCP tool as the default orchestration entrypoint for new delegated sessions in this repo unless the user explicitly asked for CLI behavior.
-- Choose the entrypoint by task shape: `orchestrate_workflow` for multi-job or traced delegation, direct async worker tools for one long-running worker job, sync tools only for short direct calls.
-- The MCP orchestration path preserves each workflow job's requested `workerRuntime`; omit it to keep the default shell worker behavior, or set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime.
-- Prefer `waitForCompletion: false` for long-running workflows.
-- If `waitForCompletion` is omitted, workflows may auto-start in background and return `{ requestId, status: "running", autoAsync: true }`.
-- `waitForCompletion: true` is limited to a single Gemini job with no retries; Cursor or multi-job workflows must use async mode and `get_orchestration_result`.
-- Use `get_orchestration_result` to poll background orchestration runs by `requestId`.
-- Poll with backoff and wait for a terminal state. Do not switch to synchronous tools merely because an async workflow is still `running` after the first poll.
-- When using direct async worker tools (`run_cursor_worker_async`, `run_gemini_worker_async`), keep the returned `requestId` and poll the matching `get_*_result` tool until completion.
-- Direct async worker polling and `orchestrate_workflow` polling both use the same result-store model: `running` first, terminal state later.
-- That shared result-store path now carries configured retry policy metadata alongside terminal retry outcomes, so async polling can show both what was configured and what actually happened.
-- Use `list_orchestration_traces` or the CLI trace reader for execution forensics.
-- Trace and result metadata now record normalized `workerRuntimes` when present, so MCP-only control-plane runs are visible in persisted observability data.
-- Worker output is never the final truth.
-- When routing Cursor jobs through workflow specs, use workflow `defaultTrust` only when many Cursor jobs should share the same trust posture; otherwise prefer explicit per-job `trust`.
-- Important boundary: this policy controls the orchestration entrypoint. Inside the current repo implementation, worker execution still uses shell adapters for `agent` and `gemini` unless that runtime is redesigned.
+- Prefer the MCP orchestration entrypoint when the runtime actually exposes it.
+- Prefer async orchestration for long-running work.
+- Use the dedicated runtime docs in `MCP_USAGE.md` for exact payloads, polling/waiting tools, trace inspection, and direct async worker behavior.
+- Worker output is never the final truth; verification still belongs to the orchestrator.
 
 ## Expected Turn Shape
 
@@ -265,7 +253,7 @@ A good turn:
 2. Classify the task.
 3. Choose the right async entrypoint.
 4. Delegate and keep the `requestId`.
-5. Poll until terminal state.
+5. Wait or poll until terminal state according to the runtime contract.
 6. Run typecheck/test/build.
 7. Spot-check <=3 locations.
 8. Synthesize the result.

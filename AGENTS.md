@@ -1,44 +1,20 @@
 # Agent
 
-Use `README.md` for command, install, and interface reference.
+Start here, then load the narrower doc that matches your task:
 
-Use `ORCHESTRATION.md` for worker-selection posture, `orch:` protocol, routing, and async orchestration workflow guidance.
+- Use `README.md` for package overview, install, and command/reference material.
+- Use `MCP_USAGE.md` for the practical MCP/runtime tool surface, plugin-vs-MCP mode split, async waiting, and trace/result flows.
+- Use `ORCHESTRATION.md` for orchestrator posture, worker routing, delegation rules, and verification policy.
 
-## Public Contract
+## Repo identity
 
-- MCP server name: `mahiro-mcp-memory-layer`
-- Primary memory tools: `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory` (alias), `wake_up_memory`
-- Plugin-only diagnostic tool: `memory_context`
-- Orchestration tools: `orchestrate_workflow`, `get_orchestration_result`, `list_orchestration_traces`
+- Package / MCP server: `mahiro-mcp-memory-layer`
+- Standard plugin path: plugin-native memory surface first
+- Source checkout path: may additionally expose the standalone MCP/orchestration surface
 
-## Golden Rules
+## Minimal guardrails
 
-- Never `git push --force`
-- Never `rm -rf` without backup
-- Never commit secrets
-- Always preserve history
-- Always present options when a decision would change history or workflow shape materially
-- Always verify before declaring done
-- Primary verification commands: `bun run typecheck`, `bun run test`, `bun run build`
-- Keep direct file reads, local code search, and verified tool output as source of truth, but do not use that as an excuse to skip delegation when the task is non-trivial
-
-## Verification Budget
-
-Preferred order:
-
-1. `bun run typecheck`
-2. `bun run test`
-3. `bun run build`
-4. small targeted reads
-
-If executable checks already reveal the issue, do not keep rereading broadly.
-
-## Stop Rule
-
-Do not stop at analysis if the task is still actionable.
-
-Stop when one of these is true:
-
-- the requested implementation and verification are complete
-- the remaining blocker is external and clearly identified
-- the user redirects the work
+- Verify before declaring done.
+- Default verification order: `bun run typecheck`, `bun run test`, `bun run build`.
+- Preserve history and never force-push.
+- Do not present orchestration tools as guaranteed unless the current runtime mode actually exposes them; check `MCP_USAGE.md` for the mode split.
