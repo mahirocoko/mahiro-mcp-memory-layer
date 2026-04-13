@@ -81,6 +81,7 @@ When the MCP orchestration surface is available, these are the primary tools:
 
 - `orchestrate_workflow`
 - `get_orchestration_result`
+- `supervise_orchestration_result`
 - `wait_for_orchestration_result`
 - `list_orchestration_traces`
 
@@ -92,17 +93,26 @@ Important posture:
 
 - prefer `waitForCompletion: false` for long-running workflows
 - if `waitForCompletion` is omitted, the tool may auto-start in background and return async guidance
+- production default: hand the returned `requestId` to a background poller that calls `get_orchestration_result`
 - synchronous waiting is intentionally narrow and only valid for trivial Gemini-only cases
 
 ### `get_orchestration_result`
 
 Use this when you want a non-blocking status read of the latest stored workflow record.
 
+This is the primary production follow-up for async orchestration because the workflow keeps running independently in the result store even if the original MCP request ends.
+
+### `supervise_orchestration_result`
+
+Use this when you want a built-in supervisor helper that polls until terminal and returns a concise final summary instead of the full workflow record.
+
+It is the preferred convenience path for background-first hosts that still want one final MCP response per `requestId`.
+
 ### `wait_for_orchestration_result`
 
 Use this when the host wants to block until a workflow reaches a terminal state.
 
-It is the preferred replacement for brittle agent-side watcher loops because it waits against the stored workflow record directly.
+Treat it as a short-wait or debug helper, not the primary production path. It still depends on the current MCP request staying alive long enough for the workflow to finish.
 
 ### `list_orchestration_traces`
 
@@ -114,10 +124,9 @@ Recommended pattern for long-running MCP orchestration:
 
 1. call `orchestrate_workflow(..., waitForCompletion: false)`
 2. capture the returned `requestId`
-3. either:
-   - poll with `get_orchestration_result`, or
-   - block with `wait_for_orchestration_result`
-4. once terminal, inspect the final result and verify externally as needed
+3. hand that `requestId` to `supervise_orchestration_result`, or to a background poller that calls `get_orchestration_result` until terminal
+4. use `wait_for_orchestration_result` only when you explicitly need a short blocking read on a host that can safely keep the request open
+5. once terminal, inspect the final result and verify externally as needed
 
 Typical async start response includes:
 
@@ -126,7 +135,10 @@ Typical async start response includes:
 - `executionMode: "async"`
 - `waitMode`
 - `pollWith: "get_orchestration_result"`
+- `superviseWith: "supervise_orchestration_result"`
 - `waitWith: "wait_for_orchestration_result"`
+- `recommendedFollowUp: "get_orchestration_result"`
+- `warning`
 - `nextArgs`
 
 ## Direct worker tools
@@ -190,8 +202,9 @@ Treat `running` as an in-progress stored state, not as a failure.
 For long-running work:
 
 - do not switch to sync just because the first read still shows `running`
-- prefer `wait_for_orchestration_result` when the host wants deterministic blocking
-- otherwise poll with backoff using `get_orchestration_result`
+- prefer `supervise_orchestration_result` or background polling with `get_orchestration_result`
+- use `wait_for_orchestration_result` only when the host can safely hold a short MCP request open
+- distinguish three timeouts: workflow runtime timeout (`spec.timeoutMs`), wait-helper local timeout (`wait_for_orchestration_result.timeoutMs`), and host/MCP request timeout outside this repo’s control
 
 Terminal workflow states include completed and failure variants like `failed`, `step_failed`, `timed_out`, and `runner_failed`.
 
@@ -206,12 +219,16 @@ Use the result store and trace tools to answer questions like:
 
 Use:
 
-- `get_orchestration_result` / `wait_for_orchestration_result` for latest state
+- `get_orchestration_result` for the default latest-state path
+- `supervise_orchestration_result` for a concise terminal summary helper
+- `wait_for_orchestration_result` for short blocking reads only
 - `list_orchestration_traces` for persisted trace history
 
 ## Practical safety reminders
 
 - Do not present orchestration tools as guaranteed on the standard plugin path.
-- Do not rely on agent-side sleep loops when the stored-state wait tools already exist.
+- Do not rely on agent-side sleep loops when the stored-state poll and wait tools already exist.
+- Prefer background polling over blocking waits for long-running hosts.
+- Prefer `supervise_orchestration_result` when you want the repo to own the polling loop instead of the host.
 - Do not treat worker output as final truth without verification.
 - Prefer the smallest surface that matches the task: memory tool, direct async worker, or full orchestration.

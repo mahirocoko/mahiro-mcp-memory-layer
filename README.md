@@ -603,11 +603,12 @@ Use `MCP_USAGE.md` as the shorter AI-facing runtime guide for this section. `REA
 
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
 - input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
-- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, and `nextArgs`
-- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `waitWith: "wait_for_orchestration_result"`, and `autoAsync: true`
+- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `superviseWith: "supervise_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "get_orchestration_result"`, `warning`, and `nextArgs`
+- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `superviseWith: "supervise_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "get_orchestration_result"`, and `autoAsync: true`
 - `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
-- `get_orchestration_result` reads the stored workflow state/result by `requestId`
-- `wait_for_orchestration_result` blocks until the stored workflow reaches a terminal state, then returns the final record plus an optional completion summary
+- `get_orchestration_result` is the primary production follow-up: hand the `requestId` to a background poller and read the stored workflow state/result until terminal
+- `supervise_orchestration_result` polls the stored workflow until terminal and returns a concise final summary if you want the repo to own the polling loop for you
+- `wait_for_orchestration_result` blocks until the stored workflow reaches a terminal state, but it is a short blocking helper rather than the default path for long-running hosts
 - `list_orchestration_traces` lists persisted orchestration trace entries with optional filters like `source`, `mode`, `status`, `requestId`, `taskId`, and `limit` (each entry may include `jobModels` with per-job `requestedModel` / optional `reportedModel` when written by a current package version)
 
 Async MCP example:
@@ -630,7 +631,7 @@ Async MCP example:
 }
 ```
 
-Then fetch the result later with:
+Then either hand the request ID to a background poller and fetch the stored result with:
 
 ```json
 {
@@ -638,7 +639,17 @@ Then fetch the result later with:
 }
 ```
 
-Or block until the workflow finishes with:
+Or let the repo supervise the polling loop and return a concise terminal summary with:
+
+```json
+{
+  "requestId": "workflow_123",
+  "pollIntervalMs": 1000,
+  "timeoutMs": 300000
+}
+```
+
+Only if the host can safely keep a short MCP request open, you can block until the workflow finishes with:
 
 ```json
 {
@@ -660,6 +671,7 @@ When to use sync vs async:
 - use async tools when the worker may take noticeable time, when you want explicit polling, or when the host should avoid keeping one MCP request open
 - use `orchestrate_workflow` when you need multiple jobs/steps, workflow-level traces, or mixed Gemini/Cursor execution
 - if a sync response includes `warning`, treat it as a hint that the same task shape is a better fit for the async start/poll pair
+- for long-running MCP orchestration, background polling is the default production path because host/MCP request timeouts can be shorter than the workflow runtime
 
 Direct async worker MCP tools:
 

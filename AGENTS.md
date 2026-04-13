@@ -12,6 +12,12 @@ Start here, then load the narrower doc that matches your task:
 - Standard plugin path: plugin-native memory surface first
 - Source checkout path: may additionally expose the standalone MCP/orchestration surface
 
+## Documentation boundary rules
+
+- When editing `MCP_USAGE.md` or `ORCHESTRATION.md`, write for AI agents consuming this MCP from other repositories, not primarily for maintainers working inside this repo.
+- Keep `README.md` human-facing. Keep `MCP_USAGE.md` and `ORCHESTRATION.md` consumer-AI-facing.
+- Do not turn `MCP_USAGE.md` or `ORCHESTRATION.md` into local dev notes for this repo unless that guidance is also genuinely useful to external AI consumers.
+
 ## Minimal guardrails
 
 - Verify before declaring done.

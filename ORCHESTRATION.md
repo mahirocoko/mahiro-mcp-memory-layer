@@ -242,6 +242,7 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 
 - Prefer the MCP orchestration entrypoint when the runtime actually exposes it.
 - Prefer async orchestration for long-running work.
+- Poll-first is the default production posture: hand the request ID to `supervise_orchestration_result` or to a background poller before considering any blocking wait helper.
 - Use the dedicated runtime docs in `MCP_USAGE.md` for exact payloads, polling/waiting tools, trace inspection, and direct async worker behavior.
 - Worker output is never the final truth; verification still belongs to the orchestrator.
 
@@ -253,7 +254,7 @@ A good turn:
 2. Classify the task.
 3. Choose the right async entrypoint.
 4. Delegate and keep the `requestId`.
-5. Wait or poll until terminal state according to the runtime contract.
+5. Hand the `requestId` to `supervise_orchestration_result` or to a background poller and treat blocking waits as a secondary short-helper path only.
 6. Run typecheck/test/build.
 7. Spot-check <=3 locations.
 8. Synthesize the result.

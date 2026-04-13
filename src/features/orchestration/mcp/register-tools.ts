@@ -7,7 +7,8 @@ import { OrchestrationLifecycle } from "../observability/orchestration-lifecycle
 import { OrchestrationResultStore } from "../observability/orchestration-result-store.js";
 import { OrchestrationTraceStore } from "../observability/orchestration-trace.js";
 import { runOrchestrationWorkflow } from "../run-orchestration-workflow.js";
-import { listOrchestrationTracesInputSchema, waitForOrchestrationResultInputSchema } from "../schemas.js";
+import { listOrchestrationTracesInputSchema, superviseOrchestrationResultInputSchema, waitForOrchestrationResultInputSchema } from "../schemas.js";
+import { superviseOrchestrationResult } from "../supervise-orchestration-result.js";
 import { waitForOrchestrationResult } from "../wait-for-orchestration-result.js";
 import { normalizeWorkflowSpec, orchestrateToolInputSchema } from "../workflow-spec.js";
 
@@ -28,7 +29,7 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
     {
       name: "orchestrate_workflow",
       description:
-        "Run a static parallel or sequential worker workflow. Default MCP behavior is async-first and returns polling guidance; synchronous wait is limited to a single Gemini job or step with no retries.",
+        "Run a static parallel or sequential worker workflow. Default MCP behavior is async-first and returns background-polling guidance; synchronous wait is limited to a single Gemini job or step with no retries.",
       inputSchema: orchestrateToolInputSchema.shape,
       execute: async (input) => {
         const parsed = orchestrateToolInputSchema.parse(input);
@@ -78,14 +79,18 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
             executionMode: "async",
             waitMode,
             pollWith: "get_orchestration_result",
+            superviseWith: "supervise_orchestration_result",
             waitWith: "wait_for_orchestration_result",
+            recommendedFollowUp: "get_orchestration_result",
             nextArgs: {
               requestId,
             },
+            warning:
+              "Prefer background polling in production hosts. Use supervise_orchestration_result or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
             message:
               waitMode === "auto_async"
-                ? "Workflow started in background because waitForCompletion was omitted. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal."
-                : "Workflow started in background because waitForCompletion was false. Poll get_orchestration_result with this requestId for the latest status, or call wait_for_orchestration_result to block until terminal.",
+                ? "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks."
+                : "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
             ...(waitMode === "auto_async" ? { autoAsync: true } : {}),
           };
         }
@@ -128,7 +133,7 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
     {
       name: "wait_for_orchestration_result",
       description:
-        "Block until an orchestration workflow reaches a terminal state, then return the final stored result and an optional completion summary.",
+        "Block on the stored orchestration result until terminal and return the final record plus an optional completion summary. Secondary helper only: prefer get_orchestration_result with a background poller for long-running hosts.",
       inputSchema: waitForOrchestrationResultInputSchema.shape,
       execute: async (input) => {
         const parsed = waitForOrchestrationResultInputSchema.parse(input);
@@ -136,6 +141,19 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
           pollIntervalMs: parsed.pollIntervalMs,
           timeoutMs: parsed.timeoutMs,
           includeCompletionSummary: parsed.includeCompletionSummary,
+        });
+      },
+    },
+    {
+      name: "supervise_orchestration_result",
+      description:
+        "Poll an orchestration request until terminal and return a concise supervision summary. Preferred helper for background-first hosts that want one terminal summary rather than the full workflow record.",
+      inputSchema: superviseOrchestrationResultInputSchema.shape,
+      execute: async (input) => {
+        const parsed = superviseOrchestrationResultInputSchema.parse(input);
+        return superviseOrchestrationResult(orchestrationResultStore, parsed.requestId, {
+          pollIntervalMs: parsed.pollIntervalMs,
+          timeoutMs: parsed.timeoutMs,
         });
       },
     },
