@@ -13,6 +13,10 @@ export const superviseOrchestrationResultInputSchema = z.object({
   timeoutMs: z.number().int().positive().max(600_000).optional(),
 });
 
+export const getOrchestrationSupervisionResultInputSchema = z.object({
+  requestId: z.string().trim().regex(/^supervisor_[0-9a-f]{32}$/, "requestId must be the supervisor_* id returned by supervise_orchestration_result"),
+});
+
 export const listOrchestrationTracesInputSchema = z.object({
   source: z.enum(["cli", "mcp"]).optional(),
   mode: z.enum(["parallel", "sequential"]).optional(),

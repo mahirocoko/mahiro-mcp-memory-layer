@@ -14,6 +14,7 @@ export const paths = {
   logDirectory: path.join(dataDirectory, "log"),
   tracesDirectory: path.join(dataDirectory, "traces"),
   orchestrationResultDirectory: path.join(dataDirectory, "traces", "orchestration-results"),
+  orchestrationSupervisionDirectory: path.join(dataDirectory, "traces", "orchestration-supervisions"),
   lanceDbDirectory: path.join(dataDirectory, "lancedb"),
   geminiCacheFilePath: path.join(dataDirectory, "cache", "gemini-cache.json"),
   canonicalLogFilePath: path.join(dataDirectory, "log", "canonical-log.jsonl"),

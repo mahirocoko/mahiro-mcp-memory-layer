@@ -5,10 +5,16 @@ import { z } from "zod";
 import { listOrchestrationTraces } from "../observability/list-orchestration-traces.js";
 import { OrchestrationLifecycle } from "../observability/orchestration-lifecycle.js";
 import { OrchestrationResultStore } from "../observability/orchestration-result-store.js";
+import { OrchestrationSupervisionStore } from "../observability/orchestration-supervision-store.js";
 import { OrchestrationTraceStore } from "../observability/orchestration-trace.js";
 import { runOrchestrationWorkflow } from "../run-orchestration-workflow.js";
-import { listOrchestrationTracesInputSchema, superviseOrchestrationResultInputSchema, waitForOrchestrationResultInputSchema } from "../schemas.js";
-import { superviseOrchestrationResult } from "../supervise-orchestration-result.js";
+import {
+  getOrchestrationSupervisionResultInputSchema,
+  listOrchestrationTracesInputSchema,
+  superviseOrchestrationResultInputSchema,
+  waitForOrchestrationResultInputSchema,
+} from "../schemas.js";
+import { getOrchestrationSupervisionResult, startOrchestrationSupervision } from "../supervise-orchestration-result.js";
 import { waitForOrchestrationResult } from "../wait-for-orchestration-result.js";
 import { normalizeWorkflowSpec, orchestrateToolInputSchema } from "../workflow-spec.js";
 
@@ -23,6 +29,7 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
   const env = getAppEnv();
   const orchestrationTraceStore = new OrchestrationTraceStore(env.dataPaths.orchestrationTraceFilePath);
   const orchestrationResultStore = new OrchestrationResultStore(env.dataPaths.orchestrationResultDirectory);
+  const orchestrationSupervisionStore = new OrchestrationSupervisionStore(env.dataPaths.orchestrationSupervisionDirectory);
   const orchestrationLifecycle = new OrchestrationLifecycle(orchestrationTraceStore, orchestrationResultStore);
 
   return [
@@ -80,17 +87,18 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
             waitMode,
             pollWith: "get_orchestration_result",
             superviseWith: "supervise_orchestration_result",
+            superviseResultWith: "get_orchestration_supervision_result",
             waitWith: "wait_for_orchestration_result",
-            recommendedFollowUp: "get_orchestration_result",
+            recommendedFollowUp: "supervise_orchestration_result",
             nextArgs: {
               requestId,
             },
             warning:
-              "Prefer background polling in production hosts. Use supervise_orchestration_result or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+              "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
             message:
               waitMode === "auto_async"
-                ? "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks."
-                : "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+                ? "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks."
+                : "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
             ...(waitMode === "auto_async" ? { autoAsync: true } : {}),
           };
         }
@@ -147,14 +155,23 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
     {
       name: "supervise_orchestration_result",
       description:
-        "Poll an orchestration request until terminal and return a concise supervision summary. Preferred helper for background-first hosts that want one terminal summary rather than the full workflow record.",
+        "Start repo-owned background supervision for an orchestration request and return a supervisor_* request ID you can poll later. Preferred production helper for long-running hosts.",
       inputSchema: superviseOrchestrationResultInputSchema.shape,
       execute: async (input) => {
         const parsed = superviseOrchestrationResultInputSchema.parse(input);
-        return superviseOrchestrationResult(orchestrationResultStore, parsed.requestId, {
+        return startOrchestrationSupervision(orchestrationResultStore, orchestrationSupervisionStore, parsed.requestId, {
           pollIntervalMs: parsed.pollIntervalMs,
           timeoutMs: parsed.timeoutMs,
         });
+      },
+    },
+    {
+      name: "get_orchestration_supervision_result",
+      description: "Get the latest stored background supervision result by supervisor request ID.",
+      inputSchema: getOrchestrationSupervisionResultInputSchema.shape,
+      execute: async (input) => {
+        const parsed = getOrchestrationSupervisionResultInputSchema.parse(input);
+        return getOrchestrationSupervisionResult(orchestrationSupervisionStore, parsed.requestId);
       },
     },
     {

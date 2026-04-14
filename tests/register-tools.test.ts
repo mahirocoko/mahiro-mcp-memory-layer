@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrchestrationResultRecord } from "../src/features/orchestration/observability/orchestration-result-store.js";
+import type { OrchestrationSupervisionRecord } from "../src/features/orchestration/observability/orchestration-supervision-store.js";
 
 vi.mock("../src/features/orchestration/run-orchestration-workflow.js", () => ({
   runOrchestrationWorkflow: vi.fn(async (spec) => ({
@@ -78,8 +79,56 @@ const orchestrationResultStoreMock = {
   read: vi.fn<() => Promise<OrchestrationResultRecord | null>>(async () => null),
 };
 
+const orchestrationSupervisionStoreMock = {
+  writeRunning: vi.fn(async ({ requestId, targetRequestId, source, pollIntervalMs, timeoutMs, pollCount, lastObservedWorkflowStatus }) => ({
+    requestId,
+    targetRequestId,
+    source,
+    status: "running",
+    pollIntervalMs,
+    ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+    pollCount,
+    ...(lastObservedWorkflowStatus !== undefined ? { lastObservedWorkflowStatus } : {}),
+    createdAt: "2026-04-05T00:00:00.000Z",
+    updatedAt: "2026-04-05T00:00:00.000Z",
+  } satisfies OrchestrationSupervisionRecord)),
+  writeCompleted: vi.fn(async ({ requestId, targetRequestId, source, pollIntervalMs, timeoutMs, pollCount, workflowStatus, taskIds, summary, error }) => ({
+    requestId,
+    targetRequestId,
+    source,
+    status: workflowStatus,
+    workflowStatus,
+    taskIds,
+    summary,
+    ...(error !== undefined ? { error } : {}),
+    pollIntervalMs,
+    ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+    pollCount,
+    createdAt: "2026-04-05T00:00:00.000Z",
+    updatedAt: "2026-04-05T00:00:01.000Z",
+  } satisfies OrchestrationSupervisionRecord)),
+  writeSupervisorFailed: vi.fn(async ({ requestId, targetRequestId, source, pollIntervalMs, timeoutMs, pollCount, error, lastObservedWorkflowStatus }) => ({
+    requestId,
+    targetRequestId,
+    source,
+    status: "supervisor_failed",
+    error,
+    pollIntervalMs,
+    ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+    pollCount,
+    ...(lastObservedWorkflowStatus !== undefined ? { lastObservedWorkflowStatus } : {}),
+    createdAt: "2026-04-05T00:00:00.000Z",
+    updatedAt: "2026-04-05T00:00:01.000Z",
+  } satisfies OrchestrationSupervisionRecord)),
+  read: vi.fn<() => Promise<OrchestrationSupervisionRecord | null>>(async () => null),
+};
+
 vi.mock("../src/features/orchestration/observability/orchestration-result-store.js", () => ({
   OrchestrationResultStore: vi.fn(() => orchestrationResultStoreMock),
+}));
+
+vi.mock("../src/features/orchestration/observability/orchestration-supervision-store.js", () => ({
+  OrchestrationSupervisionStore: vi.fn(() => orchestrationSupervisionStoreMock),
 }));
 
 import { getRegisteredOrchestrationTools } from "../src/features/orchestration/mcp/register-tools.js";
@@ -272,19 +321,20 @@ describe("getRegisteredOrchestrationTools", () => {
       waitMode: "explicit_async",
       pollWith: "get_orchestration_result",
       superviseWith: "supervise_orchestration_result",
+      superviseResultWith: "get_orchestration_supervision_result",
       waitWith: "wait_for_orchestration_result",
-      recommendedFollowUp: "get_orchestration_result",
+      recommendedFollowUp: "supervise_orchestration_result",
       nextArgs: {
         requestId: expect.stringMatching(/^workflow_/),
       },
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Use supervise_orchestration_result or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+      "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
     );
     expect(result).not.toHaveProperty("autoAsync");
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
@@ -347,8 +397,9 @@ describe("getRegisteredOrchestrationTools", () => {
       waitMode: "auto_async",
       pollWith: "get_orchestration_result",
       superviseWith: "supervise_orchestration_result",
+      superviseResultWith: "get_orchestration_supervision_result",
       waitWith: "wait_for_orchestration_result",
-      recommendedFollowUp: "get_orchestration_result",
+      recommendedFollowUp: "supervise_orchestration_result",
       nextArgs: {
         requestId: expect.stringMatching(/^workflow_/),
       },
@@ -356,11 +407,11 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Use supervise_orchestration_result or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+      "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
     );
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
@@ -409,7 +460,7 @@ describe("getRegisteredOrchestrationTools", () => {
         waitForCompletion: true,
       }),
     ).rejects.toThrowError(
-      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result. wait_for_orchestration_result is only for short blocking checks.",
+      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. wait_for_orchestration_result is only for short blocking checks.",
     );
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
@@ -680,47 +731,35 @@ describe("getRegisteredOrchestrationTools", () => {
     });
   });
 
-  it("supervises orchestration completion through the concise supervisor tool", async () => {
+  it("starts background supervision and returns a supervisor request id", async () => {
     const requestId = "workflow_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    orchestrationResultStoreMock.read
-      .mockResolvedValueOnce({
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId,
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["g1"],
+      },
+      status: "completed",
+      result: {
         requestId,
-        source: "mcp",
-        metadata: {
-          mode: "parallel",
-          taskIds: ["g1"],
-        },
-        status: "running",
-        createdAt: "2026-04-05T00:00:00.000Z",
-        updatedAt: "2026-04-05T00:00:00.000Z",
-      })
-      .mockResolvedValueOnce({
-        requestId,
-        source: "mcp",
-        metadata: {
-          mode: "parallel",
-          taskIds: ["g1"],
-        },
+        mode: "parallel",
         status: "completed",
-        result: {
-          requestId,
-          mode: "parallel",
-          status: "completed",
-          results: [],
-          summary: {
-            totalJobs: 1,
-            finishedJobs: 1,
-            completedJobs: 1,
-            failedJobs: 0,
-            skippedJobs: 0,
-            startedAt: "2026-04-05T00:00:00.000Z",
-            finishedAt: "2026-04-05T00:00:01.000Z",
-            durationMs: 1000,
-          },
+        results: [],
+        summary: {
+          totalJobs: 1,
+          finishedJobs: 1,
+          completedJobs: 1,
+          failedJobs: 0,
+          skippedJobs: 0,
+          startedAt: "2026-04-05T00:00:00.000Z",
+          finishedAt: "2026-04-05T00:00:01.000Z",
+          durationMs: 1000,
         },
-        createdAt: "2026-04-05T00:00:00.000Z",
-        updatedAt: "2026-04-05T00:00:01.000Z",
-      });
+      },
+      createdAt: "2026-04-05T00:00:00.000Z",
+      updatedAt: "2026-04-05T00:00:01.000Z",
+    });
 
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "supervise_orchestration_result");
@@ -731,11 +770,42 @@ describe("getRegisteredOrchestrationTools", () => {
     });
 
     expect(result).toMatchObject({
-      requestId,
+      requestId: expect.stringMatching(/^supervisor_/),
+      targetRequestId: requestId,
+      status: "running",
+      resultTool: "get_orchestration_supervision_result",
+    });
+    expect(orchestrationSupervisionStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads a stored supervision result by supervisor request id", async () => {
+    const supervisorRequestId = "supervisor_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    orchestrationSupervisionStoreMock.read.mockResolvedValueOnce({
+      requestId: supervisorRequestId,
+      targetRequestId: "workflow_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      source: "mcp",
       status: "completed",
       workflowStatus: "completed",
       taskIds: ["g1"],
       summary: "completed — 1/1 jobs succeeded, 0 failed, 0 skipped in 1000ms",
+      pollIntervalMs: 1000,
+      pollCount: 2,
+      createdAt: "2026-04-05T00:00:00.000Z",
+      updatedAt: "2026-04-05T00:00:01.000Z",
+    });
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "get_orchestration_supervision_result");
+
+    const result = await tool?.execute({
+      requestId: supervisorRequestId,
+    });
+
+    expect(orchestrationSupervisionStoreMock.read).toHaveBeenCalledWith(supervisorRequestId);
+    expect(result).toMatchObject({
+      requestId: supervisorRequestId,
+      status: "completed",
+      workflowStatus: "completed",
     });
   });
 

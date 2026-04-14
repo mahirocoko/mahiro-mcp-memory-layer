@@ -64,7 +64,7 @@ export const orchestrateToolInputSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: ["waitForCompletion"],
         message:
-          "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result or a host-side poller that calls get_orchestration_result. wait_for_orchestration_result is only for short blocking checks.",
+          "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. wait_for_orchestration_result is only for short blocking checks.",
       });
    }
  });

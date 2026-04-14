@@ -390,6 +390,13 @@ export function createOpenCodePluginRuntime(
           return;
         }
 
+        case "message.part.updated": {
+          const sessionState = await routeEvent(event, "event");
+          startSessionWakeUp(sessionState);
+          scheduleMessageUpdatedPrecompute(sessionState, event);
+          return;
+        }
+
         case "session.idle": {
           await handleSessionIdleEvent(event, "event");
           return;

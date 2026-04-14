@@ -603,15 +603,17 @@ Use `MCP_USAGE.md` as the shorter AI-facing runtime guide for this section. `REA
 
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
 - input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
-- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `superviseWith: "supervise_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "get_orchestration_result"`, `warning`, and `nextArgs`
-- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `superviseWith: "supervise_orchestration_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "get_orchestration_result"`, and `autoAsync: true`
+- prefer `orchestrate_workflow` for multi-job, multi-step, mixed-worker, or workflow-trace-oriented tasks; do not default to it for a single worker job when the direct async worker tools are enough
+- set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `superviseWith: "supervise_orchestration_result"`, `superviseResultWith: "get_orchestration_supervision_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "supervise_orchestration_result"`, `warning`, and `nextArgs`
+- when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `superviseWith: "supervise_orchestration_result"`, `superviseResultWith: "get_orchestration_supervision_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "supervise_orchestration_result"`, and `autoAsync: true`
 - `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
 - `get_orchestration_result` is the primary production follow-up: hand the `requestId` to a background poller and read the stored workflow state/result until terminal
-- `supervise_orchestration_result` polls the stored workflow until terminal and returns a concise final summary if you want the repo to own the polling loop for you
+- `supervise_orchestration_result` starts repo-owned detached supervision for a `workflow_*` request and returns a `supervisor_*` request ID immediately
+- `get_orchestration_supervision_result` polls the latest stored background supervision result by `supervisor_*` request ID
 - `wait_for_orchestration_result` blocks until the stored workflow reaches a terminal state, but it is a short blocking helper rather than the default path for long-running hosts
 - `list_orchestration_traces` lists persisted orchestration trace entries with optional filters like `source`, `mode`, `status`, `requestId`, `taskId`, and `limit` (each entry may include `jobModels` with per-job `requestedModel` / optional `reportedModel` when written by a current package version)
 
-Async MCP example:
+Async MCP workflow example:
 
 ```json
 {
@@ -623,6 +625,15 @@ Async MCP example:
         "input": {
           "prompt": "Review this diff",
           "model": "claude-4.6-opus-high"
+        }
+      },
+      {
+        "kind": "gemini",
+        "workerRuntime": "mcp",
+        "input": {
+          "prompt": "Summarize the review findings in one paragraph.",
+          "model": "gemini-3.1-pro-preview",
+          "taskKind": "summarize"
         }
       }
     ]
@@ -639,13 +650,21 @@ Then either hand the request ID to a background poller and fetch the stored resu
 }
 ```
 
-Or let the repo supervise the polling loop and return a concise terminal summary with:
+Or let the repo start a detached supervision loop and return a `supervisor_*` request ID with:
 
 ```json
 {
   "requestId": "workflow_123",
   "pollIntervalMs": 1000,
   "timeoutMs": 300000
+}
+```
+
+Then poll that supervisor result with:
+
+```json
+{
+  "requestId": "supervisor_123"
 }
 ```
 
@@ -670,6 +689,7 @@ When to use sync vs async:
 - use sync tools when you expect a short, direct worker response and want the full result in one MCP call
 - use async tools when the worker may take noticeable time, when you want explicit polling, or when the host should avoid keeping one MCP request open
 - use `orchestrate_workflow` when you need multiple jobs/steps, workflow-level traces, or mixed Gemini/Cursor execution
+- for a single worker job, prefer `run_gemini_worker_async` or `run_cursor_worker_async` over `orchestrate_workflow`
 - if a sync response includes `warning`, treat it as a hint that the same task shape is a better fit for the async start/poll pair
 - for long-running MCP orchestration, background polling is the default production path because host/MCP request timeouts can be shorter than the workflow runtime
 

@@ -39,7 +39,7 @@ Use the plugin-native memory surface first for memory work. Do not assume orches
 - **Plugin-native memory work**: use the memory tools above
 - **MCP orchestration / worker work**: use only when the host/runtime actually exposes those tools
 
-If the current tool list contains `orchestrate_workflow`, `get_orchestration_result`, or `wait_for_orchestration_result`, you are on an MCP-capable path.
+If the current tool list contains `orchestrate_workflow`, `get_orchestration_result`, `supervise_orchestration_result`, or `wait_for_orchestration_result`, you are on an MCP-capable path.
 
 ## Memory-side task flows
 
@@ -82,31 +82,38 @@ When the MCP orchestration surface is available, these are the primary tools:
 - `orchestrate_workflow`
 - `get_orchestration_result`
 - `supervise_orchestration_result`
+- `get_orchestration_supervision_result`
 - `wait_for_orchestration_result`
 - `list_orchestration_traces`
 
 ### `orchestrate_workflow`
 
-Use this for multi-job or multi-step workflows, mixed Gemini/Cursor execution, traceable runs, or when you want a single workflow request ID.
+Use this for multi-job or multi-step workflows, mixed Gemini/Cursor execution, traceable runs, or when you want one request ID for a whole workflow-shaped batch. Do not default to this for a single worker job when the direct async worker tools are enough.
 
 Important posture:
 
 - prefer `waitForCompletion: false` for long-running workflows
 - if `waitForCompletion` is omitted, the tool may auto-start in background and return async guidance
-- production default: hand the returned `requestId` to a background poller that calls `get_orchestration_result`
+- production default: hand the returned `requestId` to `supervise_orchestration_result`, or to a background poller that calls `get_orchestration_result`
 - synchronous waiting is intentionally narrow and only valid for trivial Gemini-only cases
 
 ### `get_orchestration_result`
 
 Use this when you want a non-blocking status read of the latest stored workflow record.
 
-This is the primary production follow-up for async orchestration because the workflow keeps running independently in the result store even if the original MCP request ends.
+This is the primary low-level production follow-up for async orchestration because the workflow keeps running independently in the result store even if the original MCP request ends.
 
 ### `supervise_orchestration_result`
 
-Use this when you want a built-in supervisor helper that polls until terminal and returns a concise final summary instead of the full workflow record.
+Use this when you want the repo to start a detached supervision loop for a `workflow_*` request and return immediately with a `supervisor_*` request ID.
 
-It is the preferred convenience path for background-first hosts that still want one final MCP response per `requestId`.
+It is the preferred production convenience path for background-first hosts because it avoids holding one MCP request open for the full supervision duration.
+
+### `get_orchestration_supervision_result`
+
+Use this when you want to poll the latest stored supervisor result by `supervisor_*` request ID.
+
+It returns the background supervision state, not the raw workflow record.
 
 ### `wait_for_orchestration_result`
 
@@ -124,7 +131,7 @@ Recommended pattern for long-running MCP orchestration:
 
 1. call `orchestrate_workflow(..., waitForCompletion: false)`
 2. capture the returned `requestId`
-3. hand that `requestId` to `supervise_orchestration_result`, or to a background poller that calls `get_orchestration_result` until terminal
+3. hand that `requestId` to `supervise_orchestration_result` to start repo-owned supervision, or to a background poller that calls `get_orchestration_result` until terminal
 4. use `wait_for_orchestration_result` only when you explicitly need a short blocking read on a host that can safely keep the request open
 5. once terminal, inspect the final result and verify externally as needed
 
@@ -136,8 +143,9 @@ Typical async start response includes:
 - `waitMode`
 - `pollWith: "get_orchestration_result"`
 - `superviseWith: "supervise_orchestration_result"`
+- `superviseResultWith: "get_orchestration_supervision_result"`
 - `waitWith: "wait_for_orchestration_result"`
-- `recommendedFollowUp: "get_orchestration_result"`
+- `recommendedFollowUp: "supervise_orchestration_result"`
 - `warning`
 - `nextArgs`
 
@@ -159,13 +167,14 @@ Use these only for short direct calls where holding the MCP request open is acce
 - `run_cursor_worker_async`
 - `get_cursor_worker_result`
 
-Use these when you want one worker job without the heavier orchestration envelope.
+Use these when you want one worker job without the heavier orchestration envelope. This should be the default for a single Gemini or Cursor worker job.
 
 Recommended posture:
 
 - use the async start tool for long-running direct worker calls
 - keep the returned `requestId`
 - poll the matching `get_*_result` tool until terminal
+- prefer this path over `orchestrate_workflow` when you only need one worker job
 
 ## Choosing between orchestration and direct worker tools
 
@@ -180,10 +189,12 @@ Use direct async worker tools when:
 
 - you only need one worker job
 - you still want async behavior without keeping a single request open
+- you want the simplest default path for a single Gemini or Cursor task
 
 Use sync worker tools only when:
 
 - the task is short enough that a single blocking call is acceptable
+- you are intentionally choosing a short direct call and can tolerate host/MCP request timeouts
 
 ## Runtime selection
 
@@ -202,9 +213,11 @@ Treat `running` as an in-progress stored state, not as a failure.
 For long-running work:
 
 - do not switch to sync just because the first read still shows `running`
-- prefer `supervise_orchestration_result` or background polling with `get_orchestration_result`
+- prefer `supervise_orchestration_result` plus `get_orchestration_supervision_result`, or background polling with `get_orchestration_result`
 - use `wait_for_orchestration_result` only when the host can safely hold a short MCP request open
 - distinguish three timeouts: workflow runtime timeout (`spec.timeoutMs`), wait-helper local timeout (`wait_for_orchestration_result.timeoutMs`), and host/MCP request timeout outside this repo’s control
+
+For single-worker jobs, prefer `run_gemini_worker_async` or `run_cursor_worker_async` instead of `orchestrate_workflow` unless you specifically need workflow-level traces or mixed-worker composition.
 
 Terminal workflow states include completed and failure variants like `failed`, `step_failed`, `timed_out`, and `runner_failed`.
 
@@ -219,8 +232,9 @@ Use the result store and trace tools to answer questions like:
 
 Use:
 
-- `get_orchestration_result` for the default latest-state path
-- `supervise_orchestration_result` for a concise terminal summary helper
+- `get_orchestration_result` for the default low-level latest-state path
+- `supervise_orchestration_result` to start repo-owned detached supervision
+- `get_orchestration_supervision_result` for the preferred concise supervision-result polling path
 - `wait_for_orchestration_result` for short blocking reads only
 - `list_orchestration_traces` for persisted trace history
 
@@ -229,6 +243,6 @@ Use:
 - Do not present orchestration tools as guaranteed on the standard plugin path.
 - Do not rely on agent-side sleep loops when the stored-state poll and wait tools already exist.
 - Prefer background polling over blocking waits for long-running hosts.
-- Prefer `supervise_orchestration_result` when you want the repo to own the polling loop instead of the host.
+- Prefer `supervise_orchestration_result` + `get_orchestration_supervision_result` when you want the repo to own the polling loop instead of the host.
 - Do not treat worker output as final truth without verification.
 - Prefer the smallest surface that matches the task: memory tool, direct async worker, or full orchestration.

@@ -236,13 +236,13 @@ Dependent and must sequence:
 - Gemini extracts facts -> you use those facts to write the Cursor prompt
 - Cursor produces a plan -> you send that plan to Gemini for critique
 
-For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `MCP_USAGE.md` and `README.md`.
+For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `MCP_USAGE.md`. Treat `README.md` as human-facing reference rather than guaranteed injected AI context.
 
 ## MCP Workflow Posture
 
-- Prefer the MCP orchestration entrypoint when the runtime actually exposes it.
+- Prefer the right async entrypoint when the runtime actually exposes MCP tools. Use direct async worker tools for a single worker job and `orchestrate_workflow` only for genuinely workflow-shaped tasks.
 - Prefer async orchestration for long-running work.
-- Poll-first is the default production posture: hand the request ID to `supervise_orchestration_result` or to a background poller before considering any blocking wait helper.
+- Poll-first is the default production posture: hand the request ID to `supervise_orchestration_result` and then poll `get_orchestration_supervision_result`, or use a host-side background poller before considering any blocking wait helper.
 - Use the dedicated runtime docs in `MCP_USAGE.md` for exact payloads, polling/waiting tools, trace inspection, and direct async worker behavior.
 - Worker output is never the final truth; verification still belongs to the orchestrator.
 
@@ -254,7 +254,7 @@ A good turn:
 2. Classify the task.
 3. Choose the right async entrypoint.
 4. Delegate and keep the `requestId`.
-5. Hand the `requestId` to `supervise_orchestration_result` or to a background poller and treat blocking waits as a secondary short-helper path only.
+5. Hand the `requestId` to `supervise_orchestration_result` and then poll `get_orchestration_supervision_result`, or use a host-side background poller, and treat blocking waits as a secondary short-helper path only.
 6. Run typecheck/test/build.
 7. Spot-check <=3 locations.
 8. Synthesize the result.

@@ -106,6 +106,7 @@ export function syncSessionStateFromEvent(
 
   const existingState = runtimeState.sessions.get(sessionId);
   const nextMessageId = resolveMessageId(event) ?? existingState?.lastMessageId;
+  const isTurnUpdateEvent = isTurnTextUpdateEvent(event);
   const nextState: OpenCodePluginSessionState = {
     sessionId,
     scopeResolution,
@@ -114,7 +115,7 @@ export function syncSessionStateFromEvent(
     lastMessageId: nextMessageId,
     recentConversation: resolveRecentConversationForEvent(event, existingState, nextMessageId),
     messageVersion:
-      event.type === "message.updated"
+      isTurnUpdateEvent
         ? (existingState?.messageVersion ?? 0) + 1
         : (existingState?.messageVersion ?? 0),
     messageDebounceMs,
@@ -124,7 +125,7 @@ export function syncSessionStateFromEvent(
     pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
     wakeUp: existingState?.wakeUp,
-    prepareTurn: event.type === "message.updated" ? undefined : existingState?.prepareTurn,
+    prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
     prepareHostTurn: existingState?.prepareHostTurn,
   };
 
@@ -209,7 +210,7 @@ function resolveRecentConversationForEvent(
   existingState: OpenCodePluginSessionState | undefined,
   nextMessageId: string | undefined,
 ): string | undefined {
-  if (event.type !== "message.updated") {
+  if (!isTurnTextUpdateEvent(event)) {
     return existingState?.recentConversation;
   }
 
@@ -228,6 +229,12 @@ function resolveRecentConversationForEvent(
 
 export function extractRecentConversation(event: OpenCodePluginEvent): string | undefined {
   const properties = asRecord(event.properties);
+  const singlePartText = toNonEmptyString(asRecord(properties?.part)?.text);
+
+  if (singlePartText) {
+    return singlePartText;
+  }
+
   const parts = Array.isArray(properties?.parts) ? properties.parts : [];
   const textParts = parts
     .map((part) => {
@@ -241,6 +248,10 @@ export function extractRecentConversation(event: OpenCodePluginEvent): string | 
   }
 
   return toNonEmptyString(properties?.message);
+}
+
+function isTurnTextUpdateEvent(event: OpenCodePluginEvent): boolean {
+  return event.type === "message.updated" || event.type === "message.part.updated";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

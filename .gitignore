@@ -5,6 +5,7 @@ data/log/*.jsonl
 data/cache/*.json
 data/traces/*.jsonl
 data/traces/orchestration-results/*.json
+data/traces/orchestration-supervisions/*.json
 data/lancedb/*
 .pulselane-refactor/
 !data/cache/.gitkeep

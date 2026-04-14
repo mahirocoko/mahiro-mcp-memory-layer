@@ -106,6 +106,7 @@ function createMessageUpdatedEventWithoutText(
 
 function createMessagePartUpdatedEvent(
   sessionId = "session-1",
+  message = "partial turn",
   messageId = `${sessionId}-message-1`,
 ): PluginEvent {
   return {
@@ -115,7 +116,7 @@ function createMessagePartUpdatedEvent(
       messageID: messageId,
       part: {
         type: "text",
-        text: "partial turn",
+        ...(message ? { text: message } : {}),
       },
     },
   };
@@ -811,6 +812,151 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("debounces message.part.updated precompute and caches the latest part text", async () => {
+    vi.useFakeTimers();
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context: partial draft three")),
+      },
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-turn", "partial draft one", "session-part-turn-message-1"),
+    });
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-turn", "partial draft two", "session-part-turn-message-1"),
+    });
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-turn", "partial draft three", "session-part-turn-message-1"),
+    });
+
+    const whilePending = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-part-turn",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(whilePending).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-part-turn",
+        lastEventType: "message.part.updated",
+        coordination: {
+          messageVersion: 3,
+          hasPendingMessageDebounce: true,
+        },
+        cached: {},
+      },
+    });
+
+    await advanceFakeTimeBy(25);
+
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledTimes(1);
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledWith({
+      task: "Summarize relevant memory context for the latest OpenCode turn.",
+      mode: "query",
+      recentConversation: "partial draft three",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-part-turn",
+      userId: expectedLocalUserId,
+    });
+    expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-part-turn",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-part-turn",
+        coordination: {
+          messageVersion: 3,
+          hasPendingMessageDebounce: false,
+        },
+        cached: {
+          prepareTurn: {
+            context: "turn context: partial draft three",
+            conservativePolicy: {
+              autoSaved: [],
+            },
+          },
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("drops stale message.part.updated completions so older results cannot overwrite newer cache", async () => {
+    vi.useFakeTimers();
+    const firstTurn = createDeferredPromise<ReturnType<typeof createPrepareTurnResult>>();
+    const secondTurn = createDeferredPromise<ReturnType<typeof createPrepareTurnResult>>();
+    const prepareTurnMemory = vi
+      .fn()
+      .mockImplementationOnce(() => firstTurn.promise)
+      .mockImplementationOnce(() => secondTurn.promise);
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareTurnMemory,
+      },
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-stale", "first partial", "session-part-stale-message-1"),
+    });
+    await advanceFakeTimeBy(25);
+    expect(prepareTurnMemory).toHaveBeenCalledTimes(1);
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-stale", "second partial", "session-part-stale-message-1"),
+    });
+    await advanceFakeTimeBy(25);
+    expect(prepareTurnMemory).toHaveBeenCalledTimes(2);
+
+    secondTurn.resolve(createPrepareTurnResult("turn context: second partial"));
+    await flushMicrotasks();
+
+    firstTurn.resolve(createPrepareTurnResult("turn context: first partial"));
+    await flushMicrotasks();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-part-stale",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-part-stale",
+        coordination: {
+          messageVersion: 2,
+          hasPendingMessageDebounce: false,
+        },
+        cached: {
+          prepareTurn: {
+            context: "turn context: second partial",
+          },
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("keeps message.updated fail-open when precompute errors", async () => {
     vi.useFakeTimers();
     const harness = await createPluginHarness({
@@ -1002,6 +1148,71 @@ describe("product memory OpenCode plugin contract", () => {
         cached: {
           prepareHostTurn: {
             context: "host context: first turn",
+          },
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("does not reuse stale recentConversation for a new textless message.part.updated turn", async () => {
+    const prepareHostTurnMemory = vi
+      .fn()
+      .mockResolvedValueOnce(createPrepareHostTurnResult("host context: first partial turn"));
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareHostTurnMemory,
+      },
+    });
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent(
+        "session-empty-part-turn",
+        "first partial turn",
+        "session-empty-part-turn-message-1",
+      ),
+    });
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-empty-part-turn") });
+    await flushMicrotasks();
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-empty-part-turn", "", "session-empty-part-turn-message-2"),
+    });
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-empty-part-turn") });
+    await flushMicrotasks();
+
+    expect(prepareHostTurnMemory).toHaveBeenCalledTimes(1);
+    expect(prepareHostTurnMemory).toHaveBeenCalledWith({
+      task: "Summarize relevant memory context for the latest OpenCode turn.",
+      mode: "query",
+      recentConversation: "first partial turn",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-empty-part-turn",
+      userId: expectedLocalUserId,
+    });
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-empty-part-turn",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-empty-part-turn",
+        lastMessageId: "session-empty-part-turn-message-2",
+        coordination: {
+          messageVersion: 2,
+          hasPendingMessageDebounce: false,
+        },
+        cached: {
+          prepareHostTurn: {
+            context: "host context: first partial turn",
           },
         },
       },
