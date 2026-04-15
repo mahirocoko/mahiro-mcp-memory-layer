@@ -8,6 +8,7 @@ data/traces/orchestration-results/*.json
 data/traces/orchestration-supervisions/*.json
 data/lancedb/*
 .pulselane-refactor/
+.agent-state/learn/**/origin
 !data/cache/.gitkeep
 !data/log/.gitkeep
 !data/traces/.gitkeep
