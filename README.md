@@ -22,9 +22,11 @@ Standard path:
 
 OpenCode installs npm plugins with Bun at startup, so this is the only step for the normal plugin path.
 
-With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, `wake_up_memory`, or the plugin-only diagnostic tool `memory_context`.
+With that plugin-only install, OpenCode gets the native memory tool surface directly from the in-process shared backend — no separate `mcp` block is required for `remember`, `search_memories`, `build_context_for_task`, `upsert_document`, `list_memories`, `suggest_memory_candidates`, `apply_conservative_memory_policy`, `prepare_host_turn_memory`, `prepare_turn_memory`, `wake_up_memory`, `inspect_memory_retrieval`, or the plugin-only diagnostic tools `memory_context` and `runtime_capabilities`.
 
 The plugin's session-start memory bootstrap now tolerates live OpenCode runs that emit generic message events before a dedicated `session.created` hook. In practice, that means wake-up can start from the first session-scoped generic event as a fallback, so `memory_context` still gets a cached `wakeUp` payload even when `opencode run` does not surface `session.created` early enough for the plugin.
+
+That cached wake-up payload now includes a compact startup brief that advertises the current runtime mode. On the standard plugin path it says memory-only; on the source-checkout path it also advertises the injected standalone MCP orchestration path. The same mode split is also available as structured JSON from `runtime_capabilities`.
 
 The plugin also appends the packaged `MCP_USAGE.md` and `ORCHESTRATION.md` files to OpenCode's `instructions` config automatically, so the standard package/plugin path does not require a manual `instructions` entry in `opencode.json`.
 
@@ -89,12 +91,13 @@ bun run reindex
 
 ## Memory tools
 
-OpenCode plugin users now get the same memory tool names natively from the shared in-process backend, plus the plugin-only diagnostic tool `memory_context` for cached session state.
+OpenCode plugin users now get the same memory tool names natively from the shared in-process backend, plus the plugin-only diagnostic tools `memory_context` for cached session state and `runtime_capabilities` for the current runtime capability contract.
 
 The memory side now has two distinct loops:
 
 - read loop: `search_memories`, `build_context_for_task`, and product wrappers `wake_up_memory` / `prepare_turn_memory`
 - write loop: `remember`, `upsert_document`, `suggest_memory_candidates`, and `apply_conservative_memory_policy`
+- audit loop: `inspect_memory_retrieval`, `memory_context`, and `runtime_capabilities`
 
 Plugin override knob:
 
@@ -104,6 +107,12 @@ Plugin override knob:
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 
 **Wake-up:** `wake_up_memory` — same scope + optional `maxItems` / `maxChars` as `build_context_for_task`, but runs two internal retrieval passes (`profile` and `recent` modes) and returns `wakeUpContext` (combined) plus `profile` and `recent` section objects (each matches one `build_context_for_task` result). No suggestions or policy.
+
+On the OpenCode plugin path, the cached wake-up context exposed through `memory_context` also prepends a small runtime startup brief so fresh sessions can tell whether they are on the plugin-native memory-only path or on a source-checkout path with injected MCP orchestration.
+
+**Retrieval audit:** `inspect_memory_retrieval` — read the latest retrieval trace or inspect one by `requestId`. This is the smallest public hit/miss audit surface: it returns the stored retrieval trace plus a compact summary (`hit`, `returnedCount`, `degraded`) without introducing a second trace model.
+
+**Runtime capability contract:** `runtime_capabilities` — plugin-only read-only surface that reports whether the current OpenCode session is on the standard plugin-native path or on a source-checkout path where the standalone MCP server was injected. Use this instead of guessing whether orchestration tools should be available.
 
 Recommended conservative write flow:
 

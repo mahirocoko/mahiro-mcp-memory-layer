@@ -1,6 +1,7 @@
 import type { ZodRawShape } from "zod";
 
 import {
+  inspectMemoryRetrievalInputSchema,
   applyConservativeMemoryPolicyInputObjectSchema,
   buildContextForTaskInputObjectSchema,
   listMemoriesInputSchema,
@@ -25,6 +26,7 @@ export type MemoryToolBackend = Pick<
   | "prepareHostTurnMemory"
   | "wakeUpMemory"
   | "prepareTurnMemory"
+  | "inspectMemoryRetrieval"
 >;
 
 export interface MemoryToolDefinition {
@@ -35,6 +37,13 @@ export interface MemoryToolDefinition {
 }
 
 const memoryToolDefinitions: readonly MemoryToolDefinition[] = [
+  {
+    name: "inspect_memory_retrieval",
+    description:
+      "Read the latest retrieval trace or inspect one by requestId to understand why memory hit, missed, or degraded.",
+    inputSchema: inspectMemoryRetrievalInputSchema.shape,
+    execute: (backend, input) => backend.inspectMemoryRetrieval(input as never),
+  },
   {
     name: "remember",
     description: "Write one scoped memory record.",

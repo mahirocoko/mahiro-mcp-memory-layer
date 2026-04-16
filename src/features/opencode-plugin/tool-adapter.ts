@@ -24,6 +24,13 @@ export function createOpenCodePluginTools(
 
   return {
     ...memoryTools,
+    runtime_capabilities: {
+      description: "Read the active OpenCode runtime capability contract for memory and optional orchestration surfaces.",
+      args: {},
+      execute: async () => {
+        return serializeOpenCodeToolResult(await runtime.readRuntimeCapabilities());
+      },
+    },
     memory_context: {
       description: "Read cached memory context for the active OpenCode session.",
       args: {},

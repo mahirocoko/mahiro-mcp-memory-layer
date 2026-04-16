@@ -155,6 +155,10 @@ function createSharedMemoryBackend(): MemoryToolBackend {
         },
       ],
     }),
+    inspectMemoryRetrieval: vi.fn().mockResolvedValue({
+      status: "empty",
+      lookup: "latest",
+    }),
     prepareHostTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareHostTurnResult("host-turn-context")),
     wakeUpMemory: vi.fn().mockResolvedValue(createFixedWakeUpResult("wake-up-context")),
     prepareTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareTurnResult("turn-context")),
@@ -326,6 +330,7 @@ describe("OpenCode plugin package", () => {
           __test: {
             memory: sharedMemoryBackend,
             messageDebounceMs: 0,
+            standaloneMcpAvailable: false,
           },
         },
       );
@@ -395,8 +400,20 @@ describe("OpenCode plugin package", () => {
             messageVersion: 1,
             hasPendingMessageDebounce: false,
           },
+          startupBrief: expect.stringContaining("Runtime startup brief"),
+          capabilities: {
+            memory: {
+              sessionStartWakeUpAvailable: true,
+            },
+            orchestration: {
+              available: false,
+            },
+          },
           cached: {
-            wakeUp: createFixedWakeUpResult("wake-up-context"),
+            wakeUp: expect.objectContaining({
+              ...createFixedWakeUpResult("wake-up-context"),
+              wakeUpContext: expect.stringContaining("Runtime startup brief"),
+            }),
             prepareTurn: createFixedPrepareTurnResult("turn-context"),
             prepareHostTurn: createFixedPrepareHostTurnResult("host-turn-context"),
           },
@@ -411,7 +428,11 @@ describe("OpenCode plugin package", () => {
         sharedMemoryBackend as unknown as MemoryService,
       );
 
-      const expectedToolNames = [...sharedToolDefinitions.map((tool) => tool.name), "memory_context"].sort();
+      const expectedToolNames = [
+        ...sharedToolDefinitions.map((tool) => tool.name),
+        "memory_context",
+        "runtime_capabilities",
+      ].sort();
 
       expect(Object.keys(pluginHooks.tool).sort()).toEqual(expectedToolNames);
       expect(tools.map((tool) => tool.name).sort()).toEqual(sharedToolDefinitions.map((tool) => tool.name).sort());

@@ -16,6 +16,8 @@ import { searchMemories } from "../src/features/memory/core/search-memories.js";
 import { buildContextForTask } from "../src/features/memory/core/build-context-for-task.js";
 import { reindexMemoryRecords } from "../src/features/memory/index/reindex.js";
 import { toRetrievalRow } from "../src/features/memory/retrieval/rank.js";
+import { MemoryService } from "../src/features/memory/memory-service.js";
+import type { RetrievalTraceEntry } from "../src/features/memory/types.js";
 
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "mahiro-mcp-memory-layer-"));
@@ -652,5 +654,67 @@ describe("memory service core", () => {
     const traceLines = (await readFile(fixture.traceFilePath, "utf8")).trim().split("\n");
     const lastTrace = JSON.parse(traceLines.at(-1)!) as { degraded: boolean };
     expect(lastTrace.degraded).toBe(true);
+  });
+
+  it("inspects the latest retrieval trace with hit summary", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await service.remember({
+      content: "A durable project fact for retrieval.",
+      kind: "fact",
+      scope: "project",
+      userId: "mahiro",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    const searchResult = await service.search({
+      query: "durable retrieval",
+      mode: "query",
+      scope: "project",
+      userId: "mahiro",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(searchResult.items.length).toBeGreaterThan(0);
+
+    const traceLines = (await readFile(fixture.traceFilePath, "utf8")).trim().split("\n");
+    const latestTrace = JSON.parse(traceLines.at(-1)!) as RetrievalTraceEntry;
+    const audit = await service.inspectMemoryRetrieval({});
+
+    expect(audit).toEqual({
+      status: "found",
+      lookup: "latest",
+      trace: latestTrace,
+      summary: {
+        hit: true,
+        returnedCount: latestTrace.returnedMemoryIds.length,
+        degraded: latestTrace.degraded,
+      },
+    });
+  });
+
+  it("returns empty when requestId lookup does not exist", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await expect(service.inspectMemoryRetrieval({ requestId: "req_missing" })).resolves.toEqual({
+      status: "empty",
+      lookup: "request_id",
+      requestId: "req_missing",
+    });
   });
 });

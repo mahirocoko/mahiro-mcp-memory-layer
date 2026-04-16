@@ -22,9 +22,13 @@ When OpenCode loads the published plugin by package name, the guaranteed surface
 - `prepare_host_turn_memory`
 - `prepare_turn_memory`
 - `wake_up_memory`
+- `inspect_memory_retrieval`
 - `memory_context`
+- `runtime_capabilities`
 
 Treat this as the default assumption unless you have evidence that the standalone MCP server was also injected.
+
+`runtime_capabilities` is the plugin-side way to read that evidence explicitly. On the package/plugin path it reports `mode: "plugin-native"`; on a source checkout where the plugin injected the standalone MCP server it reports `mode: "plugin-native+mcp"` and lists the advertised orchestration tools.
 
 ### 2. Source checkout or standalone MCP path
 
@@ -41,6 +45,8 @@ Use the plugin-native memory surface first for memory work. Do not assume orches
 
 If the current tool list contains `orchestrate_workflow`, `get_orchestration_result`, `supervise_orchestration_result`, or `wait_for_orchestration_result`, you are on an MCP-capable path.
 
+If you want a structured answer instead of inferring from the tool list, call `runtime_capabilities` on the plugin path.
+
 ## Memory-side task flows
 
 ### Retrieval and turn prep
@@ -52,12 +58,28 @@ Use these for building context:
 - `wake_up_memory`
 - `prepare_host_turn_memory`
 - `prepare_turn_memory`
+- `memory_context`
 
 Recommended default:
 
 - use `prepare_host_turn_memory` / `prepare_turn_memory` when you want retrieval context plus memory suggestions and conservative policy in one pass
 - use `wake_up_memory` for broader session/profile wake-up context
 - use `build_context_for_task` when you need retrieval without the higher-level host wrapper
+- use `memory_context` when you want the plugin's cached session-start wake-up, turn precompute, idle persistence, startup brief, and capability snapshot for the active OpenCode session
+
+### Diagnostics and audit
+
+Use these when you want to understand what the plugin/runtime already knows:
+
+- `memory_context`
+- `runtime_capabilities`
+- `inspect_memory_retrieval`
+
+Recommended posture:
+
+- use `runtime_capabilities` to determine whether orchestration should be advertised at all
+- use `memory_context` to inspect cached session memory state, including the startup brief and capability snapshot on the plugin path
+- use `inspect_memory_retrieval` when you need to answer why memory hit, missed, or degraded for the latest retrieval or for a known `requestId`
 
 ### Writing and persistence
 
@@ -229,6 +251,8 @@ Use the result store and trace tools to answer questions like:
 - was the orchestration entrypoint called from MCP or CLI?
 - what `workerRuntime` did the job use?
 - did the workflow fail at the runner level or inside a worker job?
+
+For memory retrieval diagnostics on the plugin/memory side, use `inspect_memory_retrieval` instead of reading trace files directly.
 
 Use:
 

@@ -21,6 +21,8 @@ import type {
   ApplyConservativeMemoryPolicyResult,
   BuildContextForTaskInput,
   BuildContextForTaskResult,
+  InspectMemoryRetrievalInput,
+  InspectMemoryRetrievalResult,
   ListMemoriesInput,
   MemoryRecord,
   PrepareHostTurnMemoryInput,
@@ -153,5 +155,32 @@ export class MemoryService {
       table: this.table,
       embeddingProvider: this.embeddingProvider,
     });
+  }
+
+  public async inspectMemoryRetrieval(
+    payload: InspectMemoryRetrievalInput,
+  ): Promise<InspectMemoryRetrievalResult> {
+    const trace = payload.requestId
+      ? await this.traceStore.readByRequestId(payload.requestId)
+      : await this.traceStore.readLatest();
+
+    if (!trace) {
+      return {
+        status: "empty",
+        lookup: payload.requestId ? "request_id" : "latest",
+        ...(payload.requestId ? { requestId: payload.requestId } : {}),
+      };
+    }
+
+    return {
+      status: "found",
+      lookup: payload.requestId ? "request_id" : "latest",
+      trace,
+      summary: {
+        hit: trace.returnedMemoryIds.length > 0,
+        returnedCount: trace.returnedMemoryIds.length,
+        degraded: trace.degraded,
+      },
+    };
   }
 }

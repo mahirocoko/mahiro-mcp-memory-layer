@@ -276,6 +276,10 @@ function createToolTestMemoryBackend(overrides?: Partial<MemoryToolBackend>): Me
       autoSaveSkipped: [],
       reviewOnlySuggestions: [],
     }),
+    inspectMemoryRetrieval: vi.fn().mockResolvedValue({
+      status: "empty",
+      lookup: "latest",
+    }),
     prepareHostTurnMemory: vi.fn().mockResolvedValue(createPrepareHostTurnResult("host context")),
     wakeUpMemory: vi.fn().mockResolvedValue({
       wakeUpContext: "profile\n\n---\n\nrecent",
@@ -303,6 +307,7 @@ async function createPluginHarness(options?: {
   readonly memoryOverrides?: Partial<MemoryToolBackend>;
   readonly createMemoryBackend?: ReturnType<typeof vi.fn>;
   readonly messageDebounceMs?: number;
+  readonly standaloneMcpAvailable?: boolean;
   readonly resetModules?: boolean;
 }) {
   const resetModules = (vi as typeof vi & { resetModules?: () => void }).resetModules;
@@ -323,6 +328,9 @@ async function createPluginHarness(options?: {
     ...(options?.createMemoryBackend ? {} : { memory }),
     ...(options?.createMemoryBackend ? { createMemoryBackend: options.createMemoryBackend } : {}),
     messageDebounceMs: options?.messageDebounceMs ?? 25,
+    ...(options?.standaloneMcpAvailable === undefined
+      ? {}
+      : { standaloneMcpAvailable: options.standaloneMcpAvailable }),
   };
   const hooks = await module.server(
     {
@@ -379,7 +387,7 @@ afterEach(async () => {
 });
 
 describe("product memory OpenCode plugin contract", () => {
-  it("initializes as an OpenCode plugin module with the shared native memory tool surface, memory_context, and no stdio self-spawn", async () => {
+  it("initializes as an OpenCode plugin module with the shared native memory tool surface, memory_context, runtime_capabilities, and no stdio self-spawn", async () => {
     const harness = await createPluginHarness();
     const sharedMemoryToolNames = getMemoryToolDefinitions().map((tool) => tool.name).sort();
 
@@ -388,7 +396,9 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks["message.updated"]).toEqual(expect.any(Function));
     expect(harness.hooks["session.idle"]).toEqual(expect.any(Function));
     expect(harness.hooks["experimental.session.compacting"]).toEqual(expect.any(Function));
-    expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual([...sharedMemoryToolNames, "memory_context"].sort());
+    expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual(
+      [...sharedMemoryToolNames, "memory_context", "runtime_capabilities"].sort(),
+    );
     for (const sharedMemoryTool of getMemoryToolDefinitions()) {
       expect(harness.hooks.tool?.[sharedMemoryTool.name]?.description).toBe(sharedMemoryTool.description);
       expect(Object.keys(harness.hooks.tool?.[sharedMemoryTool.name]?.args ?? {}).sort()).toEqual(
@@ -399,11 +409,61 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks.tool?.memory_context?.description).toContain("cached memory context");
     expect(harness.hooks.tool?.memory_context?.args).toEqual({});
     expect(harness.hooks.tool?.memory_context?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.runtime_capabilities?.description).toContain("runtime capability contract");
+    expect(harness.hooks.tool?.runtime_capabilities?.args).toEqual({});
+    expect(harness.hooks.tool?.runtime_capabilities?.execute).toEqual(expect.any(Function));
+    expectNoSelfSpawn(harness);
+  });
+
+  it("reports plugin-native-only capabilities when standalone MCP orchestration is unavailable", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: false,
+    });
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
+
+    expect(result).toEqual({
+      mode: "plugin-native",
+      memory: {
+        toolNames: expect.arrayContaining(["remember", "prepare_host_turn_memory", "wake_up_memory", "memory_context"]),
+        sessionStartWakeUpAvailable: true,
+        turnPreflightAvailable: true,
+        idlePersistenceAvailable: true,
+        memoryContextToolAvailable: true,
+      },
+      orchestration: {
+        available: false,
+        toolNames: [],
+        activation: "unavailable",
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("reports MCP-capable capabilities when standalone orchestration is available", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: true,
+    });
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
+
+    expect(result).toMatchObject({
+      mode: "plugin-native+mcp",
+      orchestration: {
+        available: true,
+        serverName: "mahiro-mcp-memory-layer",
+        activation: "source-checkout-mcp-injection",
+      },
+    });
+    expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
+      "orchestrate_workflow",
+    );
     expectNoSelfSpawn(harness);
   });
 
   it("serves the native memory_context tool from cached singleton runtime state", async () => {
     const harness = await createPluginHarness({
+      standaloneMcpAvailable: false,
       memoryOverrides: {
         wakeUpMemory: vi.fn().mockResolvedValue({
           wakeUpContext: "profile\n\n---\n\nrecent",
@@ -454,9 +514,15 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 0,
           hasPendingMessageDebounce: false,
         },
+        startupBrief: expect.stringContaining("Runtime startup brief"),
+        capabilities: {
+          memory: {
+            sessionStartWakeUpAvailable: true,
+          },
+        },
         cached: {
           wakeUp: {
-            wakeUpContext: "profile\n\n---\n\nrecent",
+            wakeUpContext: expect.stringContaining("Runtime startup brief"),
             truncated: false,
             degraded: false,
           },
@@ -756,6 +822,37 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("uses a stronger continuity-focused preflight task for recall-heavy message.updated prompts", async () => {
+    vi.useFakeTimers();
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context: continue previous work")),
+      },
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks["message.updated"]?.({
+      event: createMessageUpdatedEvent(
+        "session-continuity",
+        "Continue from the previous orchestration debugging session and recall what we decided earlier.",
+      ),
+    });
+    await advanceFakeTimeBy(25);
+
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledWith({
+      task:
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+      mode: "query",
+      recentConversation:
+        "Continue from the previous orchestration debugging session and recall what we decided earlier.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-continuity",
+      userId: expectedLocalUserId,
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("drops stale message.updated completions so older results cannot overwrite newer cache", async () => {
     vi.useFakeTimers();
     const firstTurn = createDeferredPromise<ReturnType<typeof createPrepareTurnResult>>();
@@ -1001,6 +1098,24 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("skips low-value chatter for message.updated and session.idle preflight", async () => {
+    vi.useFakeTimers();
+    const harness = await createPluginHarness({
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks["message.updated"]?.({
+      event: createMessageUpdatedEvent("session-small-talk", "thanks"),
+    });
+    await advanceFakeTimeBy(25);
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-small-talk") });
+    await flushMicrotasks();
+
+    expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
+    expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
+    expectNoSelfSpawn(harness);
+  });
+
   it("runs session.idle conservative persistence once per handled turn and caches the result", async () => {
     const prepareHostTurnMemory = vi
       .fn()
@@ -1049,6 +1164,40 @@ describe("product memory OpenCode plugin contract", () => {
           },
         },
       },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("uses a stronger continuity-focused preflight task for recall-heavy session.idle persistence", async () => {
+    const prepareHostTurnMemory = vi
+      .fn()
+      .mockResolvedValue(createPrepareHostTurnResult("host turn context: continue previous work"));
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareHostTurnMemory,
+      },
+      messageDebounceMs: 0,
+    });
+
+    await harness.hooks["message.updated"]?.({
+      event: createMessageUpdatedEvent(
+        "session-idle-continuity",
+        "Resume from the previous session and remember the project context before we continue.",
+      ),
+    });
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-idle-continuity") });
+    await flushMicrotasks();
+
+    expect(prepareHostTurnMemory).toHaveBeenCalledWith({
+      task:
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+      mode: "query",
+      recentConversation:
+        "Resume from the previous session and remember the project context before we continue.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-idle-continuity",
+      userId: expectedLocalUserId,
     });
     expectNoSelfSpawn(harness);
   });

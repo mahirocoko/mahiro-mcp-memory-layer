@@ -17,6 +17,11 @@ import {
 } from "./runtime-backend.js";
 import { logPluginLifecycle, toErrorMessage } from "./runtime-logging.js";
 import {
+  buildOpenCodePluginStartupBrief,
+  resolveOpenCodePluginRuntimeCapabilities,
+  type OpenCodePluginRuntimeCapabilities,
+} from "./runtime-capabilities.js";
+import {
   buildMemoryContextResult,
   buildPrepareHostTurnKey,
   extractRecentConversation,
@@ -81,6 +86,7 @@ export interface OpenCodePluginRuntime {
   readonly readMemoryContext: (
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<OpenCodePluginMemoryContextResult>;
+  readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
 }
 
 export function createOpenCodePluginRuntime(
@@ -90,6 +96,9 @@ export function createOpenCodePluginRuntime(
   providedUserId: string,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
+  const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
+    standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
+  });
 
   const routeEvent = async (
     event: OpenCodePluginEvent,
@@ -139,15 +148,46 @@ export function createOpenCodePluginRuntime(
         hasStartedWakeUpBeforeStart: false,
       },
     });
-    pendingWakeUp = getOpenCodePluginMemoryBackend(options.__test)
-      .then((backend) =>
-        backend.wakeUpMemory({
-          userId: wakeUpScope.userId,
-          projectId: wakeUpScope.projectId,
-          containerId: wakeUpScope.containerId,
-          sessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
+    const wakeUpPromise = getOpenCodePluginMemoryBackend(options.__test).then((backend) =>
+      backend.wakeUpMemory({
+        userId: wakeUpScope.userId,
+        projectId: wakeUpScope.projectId,
+        containerId: wakeUpScope.containerId,
+        sessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
+      }),
+    );
+
+    void runtimeCapabilitiesPromise
+      .then((capabilities) => {
+        const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+        if (!latestSessionState) {
+          return;
+        }
+
+        const startupBrief = buildOpenCodePluginStartupBrief(capabilities);
+        latestSessionState.capabilities = capabilities;
+        latestSessionState.startupBrief = startupBrief;
+        if (latestSessionState.wakeUp) {
+          latestSessionState.wakeUp = {
+            ...latestSessionState.wakeUp,
+            wakeUpContext: prependStartupBrief(latestSessionState.wakeUp.wakeUpContext, startupBrief),
+          };
+        }
+      })
+      .catch((error) =>
+        logPluginLifecycle(context, {
+          service: "opencode-memory-plugin",
+          level: "warn",
+          message: "OpenCode plugin runtime capability detection failed open.",
+          extra: {
+            sessionId: sessionState.sessionId,
+            error: toErrorMessage(error),
+          },
         }),
-      )
+      );
+
+    pendingWakeUp = wakeUpPromise
       .then((wakeUp) => {
         const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
 
@@ -165,7 +205,10 @@ export function createOpenCodePluginRuntime(
         }
 
         const hadCachedWakeUpBeforeWrite = Boolean(latestSessionState.wakeUp);
-        latestSessionState.wakeUp = wakeUp;
+        latestSessionState.wakeUp = {
+          ...wakeUp,
+          wakeUpContext: prependStartupBrief(wakeUp.wakeUpContext, latestSessionState.startupBrief),
+        };
         void logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
           level: "debug",
@@ -225,11 +268,16 @@ export function createOpenCodePluginRuntime(
     currentSessionState.pendingMessageDebounce = undefined;
 
     const scope = currentSessionState.scopeResolution.scope;
+    const routing = resolveMemoryPreflightRouting(recentConversation);
+
+    if (!routing.shouldRun) {
+      return;
+    }
 
     try {
       const backend = await getOpenCodePluginMemoryBackend(options.__test);
       const prepareTurn = await backend.prepareTurnMemory({
-        task: "Summarize relevant memory context for the latest OpenCode turn.",
+        task: routing.task,
         mode: "query",
         recentConversation,
         userId: scope.userId,
@@ -327,13 +375,19 @@ export function createOpenCodePluginRuntime(
       return;
     }
 
+    const routing = resolveMemoryPreflightRouting(recentConversation);
+
+    if (!routing.shouldRun) {
+      return;
+    }
+
     const scope = sessionState.scopeResolution.scope;
     sessionState.pendingPrepareHostTurnKey = turnKey;
 
     void getOpenCodePluginMemoryBackend(options.__test)
       .then((backend) =>
         backend.prepareHostTurnMemory({
-          task: "Summarize relevant memory context for the latest OpenCode turn.",
+          task: routing.task,
           mode: "query",
           recentConversation,
           userId: scope.userId,
@@ -417,12 +471,79 @@ export function createOpenCodePluginRuntime(
       await applyCompactionContinuity(context, sessionState, output);
     },
     readMemoryContext: async (toolContext) => {
-      const sessionId =
-        resolveSessionIdFromUnknown(toolContext) ??
-        resolveSessionIdFromUnknown(toolContext.properties);
+        const sessionId =
+          resolveSessionIdFromUnknown(toolContext) ??
+          resolveSessionIdFromUnknown(toolContext.properties);
 
       return buildMemoryContextResult(runtimeState, sessionId);
     },
+    readRuntimeCapabilities: () => runtimeCapabilitiesPromise,
+  };
+}
+
+function prependStartupBrief(wakeUpContext: string, startupBrief: string | undefined): string {
+  if (!startupBrief) {
+    return wakeUpContext;
+  }
+
+  if (wakeUpContext.startsWith("## Runtime startup brief")) {
+    return wakeUpContext;
+  }
+
+  return `${startupBrief}\n\n---\n\n${wakeUpContext}`;
+}
+
+interface MemoryPreflightRouting {
+  readonly shouldRun: boolean;
+  readonly task: string;
+}
+
+const defaultMemoryPreflightTask =
+  "Summarize relevant memory context for the latest OpenCode turn.";
+
+const continuityMemoryPreflightTask =
+  "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.";
+
+const smallTalkPattern =
+  /^(hi|hello|hey|thanks|thank you|thx|ok|okay|cool|nice|great|awesome|test|ping|yo|how are you)([!.?\s]+)?$/i;
+
+const continuitySignalPattern =
+  /\b(continue|continuing|continued|resume|resuming|previous|earlier|before|prior|follow[-\s]?up|recap|what happened|what did we|we decided|decision|remember|history|compare|comparison|last time|ongoing)\b/i;
+
+function resolveMemoryPreflightRouting(recentConversation: string): MemoryPreflightRouting {
+  const normalizedConversation = recentConversation.trim();
+
+  if (normalizedConversation.length === 0) {
+    return {
+      shouldRun: false,
+      task: defaultMemoryPreflightTask,
+    };
+  }
+
+  if (smallTalkPattern.test(normalizedConversation)) {
+    return {
+      shouldRun: false,
+      task: defaultMemoryPreflightTask,
+    };
+  }
+
+  if (continuitySignalPattern.test(normalizedConversation)) {
+    return {
+      shouldRun: true,
+      task: continuityMemoryPreflightTask,
+    };
+  }
+
+  if (normalizedConversation.length < 5) {
+    return {
+      shouldRun: false,
+      task: defaultMemoryPreflightTask,
+    };
+  }
+
+  return {
+    shouldRun: true,
+    task: defaultMemoryPreflightTask,
   };
 }
 

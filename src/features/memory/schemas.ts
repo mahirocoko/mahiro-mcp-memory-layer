@@ -170,3 +170,7 @@ export const wakeUpMemoryInputObjectSchema = z.object({
 });
 
 export const wakeUpMemoryInputSchema = wakeUpMemoryInputObjectSchema;
+
+export const inspectMemoryRetrievalInputSchema = z.object({
+  requestId: z.string().trim().min(1).optional(),
+});

@@ -256,3 +256,28 @@ export interface RetrievalTraceEntry {
   readonly degraded: boolean;
   readonly createdAt: string;
 }
+
+export interface InspectMemoryRetrievalInput {
+  readonly requestId?: string;
+}
+
+export interface InspectMemoryRetrievalFoundResult {
+  readonly status: "found";
+  readonly lookup: "latest" | "request_id";
+  readonly trace: RetrievalTraceEntry;
+  readonly summary: {
+    readonly hit: boolean;
+    readonly returnedCount: number;
+    readonly degraded: boolean;
+  };
+}
+
+export interface InspectMemoryRetrievalEmptyResult {
+  readonly status: "empty";
+  readonly lookup: "latest" | "request_id";
+  readonly requestId?: string;
+}
+
+export type InspectMemoryRetrievalResult =
+  | InspectMemoryRetrievalFoundResult
+  | InspectMemoryRetrievalEmptyResult;

@@ -7,6 +7,7 @@ export interface OpenCodePluginTestOptions {
   readonly memory?: OpenCodePluginMemoryBackend;
   readonly createMemoryBackend?: () => Promise<OpenCodePluginMemoryBackend>;
   readonly messageDebounceMs?: number;
+  readonly standaloneMcpAvailable?: boolean;
 }
 
 let singletonMemoryBackendPromise: Promise<OpenCodePluginMemoryBackend> | undefined;

@@ -3,6 +3,7 @@ import type {
   PrepareTurnMemoryResult,
   WakeUpMemoryResult,
 } from "../memory/types.js";
+import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
 import { resolveOpenCodeScope, type OpenCodePluginContext, type OpenCodePluginEvent, type OpenCodeScopeResolution } from "./resolve-scope.js";
 
 export interface OpenCodePluginCachedSession {
@@ -16,6 +17,8 @@ export interface OpenCodePluginCachedSession {
     readonly messageVersion: number;
     readonly hasPendingMessageDebounce: boolean;
   };
+  readonly startupBrief?: string;
+  readonly capabilities?: OpenCodePluginRuntimeCapabilities;
   readonly cached: {
     readonly wakeUp?: WakeUpMemoryResult;
     readonly prepareTurn?: PrepareTurnMemoryResult;
@@ -52,6 +55,8 @@ export interface OpenCodePluginSessionState {
   pendingWakeUp?: Promise<void>;
   pendingPrepareHostTurnKey?: string;
   lastHandledPrepareHostTurnKey?: string;
+  startupBrief?: string;
+  capabilities?: OpenCodePluginRuntimeCapabilities;
   wakeUp?: WakeUpMemoryResult;
   prepareTurn?: PrepareTurnMemoryResult;
   prepareHostTurn?: PrepareHostTurnMemoryResult;
@@ -124,6 +129,8 @@ export function syncSessionStateFromEvent(
     pendingWakeUp: existingState?.pendingWakeUp,
     pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
+    startupBrief: existingState?.startupBrief,
+    capabilities: existingState?.capabilities,
     wakeUp: existingState?.wakeUp,
     prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
     prepareHostTurn: existingState?.prepareHostTurn,
@@ -169,6 +176,8 @@ export function buildMemoryContextResult(
         messageVersion: sessionState.messageVersion,
         hasPendingMessageDebounce: Boolean(sessionState.pendingMessageDebounce),
       },
+      ...(sessionState.startupBrief ? { startupBrief: sessionState.startupBrief } : {}),
+      ...(sessionState.capabilities ? { capabilities: sessionState.capabilities } : {}),
       cached: {
         ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
