@@ -24,3 +24,4 @@ Start here, then load the narrower doc that matches your task:
 - Default verification order: `bun run typecheck`, `bun run test`, `bun run build`.
 - Preserve history and never force-push.
 - Do not present orchestration tools as guaranteed unless the current runtime mode actually exposes them; check `MCP_USAGE.md` for the mode split.
+- When a user explicitly asks for interactive OpenCode testing, or explicitly asks for `tmux` + `opencode` + `send-keys`, use that live interactive path for the test step. Do not silently substitute headless `opencode run`, MCP worker calls, or other non-interactive shortcuts for the requested validation mode.

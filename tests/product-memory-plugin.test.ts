@@ -853,6 +853,37 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("uses a stronger continuity-focused preflight task for recall-heavy message.part.updated prompts", async () => {
+    vi.useFakeTimers();
+    const harness = await createPluginHarness({
+      memoryOverrides: {
+        prepareTurnMemory: vi.fn().mockResolvedValue(createPrepareTurnResult("turn context: partial continuity")),
+      },
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent(
+        "session-part-continuity",
+        "Continue from the previous session and compare it with what we decided earlier.",
+        "session-part-continuity-message-1",
+      ),
+    });
+    await advanceFakeTimeBy(25);
+
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledWith({
+      task:
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+      mode: "query",
+      recentConversation: "Continue from the previous session and compare it with what we decided earlier.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+      sessionId: "session-part-continuity",
+      userId: expectedLocalUserId,
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("drops stale message.updated completions so older results cannot overwrite newer cache", async () => {
     vi.useFakeTimers();
     const firstTurn = createDeferredPromise<ReturnType<typeof createPrepareTurnResult>>();
@@ -1110,6 +1141,22 @@ describe("product memory OpenCode plugin contract", () => {
     await advanceFakeTimeBy(25);
     await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-small-talk") });
     await flushMicrotasks();
+
+    expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
+    expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
+    expectNoSelfSpawn(harness);
+  });
+
+  it("skips low-value chatter for message.part.updated preflight", async () => {
+    vi.useFakeTimers();
+    const harness = await createPluginHarness({
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({
+      event: createMessagePartUpdatedEvent("session-part-small-talk", "ping", "session-part-small-talk-message-1"),
+    });
+    await advanceFakeTimeBy(25);
 
     expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();

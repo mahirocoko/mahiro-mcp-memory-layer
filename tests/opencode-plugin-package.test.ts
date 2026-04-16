@@ -204,6 +204,9 @@ function createSharedToolPayloads(repoPath: string): Record<string, Record<strin
       conversation: "We decided plugin users should get memory tools without MCP setup.",
       projectId: "mahiro-mcp-memory-layer",
     },
+    inspect_memory_retrieval: {
+      requestId: "req_123",
+    },
     prepare_host_turn_memory: {
       task: "Summarize relevant memory context for the latest OpenCode turn.",
       mode: "query",
