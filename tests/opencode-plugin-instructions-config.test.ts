@@ -24,6 +24,7 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
     expect(config.instructions).toEqual([
       expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
+      expect.stringContaining("/CONTINUITY_DEBUGGING.md"),
     ]);
   });
 
@@ -39,6 +40,7 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
       "/tmp/user-instructions.md",
       expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
+      expect.stringContaining("/CONTINUITY_DEBUGGING.md"),
     ]);
   });
 
@@ -52,13 +54,18 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
     expect(config.instructions).toEqual([
       expect.stringContaining("/MCP_USAGE.md"),
       expect.stringContaining("/ORCHESTRATION.md"),
+      expect.stringContaining("/CONTINUITY_DEBUGGING.md"),
     ]);
   });
 
-  it("does not append packaged instructions when both docs are missing", async () => {
+  it("does not append packaged instructions when any packaged doc is missing", async () => {
     vi.doMock("node:fs/promises", () => ({
       access: async (path: string) => {
-        if (path.endsWith("/MCP_USAGE.md") || path.endsWith("/ORCHESTRATION.md")) {
+        if (
+          path.endsWith("/MCP_USAGE.md") ||
+          path.endsWith("/ORCHESTRATION.md") ||
+          path.endsWith("/CONTINUITY_DEBUGGING.md")
+        ) {
           throw new Error("missing packaged doc");
         }
       },
@@ -77,6 +84,23 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
       access: async (path: string) => {
         if (path.endsWith("/ORCHESTRATION.md")) {
           throw new Error("missing ORCHESTRATION");
+        }
+      },
+    }));
+
+    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
+    const config = {} as Config;
+
+    await applyOpenCodePluginInstructionsConfig(config);
+
+    expect(config.instructions).toBeUndefined();
+  });
+
+  it("does not append packaged instructions when CONTINUITY_DEBUGGING is missing", async () => {
+    vi.doMock("node:fs/promises", () => ({
+      access: async (path: string) => {
+        if (path.endsWith("/CONTINUITY_DEBUGGING.md")) {
+          throw new Error("missing CONTINUITY_DEBUGGING");
         }
       },
     }));

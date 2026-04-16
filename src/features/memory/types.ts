@@ -69,6 +69,13 @@ export interface SearchMemoriesResult {
   readonly degraded: boolean;
 }
 
+export interface RetrievalTraceProvenance {
+  readonly surface: "tool" | "memory-facade" | "opencode-plugin" | "eval";
+  readonly trigger: string;
+  readonly phase: string;
+  readonly searchScope?: MemoryScope;
+}
+
 export interface BuildContextForTaskInput {
   readonly task: string;
   readonly mode: RetrievalMode;
@@ -248,6 +255,7 @@ export interface RetrievalTraceEntry {
   readonly query: string;
   readonly retrievalMode: RetrievalMode;
   readonly enforcedFilters: ScopeFilter;
+  readonly provenance?: RetrievalTraceProvenance;
   readonly returnedMemoryIds: readonly string[];
   readonly rankingReasonsById: Record<string, readonly string[]>;
   readonly contextSize: number;

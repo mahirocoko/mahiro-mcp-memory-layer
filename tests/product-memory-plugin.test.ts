@@ -42,11 +42,6 @@ interface OpenCodePluginHooks {
       readonly args?: Record<string, unknown>;
       readonly execute?: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
     };
-    readonly memory_context?: {
-      readonly description?: string;
-      readonly args?: Record<string, unknown>;
-      readonly execute?: (args: Record<string, never>, context: Record<string, unknown>) => Promise<unknown>;
-    };
   };
 }
 
@@ -228,10 +223,11 @@ async function importPluginModule(): Promise<OpenCodePluginModule> {
     expect(imported.server).toEqual(expect.any(Function));
     return imported as OpenCodePluginModule;
   } catch (error) {
-    throw new Error(
+    const wrappedError = new Error(
       "Expected an OpenCode plugin module at src/features/opencode-plugin/index.ts exporting a `server` plugin function.",
-      { cause: error },
-    );
+    ) as Error & { cause?: unknown };
+    wrappedError.cause = error;
+    throw wrappedError;
   }
 }
 
@@ -243,9 +239,11 @@ function createOptionalBunSpawnSpy() {
   }
 
   try {
-    return vi.spyOn(bunGlobal, "spawn").mockImplementation((() => {
-      throw new Error("OpenCode plugin path must not self-spawn the local stdio MCP server.");
-    }) as never);
+    return vi
+      .spyOn(bunGlobal as { spawn: (...args: unknown[]) => unknown }, "spawn")
+      .mockImplementation((() => {
+        throw new Error("OpenCode plugin path must not self-spawn the local stdio MCP server.");
+      }) as (...args: unknown[]) => unknown);
   } catch {
     return undefined;
   }
@@ -348,11 +346,11 @@ async function createPluginHarness(options?: {
         },
       },
       $: shell,
-      },
-      {
-        __test: testOptions,
-      },
-    );
+    } as unknown as PluginInput,
+    {
+      __test: testOptions,
+    } as unknown as Record<string, unknown>,
+  );
 
   expect(hooks.event).toEqual(expect.any(Function));
 
@@ -617,6 +615,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-a",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session-start",
+      phase: "wake-up",
     });
     expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.prepareHostTurnMemory).toHaveBeenCalledTimes(1);
@@ -723,6 +725,10 @@ describe("product memory OpenCode plugin contract", () => {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-fallback",
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session-start",
+      phase: "wake-up",
     });
     expect(result).toMatchObject({
       status: "ready",
@@ -788,6 +794,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "message.updated",
+      phase: "turn-preflight",
     });
     expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
     expect(harness.memory.wakeUpMemory).not.toHaveBeenCalled();
@@ -849,6 +859,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-continuity",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "message.updated",
+      phase: "turn-preflight",
     });
     expectNoSelfSpawn(harness);
   });
@@ -880,6 +894,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-part-continuity",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "message.part.updated",
+      phase: "turn-preflight",
     });
     expectNoSelfSpawn(harness);
   });
@@ -992,6 +1010,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-part-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "message.part.updated",
+      phase: "turn-preflight",
     });
     expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
 
@@ -1187,6 +1209,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-idle",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
 
     const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
@@ -1245,6 +1271,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-idle-continuity",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
     expectNoSelfSpawn(harness);
   });
@@ -1277,6 +1307,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-next-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
     expect(prepareHostTurnMemory).toHaveBeenNthCalledWith(2, {
       task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -1286,6 +1320,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-next-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
     expectNoSelfSpawn(harness);
   });
@@ -1321,6 +1359,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-empty-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
 
     const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
@@ -1386,6 +1428,10 @@ describe("product memory OpenCode plugin contract", () => {
       containerId: `worktree:${repoRoot}`,
       sessionId: "session-empty-part-turn",
       userId: expectedLocalUserId,
+    }, {
+      surface: "opencode-plugin",
+      trigger: "session.idle",
+      phase: "host-turn-persistence",
     });
 
     const result = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(

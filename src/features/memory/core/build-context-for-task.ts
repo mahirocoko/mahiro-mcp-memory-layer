@@ -1,6 +1,6 @@
 import { buildContextForTaskInputSchema } from "../schemas.js";
 import { defaultContextMaxChars, defaultContextMaxItems } from "../constants.js";
-import type { BuildContextForTaskInput, BuildContextForTaskResult } from "../types.js";
+import type { BuildContextForTaskInput, BuildContextForTaskResult, RetrievalTraceProvenance } from "../types.js";
 import { buildContextFromItems } from "../retrieval/context-builder.js";
 import { searchMemories } from "./search-memories.js";
 import { suggestMemoryCandidates } from "./suggest-memory-candidates.js";
@@ -13,6 +13,7 @@ export async function buildContextForTask(input: {
   readonly table: MemoryRecordsTable;
   readonly embeddingProvider: EmbeddingProvider;
   readonly traceStore: RetrievalTraceStore;
+  readonly traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">;
 }): Promise<BuildContextForTaskResult> {
   const payload = buildContextForTaskInputSchema.parse(input.payload);
   const maxItems = payload.maxItems ?? defaultContextMaxItems;
@@ -34,6 +35,7 @@ export async function buildContextForTask(input: {
       table: input.table,
       embeddingProvider: input.embeddingProvider,
       traceStore: input.traceStore,
+      traceProvenance: input.traceProvenance,
     });
 
     const built = buildContextFromItems({
@@ -58,6 +60,7 @@ export async function buildContextForTask(input: {
     table: input.table,
     embeddingProvider: input.embeddingProvider,
     traceStore: input.traceStore,
+    traceProvenance: input.traceProvenance,
   });
 
   const seenIds = new Set(sessionResult.items.map((item) => item.id));
@@ -74,6 +77,7 @@ export async function buildContextForTask(input: {
       table: input.table,
       embeddingProvider: input.embeddingProvider,
       traceStore: input.traceStore,
+      traceProvenance: input.traceProvenance,
     });
 
     degraded = degraded || projectResult.degraded;

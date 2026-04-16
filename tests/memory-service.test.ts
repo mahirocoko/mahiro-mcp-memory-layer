@@ -652,7 +652,7 @@ describe("memory service core", () => {
     expect(result.items[0]?.content).toContain("keyword matches");
 
     const traceLines = (await readFile(fixture.traceFilePath, "utf8")).trim().split("\n");
-    const lastTrace = JSON.parse(traceLines.at(-1)!) as { degraded: boolean };
+    const lastTrace = JSON.parse(traceLines[traceLines.length - 1]!) as { degraded: boolean };
     expect(lastTrace.degraded).toBe(true);
   });
 
@@ -687,7 +687,7 @@ describe("memory service core", () => {
     expect(searchResult.items.length).toBeGreaterThan(0);
 
     const traceLines = (await readFile(fixture.traceFilePath, "utf8")).trim().split("\n");
-    const latestTrace = JSON.parse(traceLines.at(-1)!) as RetrievalTraceEntry;
+    const latestTrace = JSON.parse(traceLines[traceLines.length - 1]!) as RetrievalTraceEntry;
     const audit = await service.inspectMemoryRetrieval({});
 
     expect(audit).toEqual({
@@ -698,6 +698,65 @@ describe("memory service core", () => {
         hit: true,
         returnedCount: latestTrace.returnedMemoryIds.length,
         degraded: latestTrace.degraded,
+      },
+    });
+    expect(latestTrace.provenance).toEqual({
+      surface: "tool",
+      trigger: "search_memories",
+      phase: "search",
+      searchScope: "project",
+    });
+  });
+
+  it("threads explicit provenance through prepareHostTurnMemory traces", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await service.remember({
+      content: "We decided to inspect trace provenance in live plugin preflight.",
+      kind: "decision",
+      scope: "project",
+      userId: "mahiro",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      sessionId: "session-1",
+      source: { type: "manual" },
+    });
+
+    await service.prepareHostTurnMemory(
+      {
+        task: "Continue from the previous session and remember the earlier decision.",
+        mode: "query",
+        recentConversation: "Continue from the previous session and remember the earlier decision.",
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        sessionId: "session-1",
+      },
+      {
+        surface: "opencode-plugin",
+        trigger: "message.part.updated",
+        phase: "turn-preflight",
+      },
+    );
+
+    const audit = await service.inspectMemoryRetrieval({});
+
+    expect(audit).toMatchObject({
+      status: "found",
+      lookup: "latest",
+      trace: {
+        provenance: {
+          surface: "opencode-plugin",
+          trigger: "message.part.updated",
+          phase: expect.stringMatching(/turn-preflight|prepare-host-turn/),
+          searchScope: expect.any(String),
+        },
       },
     });
   });

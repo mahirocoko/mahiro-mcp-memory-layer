@@ -30,6 +30,7 @@ import type {
   PrepareTurnMemoryInput,
   PrepareTurnMemoryResult,
   RememberInput,
+  RetrievalTraceProvenance,
   SearchMemoriesInput,
   SearchMemoriesResult,
   SuggestMemoryCandidatesInput,
@@ -66,7 +67,7 @@ export class MemoryService {
     private readonly traceStore: RetrievalTraceStore,
   ) {
     this.facade = createMemoryFacade({
-      buildContext: (payload) => this.buildContext(payload),
+      buildContext: (payload, traceProvenance) => this.buildContext(payload, traceProvenance),
       applyConservativeMemoryPolicy: (payload) => this.applyConservativeMemoryPolicy(payload),
     });
   }
@@ -86,15 +87,30 @@ export class MemoryService {
       table: this.table,
       embeddingProvider: this.embeddingProvider,
       traceStore: this.traceStore,
+      traceProvenance: {
+        surface: "tool",
+        trigger: "search_memories",
+        phase: "search",
+      },
     });
   }
 
-  public buildContext(payload: BuildContextForTaskInput): Promise<BuildContextForTaskResult> {
+  public buildContext(
+    payload: BuildContextForTaskInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ): Promise<BuildContextForTaskResult> {
     return buildContextForTask({
       payload,
       table: this.table,
       embeddingProvider: this.embeddingProvider,
       traceStore: this.traceStore,
+      traceProvenance:
+        traceProvenance ??
+        {
+          surface: "tool",
+          trigger: "build_context_for_task",
+          phase: "build-context",
+        },
     });
   }
 
@@ -129,24 +145,47 @@ export class MemoryService {
   }
 
   /** Product alias for {@link prepareHostTurnMemory} (same schema and result). */
-  public prepareTurnMemory(payload: PrepareTurnMemoryInput): Promise<PrepareTurnMemoryResult> {
-    return this.prepareHostTurnMemory(payload);
+  public prepareTurnMemory(
+    payload: PrepareTurnMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ): Promise<PrepareTurnMemoryResult> {
+    return this.prepareHostTurnMemory(payload, traceProvenance);
   }
 
   /**
    * Wake-up: two `build_context_for_task` calls for the same scope — `mode: "profile"` and `mode: "recent"` — plus a
    * combined `wakeUpContext` string. Does not run suggestion or conservative policy.
    */
-  public async wakeUpMemory(payload: WakeUpMemoryInput): Promise<WakeUpMemoryResult> {
-    return this.facade.wakeUpMemory(payload);
+  public async wakeUpMemory(
+    payload: WakeUpMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ): Promise<WakeUpMemoryResult> {
+    return this.facade.wakeUpMemory(
+      payload,
+      traceProvenance ?? {
+        surface: "tool",
+        trigger: "wake_up_memory",
+        phase: "wake-up",
+      },
+    );
   }
 
   /**
    * Host one-call: `build_context_for_task` with suggestions on, then `apply_conservative_memory_policy` using that
    * snapshot (single heuristic pass). Conservative writes only for `strong_candidate` with complete scope ids.
    */
-  public async prepareHostTurnMemory(payload: PrepareHostTurnMemoryInput): Promise<PrepareHostTurnMemoryResult> {
-    return this.facade.prepareHostTurnMemory(payload);
+  public async prepareHostTurnMemory(
+    payload: PrepareHostTurnMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ): Promise<PrepareHostTurnMemoryResult> {
+    return this.facade.prepareHostTurnMemory(
+      payload,
+      traceProvenance ?? {
+        surface: "tool",
+        trigger: "prepare_host_turn_memory",
+        phase: "prepare-host-turn",
+      },
+    );
   }
 
   public reindex(): Promise<void> {

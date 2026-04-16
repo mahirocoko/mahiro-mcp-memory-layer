@@ -3,7 +3,14 @@ import { dedupeSearchItems } from "./dedupe.js";
 import { evaluateKeywordMatch, scoreCombined, scoreRecency, scoreVectorMatch, toSearchMemoryItem, weightsForMode } from "./rank.js";
 import type { EmbeddingProvider } from "../index/embedding-provider.js";
 import type { MemoryRecordsTable } from "../index/memory-records-table.js";
-import type { RetrievalRow, RetrievalTraceEntry, ScopeFilter, SearchMemoriesInput, SearchMemoriesResult } from "../types.js";
+import type {
+  RetrievalRow,
+  RetrievalTraceEntry,
+  RetrievalTraceProvenance,
+  ScopeFilter,
+  SearchMemoriesInput,
+  SearchMemoriesResult,
+} from "../types.js";
 import { newId } from "../../../lib/ids.js";
 import { nowIso, toTimestamp } from "../lib/time.js";
 
@@ -12,6 +19,7 @@ export async function runHybridSearch(input: {
   readonly filter: ScopeFilter;
   readonly table: MemoryRecordsTable;
   readonly embeddingProvider: EmbeddingProvider;
+  readonly traceProvenance?: RetrievalTraceProvenance;
 }): Promise<{ readonly result: SearchMemoriesResult; readonly trace: RetrievalTraceEntry }> {
   const limit = input.search.limit ?? defaultSearchLimit;
   const weights = weightsForMode(input.search.mode);
@@ -135,6 +143,7 @@ export async function runHybridSearch(input: {
     query: input.search.query,
     retrievalMode: input.search.mode,
     enforcedFilters: input.filter,
+    ...(input.traceProvenance ? { provenance: input.traceProvenance } : {}),
     returnedMemoryIds: items.map((item) => item.id),
     rankingReasonsById: Object.fromEntries(items.map((item) => [item.id, item.reasons])),
     contextSize: 0,

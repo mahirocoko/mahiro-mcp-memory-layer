@@ -11,27 +11,41 @@ import type {
   PrepareHostTurnMemoryResult,
   PrepareTurnMemoryInput,
   PrepareTurnMemoryResult,
+  RetrievalTraceProvenance,
   WakeUpMemoryInput,
   WakeUpMemoryResult,
 } from "./types.js";
 
 export interface MemoryFacade {
-  readonly wakeUpMemory: (payload: WakeUpMemoryInput) => Promise<WakeUpMemoryResult>;
+  readonly wakeUpMemory: (
+    payload: WakeUpMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ) => Promise<WakeUpMemoryResult>;
   readonly prepareHostTurnMemory: (
     payload: PrepareHostTurnMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
   ) => Promise<PrepareHostTurnMemoryResult>;
-  readonly prepareTurnMemory: (payload: PrepareTurnMemoryInput) => Promise<PrepareTurnMemoryResult>;
+  readonly prepareTurnMemory: (
+    payload: PrepareTurnMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ) => Promise<PrepareTurnMemoryResult>;
 }
 
 interface MemoryFacadeDependencies {
-  readonly buildContext: (payload: BuildContextForTaskInput) => Promise<BuildContextForTaskResult>;
+  readonly buildContext: (
+    payload: BuildContextForTaskInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ) => Promise<BuildContextForTaskResult>;
   readonly applyConservativeMemoryPolicy: (
     payload: ApplyConservativeMemoryPolicyInput,
   ) => Promise<ApplyConservativeMemoryPolicyResult>;
 }
 
 export function createMemoryFacade(dependencies: MemoryFacadeDependencies): MemoryFacade {
-  const wakeUpMemory = async (payload: WakeUpMemoryInput): Promise<WakeUpMemoryResult> => {
+  const wakeUpMemory = async (
+    payload: WakeUpMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+  ): Promise<WakeUpMemoryResult> => {
     const parsed = wakeUpMemoryInputSchema.parse(payload);
     const base = {
       userId: parsed.userId,
@@ -46,12 +60,12 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
         ...base,
         task: "Summarize stable user and project context for session startup.",
         mode: "profile",
-      }),
+      }, buildTracePhase(traceProvenance, "wake-up-profile")),
       dependencies.buildContext({
         ...base,
         task: "Summarize recent user and project activity for session startup.",
         mode: "recent",
-      }),
+      }, buildTracePhase(traceProvenance, "wake-up-recent")),
     ]);
     const wakeUpContext = `${profile.context}\n\n---\n\n${recent.context}`;
 
@@ -66,6 +80,7 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
 
   const prepareHostTurnMemory = async (
     payload: PrepareHostTurnMemoryInput,
+    traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
   ): Promise<PrepareHostTurnMemoryResult> => {
     const parsed = prepareHostTurnMemoryInputSchema.parse(payload);
     const buildPayload: BuildContextForTaskInput = {
@@ -81,7 +96,10 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
       recentConversation: parsed.recentConversation,
       suggestionMaxCandidates: parsed.suggestionMaxCandidates,
     };
-    const built = await dependencies.buildContext(buildPayload);
+    const built = await dependencies.buildContext(
+      buildPayload,
+      buildTracePhase(traceProvenance, traceProvenance?.phase ?? "prepare-host-turn"),
+    );
     const memorySuggestions = built.memorySuggestions;
 
     if (!memorySuggestions) {
@@ -110,9 +128,30 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
     };
   };
 
+    return {
+      wakeUpMemory,
+      prepareHostTurnMemory,
+      prepareTurnMemory: (
+        payload: PrepareTurnMemoryInput,
+        traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">,
+      ) =>
+        prepareHostTurnMemory(
+          payload,
+          buildTracePhase(traceProvenance, traceProvenance?.phase ?? "prepare-turn"),
+        ),
+    };
+}
+
+function buildTracePhase(
+  traceProvenance: Omit<RetrievalTraceProvenance, "searchScope"> | undefined,
+  phase: string,
+): Omit<RetrievalTraceProvenance, "searchScope"> | undefined {
+  if (!traceProvenance) {
+    return undefined;
+  }
+
   return {
-    wakeUpMemory,
-    prepareHostTurnMemory,
-    prepareTurnMemory: (payload: PrepareTurnMemoryInput) => prepareHostTurnMemory(payload),
+    ...traceProvenance,
+    phase,
   };
 }

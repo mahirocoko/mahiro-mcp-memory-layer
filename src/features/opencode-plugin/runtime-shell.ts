@@ -154,6 +154,10 @@ export function createOpenCodePluginRuntime(
         projectId: wakeUpScope.projectId,
         containerId: wakeUpScope.containerId,
         sessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
+      }, {
+        surface: "opencode-plugin",
+        trigger: "session-start",
+        phase: "wake-up",
       }),
     );
 
@@ -258,6 +262,7 @@ export function createOpenCodePluginRuntime(
     scheduledVersion: number,
     recentConversation: string,
     timer: ReturnType<typeof setTimeout>,
+    trigger: "message.updated" | "message.part.updated",
   ): Promise<void> => {
     const currentSessionState = runtimeState.sessions.get(sessionId);
 
@@ -284,6 +289,10 @@ export function createOpenCodePluginRuntime(
         projectId: scope.projectId,
         containerId: scope.containerId,
         sessionId: scope.sessionId ?? sessionId,
+      }, {
+        surface: "opencode-plugin",
+        trigger,
+        phase: "turn-preflight",
       });
       const latestSessionState = runtimeState.sessions.get(sessionId);
 
@@ -332,6 +341,7 @@ export function createOpenCodePluginRuntime(
         sessionState.messageVersion,
         recentConversation,
         timer,
+        event.type === "message.part.updated" ? "message.part.updated" : "message.updated",
       );
     }, sessionState.messageDebounceMs);
 
@@ -394,6 +404,10 @@ export function createOpenCodePluginRuntime(
           projectId: scope.projectId,
           containerId: scope.containerId,
           sessionId: scope.sessionId ?? sessionState.sessionId,
+        }, {
+          surface: "opencode-plugin",
+          trigger: event.type === "session.idle" ? "session.idle" : "session.idle:event",
+          phase: "host-turn-persistence",
         }),
       )
       .then((prepareHostTurn) => {

@@ -328,14 +328,14 @@ describe("OpenCode plugin package", () => {
             },
           },
           $: vi.fn(),
-        },
+        } as unknown as PluginInput,
         {
           __test: {
             memory: sharedMemoryBackend,
             messageDebounceMs: 0,
             standaloneMcpAvailable: false,
           },
-        },
+        } as unknown as Record<string, unknown>,
       );
 
       await pluginHooks["session.created"]({ event: createSessionCreatedEvent() });
@@ -356,6 +356,10 @@ describe("OpenCode plugin package", () => {
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
         sessionId: "session-1",
+      }, {
+        surface: "opencode-plugin",
+        trigger: "session-start",
+        phase: "wake-up",
       });
       expect(sharedMemoryBackend.prepareTurnMemory).toHaveBeenCalledWith({
         task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -365,6 +369,10 @@ describe("OpenCode plugin package", () => {
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
         sessionId: "session-1",
+      }, {
+        surface: "opencode-plugin",
+        trigger: "message.updated",
+        phase: "turn-preflight",
       });
       expect(sharedMemoryBackend.prepareHostTurnMemory).toHaveBeenCalledWith({
         task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -374,6 +382,10 @@ describe("OpenCode plugin package", () => {
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
         sessionId: "session-1",
+      }, {
+        surface: "opencode-plugin",
+        trigger: "session.idle",
+        phase: "host-turn-persistence",
       });
       expect(pluginResult).toMatchObject({
         status: "ready",

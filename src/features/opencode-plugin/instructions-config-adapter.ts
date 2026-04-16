@@ -5,7 +5,14 @@ import type { Config } from "@opencode-ai/plugin";
 
 const packagedMcpUsageInstructionPath = fileURLToPath(new URL("../../../MCP_USAGE.md", import.meta.url));
 const packagedOrchestrationInstructionPath = fileURLToPath(new URL("../../../ORCHESTRATION.md", import.meta.url));
-const packagedInstructionPaths = [packagedMcpUsageInstructionPath, packagedOrchestrationInstructionPath];
+const packagedContinuityDebuggingInstructionPath = fileURLToPath(
+  new URL("../../../CONTINUITY_DEBUGGING.md", import.meta.url),
+);
+const packagedInstructionPaths = [
+  packagedMcpUsageInstructionPath,
+  packagedOrchestrationInstructionPath,
+  packagedContinuityDebuggingInstructionPath,
+];
 
 export async function applyOpenCodePluginInstructionsConfig(config: Config): Promise<void> {
   const availablePackagedInstructionPaths = await getAvailablePackagedInstructionPaths();
