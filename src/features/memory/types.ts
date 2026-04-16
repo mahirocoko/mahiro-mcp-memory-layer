@@ -267,6 +267,16 @@ export interface RetrievalTraceEntry {
 
 export interface InspectMemoryRetrievalInput {
   readonly requestId?: string;
+  /**
+   * Internal/plugin-side hint for resolving the latest retrieval trace relative to a live scope
+   * instead of the global latest trace across every workspace.
+   */
+  readonly latestScopeFilter?: {
+    readonly userId?: string;
+    readonly projectId?: string;
+    readonly containerId?: string;
+    readonly sessionId?: string;
+  };
 }
 
 export interface InspectMemoryRetrievalFoundResult {

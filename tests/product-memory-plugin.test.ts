@@ -600,6 +600,32 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("scopes inspect_memory_retrieval latest lookups to the active session worktree on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-trace") });
+    await flushMicrotasks();
+
+    await harness.hooks.tool?.inspect_memory_retrieval?.execute?.(
+      {},
+      {
+        sessionID: "session-trace",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    expect(harness.memory.inspectMemoryRetrieval).toHaveBeenCalledWith({
+      latestScopeFilter: {
+        userId: expectedLocalUserId,
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        sessionId: "session-trace",
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("runs session-start wake-up once per new session across generic and dedicated hooks", async () => {
     const harness = await createPluginHarness();
 

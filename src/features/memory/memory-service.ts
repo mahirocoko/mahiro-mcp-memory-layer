@@ -201,6 +201,8 @@ export class MemoryService {
   ): Promise<InspectMemoryRetrievalResult> {
     const trace = payload.requestId
       ? await this.traceStore.readByRequestId(payload.requestId)
+      : payload.latestScopeFilter
+        ? await this.traceStore.readLatestMatching(payload.latestScopeFilter)
       : await this.traceStore.readLatest();
 
     if (!trace) {

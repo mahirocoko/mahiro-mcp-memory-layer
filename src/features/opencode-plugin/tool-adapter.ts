@@ -14,7 +14,13 @@ export function createOpenCodePluginTools(
       {
         description: tool.description,
         args: tool.inputSchema,
-        execute: async (args: Record<string, unknown>) => {
+        execute: async (args: Record<string, unknown>, toolContext: Record<string, unknown>) => {
+          if (tool.name === "inspect_memory_retrieval") {
+            return serializeOpenCodeToolResult(
+              await runtime.inspectMemoryRetrieval(args, toolContext),
+            );
+          }
+
           const backend = await runtime.ensureBackend();
           return serializeOpenCodeToolResult(await tool.execute(backend, args));
         },

@@ -761,6 +761,93 @@ describe("memory service core", () => {
     });
   });
 
+  it("inspects the latest retrieval trace for a matching live scope instead of the global latest", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await service.remember({
+      content: "Repo-local session memory.",
+      kind: "decision",
+      scope: "session",
+      userId: "mahiro",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "worktree:/repo-a",
+      sessionId: "session-a",
+      source: { type: "manual" },
+    });
+
+    await service.remember({
+      content: "Different workspace memory.",
+      kind: "decision",
+      scope: "session",
+      userId: "mahiro",
+      projectId: "other-project",
+      containerId: "worktree:/repo-b",
+      sessionId: "session-b",
+      source: { type: "manual" },
+    });
+
+    await service.prepareHostTurnMemory(
+      {
+        task: "Continue from the previous session in repo A.",
+        mode: "query",
+        recentConversation: "Continue from the previous session in repo A.",
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "worktree:/repo-a",
+        sessionId: "session-a",
+      },
+      {
+        surface: "opencode-plugin",
+        trigger: "message.part.updated",
+        phase: "turn-preflight",
+      },
+    );
+
+    await service.prepareHostTurnMemory(
+      {
+        task: "Continue from the previous session in repo B.",
+        mode: "query",
+        recentConversation: "Continue from the previous session in repo B.",
+        userId: "mahiro",
+        projectId: "other-project",
+        containerId: "worktree:/repo-b",
+        sessionId: "session-b",
+      },
+      {
+        surface: "opencode-plugin",
+        trigger: "message.part.updated",
+        phase: "turn-preflight",
+      },
+    );
+
+    const audit = await service.inspectMemoryRetrieval({
+      latestScopeFilter: {
+        userId: "mahiro",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "worktree:/repo-a",
+        sessionId: "session-a",
+      },
+    });
+
+    expect(audit).toMatchObject({
+      status: "found",
+      lookup: "latest",
+      trace: {
+        enforcedFilters: {
+          userId: "mahiro",
+          projectId: "mahiro-mcp-memory-layer",
+          containerId: "worktree:/repo-a",
+        },
+      },
+    });
+  });
+
   it("returns empty when requestId lookup does not exist", async () => {
     const fixture = await createFixture();
     const service = new MemoryService(

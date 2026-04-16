@@ -86,6 +86,10 @@ export interface OpenCodePluginRuntime {
   readonly readMemoryContext: (
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<OpenCodePluginMemoryContextResult>;
+  readonly inspectMemoryRetrieval: (
+    args: Record<string, unknown>,
+    context: OpenCodePluginToolExecutionContext,
+  ) => Promise<unknown>;
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
 }
 
@@ -490,6 +494,38 @@ export function createOpenCodePluginRuntime(
           resolveSessionIdFromUnknown(toolContext.properties);
 
       return buildMemoryContextResult(runtimeState, sessionId);
+    },
+    inspectMemoryRetrieval: async (args, toolContext) => {
+      const backend = await getOpenCodePluginMemoryBackend(options.__test);
+      const requestId = typeof args.requestId === "string" ? args.requestId.trim() : undefined;
+
+      if (requestId) {
+        return backend.inspectMemoryRetrieval({ requestId });
+      }
+
+      const sessionId =
+        resolveSessionIdFromUnknown(toolContext) ??
+        resolveSessionIdFromUnknown(toolContext.properties);
+
+      if (!sessionId) {
+        return backend.inspectMemoryRetrieval({});
+      }
+
+      const sessionState = runtimeState.sessions.get(sessionId);
+      const scope = sessionState?.scopeResolution.scope;
+
+      if (!scope) {
+        return backend.inspectMemoryRetrieval({});
+      }
+
+      return backend.inspectMemoryRetrieval({
+        latestScopeFilter: {
+          userId: scope.userId,
+          projectId: scope.projectId,
+          containerId: scope.containerId,
+          sessionId: scope.sessionId,
+        },
+      });
     },
     readRuntimeCapabilities: () => runtimeCapabilitiesPromise,
   };
