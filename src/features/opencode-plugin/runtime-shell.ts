@@ -504,6 +504,8 @@ const defaultMemoryPreflightTask =
 const continuityMemoryPreflightTask =
   "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.";
 
+const continuityTaskExcerptMaxChars = 160;
+
 const smallTalkPattern =
   /^(hi|hello|hey|thanks|thank you|thx|ok|okay|cool|nice|great|awesome|test|ping|yo|how are you)([!.?\s]+)?$/i;
 
@@ -530,7 +532,7 @@ function resolveMemoryPreflightRouting(recentConversation: string): MemoryPrefli
   if (continuitySignalPattern.test(normalizedConversation)) {
     return {
       shouldRun: true,
-      task: continuityMemoryPreflightTask,
+      task: buildContinuityMemoryPreflightTask(normalizedConversation),
     };
   }
 
@@ -545,6 +547,16 @@ function resolveMemoryPreflightRouting(recentConversation: string): MemoryPrefli
     shouldRun: true,
     task: defaultMemoryPreflightTask,
   };
+}
+
+function buildContinuityMemoryPreflightTask(recentConversation: string): string {
+  const normalizedConversation = recentConversation.replace(/\s+/g, " ").trim();
+
+  if (normalizedConversation.length <= continuityTaskExcerptMaxChars) {
+    return `${continuityMemoryPreflightTask} Focus on this live turn: ${normalizedConversation}`;
+  }
+
+  return `${continuityMemoryPreflightTask} Focus on this live turn: ${normalizedConversation.slice(0, continuityTaskExcerptMaxChars).trimEnd()}…`;
 }
 
 export function resetOpenCodePluginMemoryBackendSingletonForTests(): void {

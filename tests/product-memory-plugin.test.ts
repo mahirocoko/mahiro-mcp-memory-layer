@@ -841,7 +841,7 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.prepareTurnMemory).toHaveBeenCalledWith({
       task:
-        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn. Focus on this live turn: Continue from the previous orchestration debugging session and recall what we decided earlier.",
       mode: "query",
       recentConversation:
         "Continue from the previous orchestration debugging session and recall what we decided earlier.",
@@ -873,7 +873,7 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.prepareTurnMemory).toHaveBeenCalledWith({
       task:
-        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn. Focus on this live turn: Continue from the previous session and compare it with what we decided earlier.",
       mode: "query",
       recentConversation: "Continue from the previous session and compare it with what we decided earlier.",
       projectId: "mahiro-mcp-memory-layer",
@@ -1237,7 +1237,7 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(prepareHostTurnMemory).toHaveBeenCalledWith({
       task:
-        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn.",
+        "Summarize relevant memory context, prior decisions, and earlier work that help continue the latest OpenCode turn. Focus on this live turn: Resume from the previous session and remember the project context before we continue.",
       mode: "query",
       recentConversation:
         "Resume from the previous session and remember the project context before we continue.",
