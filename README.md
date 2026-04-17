@@ -92,9 +92,9 @@ Manual MCP fallback:
 bun install
 bun run dev
 agent -p --model composer-2 --output-format json "Review this diff"
-bun run gemini -- --model gemini-3-flash "Summarize this repo"
-echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
-echo '{"taskId":"task-1","prompt":"Summarize this repo","model":"gemini-3-flash"}' | bun run gemini-worker
+bun run gemini -- --model gemini-3-flash-preview "Summarize this repo"
+echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
+echo '{"taskId":"task-1","prompt":"Summarize this repo","model":"gemini-3-flash-preview"}' | bun run gemini-worker
 bun run typecheck
 bun run test
 bun run reindex
@@ -346,8 +346,9 @@ Result shape includes:
 Model selection:
 
 - `--model` is required on every invocation
-- `gemini-3-flash` -> lighter visual/exploration/extraction work
-- `gemini-3.1-pro` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+- `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
+- `gemini-3-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+- `gemini-2.5-flash` / `gemini-2.5-pro` -> stable fallback lanes
 
 Use Gemini when you intentionally want the Gemini family for:
 
@@ -378,12 +379,12 @@ Caching:
 - cache version mismatches invalidate old entries automatically
 
 ```bash
-bun run gemini -- --model gemini-3-flash "Summarize this repo"
-bun run gemini -- --model gemini-3.1-pro "Review this architecture and propose tradeoffs"
-bun run gemini -- --model gemini-3-flash --task summarize "Summarize the latest meeting notes"
-bun run gemini -- --model gemini-3-flash --task timeline "Summarize the project timeline from these notes"
-bun run gemini -- --model gemini-3.1-pro --timeout-ms 30000 --cwd /path/to/project "Review the current diff"
-bun run gemini -- --model gemini-3.1-pro --approval-mode plan --allowed-mcp-server-names none "Draft a grounded UI patch"
+bun run gemini -- --model gemini-3-flash-preview "Summarize this repo"
+bun run gemini -- --model gemini-3-pro-preview "Review this architecture and propose tradeoffs"
+bun run gemini -- --model gemini-3-flash-preview --task summarize "Summarize the latest meeting notes"
+bun run gemini -- --model gemini-3-flash-preview --task timeline "Summarize the project timeline from these notes"
+bun run gemini -- --model gemini-3-pro-preview --timeout-ms 30000 --cwd /path/to/project "Review the current diff"
+bun run gemini -- --model gemini-3-pro-preview --approval-mode plan --allowed-mcp-server-names none "Draft a grounded UI patch"
 ```
 
 ## Gemini worker
@@ -400,7 +401,7 @@ Input shape:
 {
   "taskId": "task-1",
   "prompt": "Summarize this repo",
-  "model": "gemini-3-flash",
+  "model": "gemini-3-flash-preview",
   "approvalMode": "plan",
   "allowedMcpServerNames": "none",
   "binaryPath": "/usr/local/bin/gemini",
@@ -449,7 +450,7 @@ This section documents the command shapes. `ORCHESTRATION.md` defines the orches
 - **Unsafe:** Gemini extracts facts → you use those facts to write the Cursor prompt.
 
 ```bash
-bun run gemini -- --model gemini-3.1-pro --cwd /path/to/repo "Design the new frontend surface" &
+bun run gemini -- --model gemini-3-pro-preview --cwd /path/to/repo "Design the new frontend surface" &
 agent -p --model composer-2 --output-format json "Review the unrelated backend diff" &
 wait
 ```
@@ -520,7 +521,7 @@ Worker runtime (Cursor / Gemini):
 Parallel example:
 
 ```bash
-echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
 ```
 
 Parallel trust-default example:
@@ -532,7 +533,7 @@ echo '{"mode":"parallel","defaultTrust":false,"jobs":[{"kind":"cursor","input":{
 Parallel runtime-selection example:
 
 ```bash
-echo '{"mode":"parallel","jobs":[{"kind":"gemini","workerRuntime":"mcp","input":{"prompt":"Summarize this repo","model":"gemini-3-flash"}},{"kind":"cursor","workerRuntime":"shell","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"parallel","jobs":[{"kind":"gemini","workerRuntime":"mcp","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}},{"kind":"cursor","workerRuntime":"shell","input":{"prompt":"Review this diff","model":"composer-2"}}]}' | bun run orchestrate -- --file -
 ```
 
 Example result shape:
@@ -548,7 +549,7 @@ Example result shape:
       "input": {
         "taskId": "gemini_123",
         "prompt": "Summarize this repo.",
-        "model": "gemini-3-flash"
+        "model": "gemini-3-flash-preview"
       },
       "result": {
         "status": "completed"
@@ -591,13 +592,13 @@ Timeout behavior:
 Sequential example:
 
 ```bash
-echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Plan the next improvement from that summary","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Plan the next improvement from that summary","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
 ```
 
 Sequential interpolation example:
 
 ```bash
-echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Given this summary: {{last.result.response}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Given this summary: {{last.result.response}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
 ```
 
 Sequential failure control:
@@ -611,19 +612,19 @@ Sequential failure control:
 Stop-on-failure example:
 
 ```bash
-echo '{"mode":"sequential","steps":[{"kind":"cursor","continueOnFailure":false,"input":{"prompt":"Review this diff","model":"composer-2"}},{"kind":"gemini","input":{"prompt":"This only runs if the first step completed","model":"gemini-3-flash"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"sequential","steps":[{"kind":"cursor","continueOnFailure":false,"input":{"prompt":"Review this diff","model":"composer-2"}},{"kind":"gemini","input":{"prompt":"This only runs if the first step completed","model":"gemini-3-flash-preview"}}]}' | bun run orchestrate -- --file -
 ```
 
 Retry example:
 
 ```bash
-echo '{"mode":"parallel","jobs":[{"kind":"gemini","retries":2,"retryDelayMs":500,"input":{"prompt":"Summarize this repo","model":"gemini-3-flash"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"parallel","jobs":[{"kind":"gemini","retries":2,"retryDelayMs":500,"input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}}]}' | bun run orchestrate -- --file -
 ```
 
 Dry-run example:
 
 ```bash
-echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Given this summary: {{last.result.response}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file - --dry-run
+echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Given this summary: {{last.result.response}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file - --dry-run
 ```
 
 Interpolation helpers:
@@ -634,7 +635,7 @@ Interpolation helpers:
 Helper example:
 
 ```bash
-echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash"}},{"kind":"cursor","input":{"prompt":"Summary: {{default(last.result.response, "missing")}} Raw: {{json(default(last.result.raw, last.result.response))}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
+echo '{"mode":"sequential","steps":[{"kind":"gemini","input":{"prompt":"Summarize the retrieval module","model":"gemini-3-flash-preview"}},{"kind":"cursor","input":{"prompt":"Summary: {{default(last.result.response, "missing")}} Raw: {{json(default(last.result.raw, last.result.response))}}","model":"claude-opus-4-7-high","mode":"plan"}}]}' | bun run orchestrate -- --file -
 ```
 
 MCP tool:
@@ -672,7 +673,7 @@ Async MCP workflow example:
         "workerRuntime": "mcp",
         "input": {
           "prompt": "Summarize the review findings in one paragraph.",
-          "model": "gemini-3.1-pro",
+          "model": "gemini-3-pro-preview",
           "taskKind": "summarize"
         }
       }
@@ -747,7 +748,7 @@ Gemini async MCP example:
 {
   "taskId": "gemini-task-1",
   "prompt": "Summarize this repo",
-  "model": "gemini-3-flash",
+  "model": "gemini-3-flash-preview",
   "approvalMode": "plan",
   "allowedMcpServerNames": "none",
   "retries": 2,
@@ -884,7 +885,7 @@ Common inspection flow:
 Concrete example:
 
 ```bash
-RESULT=$(echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash"}}]}' | bun run orchestrate -- --file -)
+RESULT=$(echo '{"mode":"parallel","jobs":[{"kind":"gemini","input":{"prompt":"Summarize this repo","model":"gemini-3-flash-preview"}}]}' | bun run orchestrate -- --file -)
 REQUEST_ID=$(printf '%s' "$RESULT" | jq -r '.requestId')
 bun run list-orchestration-traces -- --format detail --request-id "$REQUEST_ID"
 ```

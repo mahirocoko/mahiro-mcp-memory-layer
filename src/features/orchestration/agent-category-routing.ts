@@ -39,11 +39,11 @@ interface AgentTaskRoutePreset {
 const defaultAgentTaskRoutePresets: Record<AgentTaskCategory, AgentTaskRoutePreset> = {
   "visual-engineering": {
     workerKind: "gemini",
-    preferredModels: ["gemini-3.1-pro", "gemini-3-flash"],
+    preferredModels: ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
   },
   artistry: {
     workerKind: "gemini",
-    preferredModels: ["gemini-3-flash", "gemini-3.1-pro"],
+    preferredModels: ["gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
   },
   ultrabrain: {
     workerKind: "cursor",
@@ -277,9 +277,9 @@ function resolvePreferredEscalatedModels(
     return [];
   }
 
-  if (currentModel === "gemini-3-flash") {
+  if (currentModel === "gemini-3-flash-preview") {
     if (signals.requiresHigherQualityGemini || signals.verificationRisk || signals.uncertaintyLevel === "high") {
-      return ["gemini-3.1-pro", currentModel];
+      return ["gemini-3-pro-preview", "gemini-2.5-pro", currentModel, "gemini-2.5-flash"];
     }
   }
 
@@ -313,7 +313,7 @@ function buildEscalationReason(
     }
   }
 
-  if (currentModel === "gemini-3-flash") {
+  if (currentModel === "gemini-3-flash-preview") {
     if (signals.requiresHigherQualityGemini) {
       return "higher_quality_gemini_escalation";
     }

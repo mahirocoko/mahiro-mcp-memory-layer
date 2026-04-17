@@ -135,7 +135,7 @@ For workflow composition:
 - Strict delegate-first posture: implementation, review, refactor, planning, and multi-file analysis should go to a worker first.
 - Local execution is reserved for the narrow escape hatch plus verification, orchestration wiring, and final synthesis.
 - Gemini and Cursor-family workers can both run in parallel when their subtasks are independent.
-- Gemini is the default family for visual-engineering, frontend/artistry work, and alternative reasoning with `gemini-3-flash` or `gemini-3.1-pro`.
+- Gemini is the default family for visual-engineering, frontend/artistry work, and alternative reasoning with `gemini-3-flash-preview` or `gemini-3-pro-preview`, with `gemini-2.5-flash` / `gemini-2.5-pro` as stable fallback lanes.
 - Cursor-family `agent` is the default family for most codebase execution work, with `composer-2` as the primary default in this repo.
 - Avoid `claude-4.6-sonnet-medium` as a primary lane in this repo; keep it as fallback-only for explicit requests or compatibility constraints.
 
@@ -143,8 +143,8 @@ For workflow composition:
 
 | Task shape | Primary worker | Default model | Verification | Notes |
 | --- | --- | --- | --- | --- |
-| Visual/frontend execution, visual-engineering, artistry | Gemini | `gemini-3.1-pro` | run checks plus visual/behavior spot-checks | default family for design-led work |
-| Lightweight visual passes, extraction, or alternate reasoning | Gemini | `gemini-3-flash` | spot-check key claims | lighter Gemini path |
+| Visual/frontend execution, visual-engineering, artistry | Gemini | `gemini-3-pro-preview` | run checks plus visual/behavior spot-checks | default family for design-led work |
+| Lightweight visual passes, extraction, or alternate reasoning | Gemini | `gemini-3-flash-preview` | spot-check key claims | lighter Gemini path |
 | Standard implementation, review, refactor, and execution | Cursor-family `agent` | `composer-2` | run typecheck/tests and inspect touched files | default coding worker |
 | Harder implementation, review, or refactor | Cursor-family `agent` | `composer-2` | targeted diff review plus typecheck/tests | stay on `composer-2` first; escalate only with a concrete reason |
 | Complex planning, Opus validation, or very hard execution | Cursor-family `agent` | `claude-opus-4-7-high` | verify against repo constraints | planner with the orchestrator, and escalate to thinking-high when deep reasoning quality is the real bottleneck |
@@ -156,7 +156,7 @@ Frontend tasks split into two shapes:
 **Design-led**: visual layout, styling, component scaffolding, and small static UI work.
 
 - Do directly when the scope is small and the pattern is clear.
-- Delegate to Gemini when you intentionally want `gemini-3-flash` or `gemini-3.1-pro` for visual/frontend execution.
+- Delegate to Gemini when you intentionally want `gemini-3-flash-preview` or `gemini-3-pro-preview` for visual/frontend execution.
 - Treat Gemini as an execution worker here, not just a summarizer or critic.
 - Do not over-orchestrate trivial frontend scaffolding.
 
@@ -188,7 +188,7 @@ If the user explicitly asks for Opus, planning, or an Opus-level validation pass
 
 ## Worker Usage Patterns
 
-Use Gemini when intentionally selecting `gemini-3-flash` or `gemini-3.1-pro`.
+Use Gemini when intentionally selecting `gemini-3-flash-preview` or `gemini-3-pro-preview`.
 
 Common reasons to choose Gemini:
 
@@ -202,8 +202,9 @@ Common reasons to choose Gemini:
 
 Recommended model ladder:
 
-- `gemini-3-flash` -> lighter visual/exploration/extraction work
-- `gemini-3.1-pro` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+- `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
+- `gemini-3-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+- `gemini-2.5-flash` / `gemini-2.5-pro` -> stable fallback lanes when preview lanes are unavailable
 
 Use the Cursor-family `agent` headless path for applied coding work:
 
@@ -288,5 +289,5 @@ If a requested model cannot be used, say so and choose the nearest justified fal
 
 Planning passes that are explicitly requested as Opus-level planning or validation must use `claude-opus-4-7-high`.
 
-- Gemini examples: `gemini-3-flash`, `gemini-3.1-pro`
+- Gemini examples: `gemini-3-flash-preview`, `gemini-3-pro-preview`, with `gemini-2.5-flash` / `gemini-2.5-pro` as stable fallbacks
 - Cursor examples: `composer-2`, `claude-opus-4-7-high`, `claude-opus-4-7-thinking-high` with Sonnet/older Opus as fallback-only

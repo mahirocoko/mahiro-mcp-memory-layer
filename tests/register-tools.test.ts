@@ -30,7 +30,7 @@ vi.mock("../src/features/orchestration/runtime-model-inventory.js", () => ({
     source: "live",
     fetchedAt: "2026-04-17T13:47:00.000Z",
     cursor: {
-      models: ["composer-2", "claude-opus-4-7-high", "gemini-3-flash", "gemini-3.1-pro"],
+      models: ["composer-2", "claude-opus-4-7-high", "gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
       modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
       supportsPrint: true,
       supportsCloud: true,

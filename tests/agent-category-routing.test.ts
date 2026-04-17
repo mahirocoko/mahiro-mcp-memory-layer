@@ -11,7 +11,7 @@ const sampleRuntimeModelInventory: RuntimeModelInventorySnapshot = {
   source: "live",
   fetchedAt: "2026-04-17T13:47:00.000Z",
   cursor: {
-    models: ["composer-2", "claude-opus-4-7-high", "claude-opus-4-7-thinking-high", "gemini-3-flash", "gemini-3.1-pro"],
+    models: ["composer-2", "claude-opus-4-7-high", "claude-opus-4-7-thinking-high", "gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
     modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
     supportsPrint: true,
     supportsCloud: true,
@@ -23,7 +23,7 @@ const fallbackOnlyRuntimeModelInventory: RuntimeModelInventorySnapshot = {
   source: "live",
   fetchedAt: "2026-04-17T13:47:00.000Z",
   cursor: {
-    models: ["composer-2", "claude-4.6-sonnet-medium", "claude-4.6-opus-high", "gemini-3.1-pro"],
+    models: ["composer-2", "claude-4.6-sonnet-medium", "claude-4.6-opus-high", "gemini-2.5-pro", "gemini-2.5-flash"],
     modes: ["agent", "plan", "ask", "print"],
     supportsPrint: true,
     supportsCloud: false,
@@ -36,7 +36,7 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "visual-engineering" })).toEqual({
       category: "visual-engineering",
       workerKind: "gemini",
-      model: "gemini-3.1-pro",
+      model: "gemini-3-pro-preview",
       reason: "default_visual-engineering_lane",
     });
   });
@@ -69,7 +69,7 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "artistry" })).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3-flash",
+      model: "gemini-3-flash-preview",
       reason: "default_artistry_lane",
     });
   });
@@ -93,13 +93,13 @@ describe("resolveAgentTaskRoute", () => {
     expect(
       resolveAgentTaskRoute({
         category: "artistry",
-        model: "gemini-3-flash",
+        model: "gemini-3-flash-preview",
         workerRuntime: "mcp",
       }),
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3-flash",
+      model: "gemini-3-flash-preview",
       reason: "explicit_model_override",
       workerRuntime: "mcp",
     });
@@ -160,7 +160,7 @@ describe("resolveAgentTaskRoute", () => {
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3.1-pro",
+      model: "gemini-2.5-flash",
       reason: "runtime_fallback_missing_primary_model",
     });
   });
@@ -186,7 +186,7 @@ describe("buildAgentTaskWorkerJob", () => {
       input: {
         taskId: "ui-task",
         prompt: "Design the sidebar.",
-        model: "gemini-3.1-pro",
+        model: "gemini-3-pro-preview",
         cwd: "/repo",
         timeoutMs: 30_000,
         taskKind: "general",
@@ -340,7 +340,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
     expect(
       resolveEscalatedAgentTaskRoute({
         category: "artistry",
-        currentModel: "gemini-3-flash",
+        currentModel: "gemini-3-flash-preview",
         signals: {
           requiresHigherQualityGemini: true,
         },
@@ -349,7 +349,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3.1-pro",
+      model: "gemini-3-pro-preview",
       reason: "higher_quality_gemini_escalation",
     });
   });

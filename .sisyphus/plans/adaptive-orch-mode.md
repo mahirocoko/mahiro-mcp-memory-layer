@@ -7,8 +7,9 @@
 > - Cursor hard escalation: `claude-opus-4-7-high`
 > - Cursor deep reasoning lane: `claude-opus-4-7-thinking-high`
 > - Cursor fallback-only: `claude-4.6-sonnet-medium`, `claude-4.6-opus-*`
-> - Gemini fast lane: `gemini-3-flash`
-> - Gemini strong lane: `gemini-3.1-pro`
+> - Gemini fast lane: `gemini-3-flash-preview`
+> - Gemini strong lane: `gemini-3-pro-preview`
+> - Gemini stable fallback lanes: `gemini-2.5-flash`, `gemini-2.5-pro`
 > **Rule**: Runtime truth first (`agent models`, CLI help, `runtime_capabilities`), docs second for positioning and caveats.
 
 ## Goals
@@ -78,7 +79,7 @@ These should not appear as primary lanes in the operator-facing matrix.
 
 ### Gemini lanes
 
-#### `gemini-3-flash`
+#### `gemini-3-flash-preview`
 Use for:
 - fast exploration
 - extraction
@@ -86,7 +87,7 @@ Use for:
 - quick parallel research
 - lightweight visual passes
 
-#### `gemini-3.1-pro`
+#### `gemini-3-pro-preview`
 Use for:
 - stronger visual / frontend / artistry work
 - harder Gemini reasoning
@@ -119,8 +120,8 @@ Adaptive orch-mode should treat **headless mode** as the default execution primi
 | routine code implementation/review/refactor | Cursor | `composer-2` |
 | hardest planning / architecture / final high-risk validation | Cursor | `claude-opus-4-7-high` |
 | deep reasoning / ambiguous debugging | Cursor | `claude-opus-4-7-thinking-high` |
-| fast exploration / extraction / summarization | Gemini | `gemini-3-flash` |
-| strong visual / design-led / artistry work | Gemini | `gemini-3.1-pro` |
+| fast exploration / extraction / summarization | Gemini | `gemini-3-flash-preview` |
+| strong visual / design-led / artistry work | Gemini | `gemini-3-pro-preview` |
 
 ### 2. Escalation policy
 
@@ -134,7 +135,7 @@ Escalate from `claude-opus-4-7-high` to `claude-opus-4-7-thinking-high` when:
 - the hard part is reasoning quality, not just difficulty
 - the problem is ambiguous and layered rather than broad and operational
 
-Escalate from `gemini-3-flash` to `gemini-3.1-pro` when:
+Escalate from `gemini-3-flash-preview` to `gemini-3-pro-preview` when:
 - the work is visual/design-led and quality matters
 - comparative reasoning or stronger synthesis is needed
 
