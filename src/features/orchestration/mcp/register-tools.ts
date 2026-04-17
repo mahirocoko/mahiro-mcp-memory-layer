@@ -25,6 +25,12 @@ const getOrchestrationResultInputSchema = z.object({
     .regex(WORKFLOW_REQUEST_ID_PATTERN, "requestId must be the workflow_* id returned by orchestrate_workflow"),
 });
 
+const ORCHESTRATION_RUNNING_WARNING =
+  'status=running means the workflow is still in progress in background, not stale or failed. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution while this requestId is still running.';
+
+const ORCHESTRATION_RUNNING_MESSAGE =
+  'Workflow result is still running in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat running as healthy in-progress state and do not switch to sync/local execution just because the workflow has not finished yet or a bounded wait timed out.';
+
 export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
   const env = getAppEnv();
   const orchestrationTraceStore = new OrchestrationTraceStore(env.dataPaths.orchestrationTraceFilePath);
@@ -94,11 +100,11 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
               requestId,
             },
             warning:
-              "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+              "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.",
             message:
               waitMode === "auto_async"
-                ? "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks."
-                : "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+                ? "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks."
+                : "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.",
             ...(waitMode === "auto_async" ? { autoAsync: true } : {}),
           };
         }
@@ -135,7 +141,26 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
       inputSchema: getOrchestrationResultInputSchema.shape,
       execute: async (input) => {
         const parsed = getOrchestrationResultInputSchema.parse(input);
-        return orchestrationResultStore.read(parsed.requestId);
+        const record = await orchestrationResultStore.read(parsed.requestId);
+
+        if (!record || record.status !== "running") {
+          return record;
+        }
+
+        return {
+          ...record,
+          executionMode: "async",
+          pollWith: "get_orchestration_result",
+          superviseWith: "supervise_orchestration_result",
+          superviseResultWith: "get_orchestration_supervision_result",
+          waitWith: "wait_for_orchestration_result",
+          recommendedFollowUp: "supervise_orchestration_result",
+          nextArgs: {
+            requestId: parsed.requestId,
+          },
+          warning: ORCHESTRATION_RUNNING_WARNING,
+          message: ORCHESTRATION_RUNNING_MESSAGE,
+        };
       },
     },
     {

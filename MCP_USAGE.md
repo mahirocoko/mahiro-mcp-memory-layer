@@ -47,6 +47,20 @@ If the current tool list contains `orchestrate_workflow`, `get_orchestration_res
 
 If you want a structured answer instead of inferring from the tool list, call `runtime_capabilities` on the plugin path.
 
+## Plugin-local façade config
+
+The OpenCode plugin path now supports a small plugin-local façade layer for category routing and reminder gating.
+
+- `runtime.remindersEnabled`: enables the plugin-side async reminder contract when the host/plugin layer actually owns a session-visible reminder surface
+- `routing.categories.<category>.model`: overrides the default model used by the local category façade
+- `routing.categories.<category>.workerRuntime`: overrides the runtime selection (`shell` or `mcp`) used by the local category façade
+
+Important posture:
+
+- this is a **plugin-local control-plane layer**, not a second orchestration engine
+- these settings do **not** imply orchestration is available on the standard plugin path; continue to gate on `runtime_capabilities`
+- categories compile down to the repo’s existing worker/runtime/model choices rather than replacing the current workflow/result/supervision primitives
+
 ## Memory-side task flows
 
 ### Retrieval and turn prep
@@ -117,7 +131,7 @@ Important posture:
 - prefer `waitForCompletion: false` for long-running workflows
 - if `waitForCompletion` is omitted, the tool may auto-start in background and return async guidance
 - production default: hand the returned `requestId` to `supervise_orchestration_result`, or to a background poller that calls `get_orchestration_result`
-- synchronous waiting is intentionally narrow and only valid for trivial Gemini-only cases
+- synchronous waiting is intentionally narrow and only valid for a single Gemini job or step with no retries
 
 ### `get_orchestration_result`
 
@@ -141,7 +155,7 @@ It returns the background supervision state, not the raw workflow record.
 
 Use this when the host wants to block until a workflow reaches a terminal state.
 
-Treat it as a short-wait or debug helper, not the primary production path. It still depends on the current MCP request staying alive long enough for the workflow to finish.
+Treat it as a short-wait or debug helper, not the primary production path. It still depends on the current MCP request staying alive long enough for the workflow to finish. Do not treat a bounded wait timeout as proof that the workflow failed, and do not fall back to sync/local execution just because the workflow is still `running`.
 
 ### `list_orchestration_traces`
 
@@ -171,6 +185,8 @@ Typical async start response includes:
 - `warning`
 - `nextArgs`
 
+That `status: "running"` response is the healthy default for background-first MCP orchestration. It means the workflow is still progressing in the stored result path, not that it went stale or failed. Keep polling the same `requestId` or start supervision; do not switch to `waitForCompletion: true`, sync worker tools, or local CLI execution for the same task while that request is still `running`.
+
 ## Direct worker tools
 
 When the direct worker MCP tools are available, they split into sync and async pairs.
@@ -196,6 +212,8 @@ Recommended posture:
 - use the async start tool for long-running direct worker calls
 - keep the returned `requestId`
 - poll the matching `get_*_result` tool until terminal
+- treat `running` as healthy in-progress state and keep polling rather than switching to the sync worker tool
+- do not fall back to local CLI execution for the same task while the async worker request is still `running`
 - prefer this path over `orchestrate_workflow` when you only need one worker job
 
 ## Choosing between orchestration and direct worker tools
@@ -234,7 +252,9 @@ Treat `running` as an in-progress stored state, not as a failure.
 
 For long-running work:
 
+- repeated `running` reads are a healthy in-progress signal, not proof of staleness or failure
 - do not switch to sync just because the first read still shows `running`
+- do not switch to sync/local CLI execution just because a bounded wait helper timed out while the stored workflow still shows `running`
 - prefer `supervise_orchestration_result` plus `get_orchestration_supervision_result`, or background polling with `get_orchestration_result`
 - use `wait_for_orchestration_result` only when the host can safely hold a short MCP request open
 - distinguish three timeouts: workflow runtime timeout (`spec.timeoutMs`), wait-helper local timeout (`wait_for_orchestration_result.timeoutMs`), and host/MCP request timeout outside this repo’s control

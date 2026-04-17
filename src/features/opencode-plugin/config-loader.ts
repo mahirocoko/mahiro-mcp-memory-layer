@@ -6,10 +6,12 @@ import { parse as parseJsonc } from "jsonc-parser";
 import { z } from "zod";
 
 import {
+  defaultOpenCodePluginRemindersEnabled,
   defaultOpenCodePluginMessageDebounceMs,
   opencodePluginConfigEnv,
   type OpenCodePluginConfig,
 } from "./config.js";
+import { agentTaskCategories } from "../orchestration/agent-category-routing.js";
 import { getAppEnv } from "../../config/env.js";
 
 const openCodePluginConfigFileSchema = z
@@ -18,6 +20,29 @@ const openCodePluginConfigFileSchema = z
       .object({
         messageDebounceMs: z.number().int().nonnegative().optional(),
         userId: z.string().trim().min(1).optional(),
+        remindersEnabled: z.boolean().optional(),
+      })
+      .partial()
+      .optional(),
+    routing: z
+      .object({
+        categories: z
+          .object(
+            Object.fromEntries(
+              agentTaskCategories.map((category) => [
+                category,
+                z
+                  .object({
+                    model: z.string().trim().min(1).optional(),
+                    workerRuntime: z.enum(["shell", "mcp"]).optional(),
+                  })
+                  .partial()
+                  .optional(),
+              ]),
+            ),
+          )
+          .partial()
+          .optional(),
       })
       .partial()
       .optional(),
@@ -53,6 +78,10 @@ export async function loadOpenCodePluginConfig(
     runtime: {
       messageDebounceMs: resolveMessageDebounceMs(mergedConfigFile, env),
       userId: resolveUserId(mergedConfigFile, env),
+      remindersEnabled: resolveRemindersEnabled(mergedConfigFile, env),
+    },
+    routing: {
+      categoryRoutes: mergeCategoryRoutes(mergedConfigFile),
     },
     env: opencodePluginConfigEnv,
   };
@@ -119,12 +148,34 @@ function mergePluginConfigFiles(
   userConfig: OpenCodePluginConfigFile,
   projectConfig: OpenCodePluginConfigFile,
 ): OpenCodePluginConfigFile {
+  const mergedCategoryConfig = Object.fromEntries(
+    agentTaskCategories.flatMap((category) => {
+      const userCategoryConfig = userConfig.routing?.categories?.[category];
+      const projectCategoryConfig = projectConfig.routing?.categories?.[category];
+      const mergedCategory = {
+        ...userCategoryConfig,
+        ...projectCategoryConfig,
+      };
+
+      if (Object.keys(mergedCategory).length === 0) {
+        return [];
+      }
+
+      return [[category, mergedCategory]];
+    }),
+  );
+
   return {
     ...userConfig,
     ...projectConfig,
     runtime: {
       ...userConfig.runtime,
       ...projectConfig.runtime,
+    },
+    routing: {
+      ...userConfig.routing,
+      ...projectConfig.routing,
+      categories: mergedCategoryConfig,
     },
   };
 }
@@ -155,6 +206,36 @@ function resolveUserId(configFile: OpenCodePluginConfigFile, env: NodeJS.Process
   }
 
   return resolveStableLocalUserId(env);
+}
+
+function resolveRemindersEnabled(configFile: OpenCodePluginConfigFile, env: NodeJS.ProcessEnv): boolean {
+  const envValue = toOptionalBoolean(env[opencodePluginConfigEnv.remindersEnabled]);
+
+  if (envValue !== undefined) {
+    return envValue;
+  }
+
+  return configFile.runtime?.remindersEnabled ?? defaultOpenCodePluginRemindersEnabled;
+}
+
+function mergeCategoryRoutes(configFile: OpenCodePluginConfigFile): OpenCodePluginConfig["routing"]["categoryRoutes"] {
+  const categoryRoutes = configFile.routing?.categories;
+
+  if (!categoryRoutes) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    agentTaskCategories.flatMap((category) => {
+      const categoryOverride = categoryRoutes[category];
+
+      if (!categoryOverride) {
+        return [];
+      }
+
+      return [[category, categoryOverride]];
+    }),
+  );
 }
 
 function resolveNonNegativeInteger(value: string | undefined, fallback: number): number {
@@ -210,4 +291,22 @@ function toNonEmptyString(value: unknown): string | undefined {
   }
 
   return normalizedValue;
+}
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (normalizedValue === "true") {
+    return true;
+  }
+
+  if (normalizedValue === "false") {
+    return false;
+  }
+
+  return undefined;
 }

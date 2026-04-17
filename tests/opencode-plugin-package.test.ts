@@ -423,6 +423,12 @@ describe("OpenCode plugin package", () => {
             orchestration: {
               available: false,
             },
+            facade: {
+              categoryRoutingAvailable: true,
+              categoryRoutes: {},
+              remindersConfigured: false,
+              sessionVisibleRemindersAvailable: false,
+            },
           },
           cached: {
             wakeUp: expect.objectContaining({

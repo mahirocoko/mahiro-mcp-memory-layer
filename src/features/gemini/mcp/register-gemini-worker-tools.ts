@@ -47,7 +47,7 @@ export function getRegisteredGeminiWorkerTools(): readonly RegisteredTool[] {
           preferredAsyncTool: "run_gemini_worker_async",
           resultTool: "get_gemini_worker_result",
           warning:
-            "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId.",
+            "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Gemini job is still running or a bounded wait timed out.",
         };
       },
     },

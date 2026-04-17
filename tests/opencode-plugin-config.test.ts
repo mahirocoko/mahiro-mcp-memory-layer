@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  defaultOpenCodePluginRemindersEnabled,
   defaultOpenCodePluginMessageDebounceMs,
   opencodePluginConfigEnv,
 } from "../src/features/opencode-plugin/config.js";
@@ -39,10 +40,15 @@ describe("loadOpenCodePluginConfig", () => {
       runtime: {
         messageDebounceMs: defaultOpenCodePluginMessageDebounceMs,
         userId: expect.stringMatching(/^local:/),
+        remindersEnabled: defaultOpenCodePluginRemindersEnabled,
+      },
+      routing: {
+        categoryRoutes: {},
       },
       env: {
         messageDebounceMs: opencodePluginConfigEnv.messageDebounceMs,
         userId: opencodePluginConfigEnv.userId,
+        remindersEnabled: opencodePluginConfigEnv.remindersEnabled,
       },
     });
   });
@@ -81,14 +87,31 @@ describe("loadOpenCodePluginConfig", () => {
         // user default
         "runtime": {
           "messageDebounceMs": 320,
-          "userId": "user-scope"
+          "userId": "user-scope",
+          "remindersEnabled": true
+        },
+        "routing": {
+          "categories": {
+            "quick": {
+              "model": "claude-4.6-opus-high"
+            }
+          }
         },
       }
       `,
     );
     await writeFile(
       path.join(projectConfigDirectory, "mahiro-mcp-memory-layer.json"),
-      JSON.stringify({ runtime: { messageDebounceMs: 120 } }),
+      JSON.stringify({
+        runtime: { messageDebounceMs: 120 },
+        routing: {
+          categories: {
+            quick: {
+              workerRuntime: "mcp",
+            },
+          },
+        },
+      }),
     );
 
     await expect(
@@ -96,10 +119,21 @@ describe("loadOpenCodePluginConfig", () => {
         env: {},
         homeDirectory,
         contextDirectory,
-      }).then((config) => config.runtime),
-    ).resolves.toEqual({
-      messageDebounceMs: 120,
-      userId: "user-scope",
+      }),
+    ).resolves.toMatchObject({
+      runtime: {
+        messageDebounceMs: 120,
+        userId: "user-scope",
+        remindersEnabled: true,
+      },
+      routing: {
+        categoryRoutes: {
+          quick: {
+            model: "claude-4.6-opus-high",
+            workerRuntime: "mcp",
+          },
+        },
+      },
     });
   });
 
@@ -147,5 +181,23 @@ describe("loadOpenCodePluginConfig", () => {
         },
       }).then((config) => config.runtime.messageDebounceMs),
     ).resolves.toBe(defaultOpenCodePluginMessageDebounceMs);
+  });
+
+  it("parses remindersEnabled from environment variables", async () => {
+    await expect(
+      loadOpenCodePluginConfig({
+        env: {
+          [opencodePluginConfigEnv.remindersEnabled]: "true",
+        },
+      }).then((config) => config.runtime.remindersEnabled),
+    ).resolves.toBe(true);
+
+    await expect(
+      loadOpenCodePluginConfig({
+        env: {
+          [opencodePluginConfigEnv.remindersEnabled]: "false",
+        },
+      }).then((config) => config.runtime.remindersEnabled),
+    ).resolves.toBe(false);
   });
 });

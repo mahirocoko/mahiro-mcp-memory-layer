@@ -38,7 +38,7 @@ export function getRegisteredCursorWorkerTools(): readonly RegisteredTool[] {
           preferredAsyncTool: "run_cursor_worker_async",
           resultTool: "get_cursor_worker_result",
           warning:
-            "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId.",
+            "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Cursor job is still running or a bounded wait timed out.",
         };
       },
     },

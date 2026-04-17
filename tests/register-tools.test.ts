@@ -244,7 +244,8 @@ describe("getRegisteredOrchestrationTools", () => {
       waitForCompletion: false,
     });
 
-    const forwardedSpec = runOrchestrationWorkflowMock.mock.calls.at(-1)?.[0];
+    const lastCall = runOrchestrationWorkflowMock.mock.calls[runOrchestrationWorkflowMock.mock.calls.length - 1];
+    const forwardedSpec = lastCall?.[0];
 
     expect(forwardedSpec).toMatchObject({
       mode: "parallel",
@@ -330,11 +331,11 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+      "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.",
     );
     expect(result).not.toHaveProperty("autoAsync");
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
@@ -407,11 +408,11 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes.",
+      "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.",
     );
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
@@ -460,7 +461,7 @@ describe("getRegisteredOrchestrationTools", () => {
         waitForCompletion: true,
       }),
     ).rejects.toThrowError(
-      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. wait_for_orchestration_result is only for short blocking checks.",
+      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. Treat running as in-progress state, not failure or staleness. wait_for_orchestration_result is only for short blocking checks, and callers must not fall back to sync/local execution just because async work is still running or a bounded wait timed out.",
     );
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
@@ -617,7 +618,24 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(result).toMatchObject({
       requestId,
       status: "running",
+      executionMode: "async",
+      pollWith: "get_orchestration_result",
+      superviseWith: "supervise_orchestration_result",
+      superviseResultWith: "get_orchestration_supervision_result",
+      waitWith: "wait_for_orchestration_result",
+      recommendedFollowUp: "supervise_orchestration_result",
+      nextArgs: {
+        requestId,
+      },
     });
+    expect(result).toHaveProperty(
+      "warning",
+      "status=running means the workflow is still in progress in background, not stale or failed. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution while this requestId is still running.",
+    );
+    expect(result).toHaveProperty(
+      "message",
+      "Workflow result is still running in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat running as healthy in-progress state and do not switch to sync/local execution just because the workflow has not finished yet or a bounded wait timed out.",
+    );
   });
 
   it("surfaces a failed workflow status when get_orchestration_result reads a failed result", async () => {

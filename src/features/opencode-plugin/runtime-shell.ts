@@ -3,6 +3,7 @@ import type { Hooks, PluginOptions } from "@opencode-ai/plugin";
 import type { ToolContext } from "@opencode-ai/plugin/tool";
 
 import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
+import type { OpenCodePluginConfig } from "./config.js";
 import {
   applyCompactionContinuity,
   createCompactionEvent,
@@ -74,6 +75,7 @@ export interface OpenCodePluginServerOptions {
 
 export interface OpenCodePluginRuntime {
   readonly messageDebounceMs: number;
+  readonly config: OpenCodePluginConfig;
   readonly ensureBackend: () => Promise<OpenCodePluginMemoryBackend>;
   readonly handleEvent: (event: OpenCodePluginEvent) => Promise<void>;
   readonly handleSessionCreated: (event: OpenCodePluginEvent) => Promise<void>;
@@ -96,12 +98,16 @@ export interface OpenCodePluginRuntime {
 export function createOpenCodePluginRuntime(
   context: OpenCodePluginContext,
   options: OpenCodePluginServerOptions,
-  messageDebounceMs: number,
-  providedUserId: string,
+  config: OpenCodePluginConfig,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
   const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
     standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
+    sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable,
+    facadeConfig: {
+      remindersEnabled: config.runtime.remindersEnabled,
+      categoryRoutes: config.routing.categoryRoutes,
+    },
   });
 
   const routeEvent = async (
@@ -122,11 +128,11 @@ export function createOpenCodePluginRuntime(
     );
     const sessionState = syncSessionStateFromEvent(
       runtimeState,
-      context,
-      event,
-      messageDebounceMs,
-      providedUserId,
-    );
+        context,
+        event,
+        config.runtime.messageDebounceMs,
+        config.runtime.userId,
+      );
     return sessionState;
   };
 
@@ -448,7 +454,8 @@ export function createOpenCodePluginRuntime(
   };
 
   return {
-    messageDebounceMs,
+    messageDebounceMs: config.runtime.messageDebounceMs,
+    config,
     ensureBackend: () => getOpenCodePluginMemoryBackend(options.__test),
     handleEvent: async (event) => {
       switch (event.type) {

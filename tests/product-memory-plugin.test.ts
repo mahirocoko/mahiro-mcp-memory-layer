@@ -306,6 +306,7 @@ async function createPluginHarness(options?: {
   readonly createMemoryBackend?: ReturnType<typeof vi.fn>;
   readonly messageDebounceMs?: number;
   readonly standaloneMcpAvailable?: boolean;
+  readonly sessionVisibleRemindersAvailable?: boolean;
   readonly resetModules?: boolean;
 }) {
   const resetModules = (vi as typeof vi & { resetModules?: () => void }).resetModules;
@@ -329,6 +330,9 @@ async function createPluginHarness(options?: {
     ...(options?.standaloneMcpAvailable === undefined
       ? {}
       : { standaloneMcpAvailable: options.standaloneMcpAvailable }),
+    ...(options?.sessionVisibleRemindersAvailable === undefined
+      ? {}
+      : { sessionVisibleRemindersAvailable: options.sessionVisibleRemindersAvailable }),
   };
   const hooks = await module.server(
     {
@@ -380,6 +384,7 @@ afterEach(async () => {
   vi.clearAllMocks();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.doUnmock("../src/features/opencode-plugin/config-loader.js");
   const runtimeShell = await import("../src/features/opencode-plugin/runtime-shell.js");
   runtimeShell.resetOpenCodePluginMemoryBackendSingletonForTests();
 });
@@ -434,6 +439,12 @@ describe("product memory OpenCode plugin contract", () => {
         toolNames: [],
         activation: "unavailable",
       },
+      facade: {
+        categoryRoutingAvailable: true,
+        categoryRoutes: {},
+        remindersConfigured: false,
+        sessionVisibleRemindersAvailable: false,
+      },
     });
     expectNoSelfSpawn(harness);
   });
@@ -451,6 +462,12 @@ describe("product memory OpenCode plugin contract", () => {
         available: true,
         serverName: "mahiro-mcp-memory-layer",
         activation: "source-checkout-mcp-injection",
+      },
+      facade: {
+        categoryRoutingAvailable: true,
+        categoryRoutes: {},
+        remindersConfigured: false,
+        sessionVisibleRemindersAvailable: false,
       },
     });
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(

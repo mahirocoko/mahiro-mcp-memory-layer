@@ -109,7 +109,7 @@ describe("getRegisteredGeminiWorkerTools", () => {
       preferredAsyncTool: "run_gemini_worker_async",
       resultTool: "get_gemini_worker_result",
       warning:
-        "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId.",
+        "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Gemini job is still running or a bounded wait timed out.",
     });
 
     expect(shellGeminiRuntime.run).toHaveBeenCalledWith(
@@ -141,7 +141,13 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t1",
       kind: "gemini",
       status: "running",
+      executionMode: "async",
       resultTool: "get_gemini_worker_result",
+      nextArgs: {
+        requestId: expect.stringMatching(/^workflow_/),
+      },
+      warning:
+        "This async worker is still running. Treat status=running as healthy in-progress state and keep polling get_gemini_worker_result until terminal; do not switch to a synchronous/local worker run just because the async job has not finished yet or a bounded wait timed out.",
     });
     expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -300,11 +306,20 @@ describe("getRegisteredGeminiWorkerTools", () => {
       taskId: "t-running",
       kind: "gemini",
       status: "running",
+      executionMode: "async",
       workflowStatus: "running",
       pollIntervalMs: 1000,
+      resultTool: "get_gemini_worker_result",
+      nextArgs: {
+        requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
       configuredRetries: 3,
       configuredRetryDelayMs: 750,
     });
+    expect(result).toHaveProperty(
+      "warning",
+      "This async worker is still running. Treat status=running as healthy in-progress state and keep polling get_gemini_worker_result until terminal; do not switch to a synchronous/local worker run just because the async job has not finished yet or a bounded wait timed out.",
+    );
   });
 
   it("maps async Gemini worker polling when orchestration runner fails before a job result", async () => {

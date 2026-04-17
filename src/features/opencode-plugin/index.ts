@@ -21,8 +21,13 @@ export async function server(
   const runtime = createOpenCodePluginRuntime(
     context,
     options,
-    options.__test?.messageDebounceMs ?? runtimeConfig.runtime.messageDebounceMs,
-    runtimeConfig.runtime.userId,
+    {
+      ...runtimeConfig,
+      runtime: {
+        ...runtimeConfig.runtime,
+        messageDebounceMs: options.__test?.messageDebounceMs ?? runtimeConfig.runtime.messageDebounceMs,
+      },
+    },
   );
 
   return {

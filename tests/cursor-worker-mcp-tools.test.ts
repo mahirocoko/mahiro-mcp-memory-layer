@@ -98,7 +98,7 @@ describe("getRegisteredCursorWorkerTools", () => {
       preferredAsyncTool: "run_cursor_worker_async",
       resultTool: "get_cursor_worker_result",
       warning:
-        "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId.",
+        "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Cursor job is still running or a bounded wait timed out.",
     });
 
     expect(shellCursorRuntime.run).toHaveBeenCalledWith(
@@ -124,7 +124,13 @@ describe("getRegisteredCursorWorkerTools", () => {
       taskId: "t1",
       kind: "cursor",
       status: "running",
+      executionMode: "async",
       resultTool: "get_cursor_worker_result",
+      nextArgs: {
+        requestId: expect.stringMatching(/^workflow_/),
+      },
+      warning:
+        "This async worker is still running. Treat status=running as healthy in-progress state and keep polling get_cursor_worker_result until terminal; do not switch to a synchronous/local worker run just because the async job has not finished yet or a bounded wait timed out.",
     });
     expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -173,9 +179,18 @@ describe("getRegisteredCursorWorkerTools", () => {
       taskId: "c-running",
       kind: "cursor",
       status: "running",
+      executionMode: "async",
       workflowStatus: "running",
       pollIntervalMs: 1000,
+      resultTool: "get_cursor_worker_result",
+      nextArgs: {
+        requestId: "workflow_cccccccccccccccccccccccccccccccc",
+      },
     });
+    expect(result).toHaveProperty(
+      "warning",
+      "This async worker is still running. Treat status=running as healthy in-progress state and keep polling get_cursor_worker_result until terminal; do not switch to a synchronous/local worker run just because the async job has not finished yet or a bounded wait timed out.",
+    );
   });
 
   it("maps async Cursor worker polling when orchestration runner fails before a job result", async () => {

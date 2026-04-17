@@ -2,6 +2,7 @@ import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
+import type { OpenCodePluginFacadeConfigSnapshot } from "./config.js";
 
 const standaloneMcpServerEntryPath = fileURLToPath(new URL("../../index.ts", import.meta.url));
 const memoryMcpServerPath = fileURLToPath(new URL("../memory/mcp/server.ts", import.meta.url));
@@ -39,10 +40,18 @@ export interface OpenCodePluginRuntimeCapabilities {
     readonly toolNames: readonly string[];
     readonly activation: "source-checkout-mcp-injection" | "unavailable";
   };
+  readonly facade: {
+    readonly categoryRoutingAvailable: true;
+    readonly categoryRoutes: OpenCodePluginFacadeConfigSnapshot["categoryRoutes"];
+    readonly remindersConfigured: boolean;
+    readonly sessionVisibleRemindersAvailable: boolean;
+  };
 }
 
 export interface OpenCodePluginRuntimeCapabilityOptions {
   readonly standaloneMcpAvailable?: boolean;
+  readonly sessionVisibleRemindersAvailable?: boolean;
+  readonly facadeConfig?: OpenCodePluginFacadeConfigSnapshot;
 }
 
 export async function resolveOpenCodePluginRuntimeCapabilities(
@@ -50,6 +59,8 @@ export async function resolveOpenCodePluginRuntimeCapabilities(
 ): Promise<OpenCodePluginRuntimeCapabilities> {
   const standaloneMcpAvailable =
     options.standaloneMcpAvailable ?? (await standaloneMcpServerExists());
+  const remindersConfigured = options.facadeConfig?.remindersEnabled ?? false;
+  const sessionVisibleRemindersAvailable = options.sessionVisibleRemindersAvailable ?? false;
 
   return {
     mode: standaloneMcpAvailable ? "plugin-native+mcp" : "plugin-native",
@@ -72,6 +83,12 @@ export async function resolveOpenCodePluginRuntimeCapabilities(
           toolNames: [],
           activation: "unavailable",
         },
+    facade: {
+      categoryRoutingAvailable: true,
+      categoryRoutes: options.facadeConfig?.categoryRoutes ?? {},
+      remindersConfigured,
+      sessionVisibleRemindersAvailable,
+    },
   };
 }
 
@@ -88,6 +105,14 @@ export function buildOpenCodePluginStartupBrief(
     capabilities.orchestration.available
       ? `- Orchestration: available through MCP server \`${capabilities.orchestration.serverName}\` with tools like ${capabilities.orchestration.toolNames.slice(0, 4).join(", ")}.`
       : "- Orchestration: not advertised on the standard plugin path unless the standalone MCP runtime is present.",
+    Object.keys(capabilities.facade.categoryRoutes).length > 0
+      ? `- Facade routing overrides: configured for ${Object.keys(capabilities.facade.categoryRoutes).join(", ")}.`
+      : "- Facade routing overrides: none configured.",
+    capabilities.facade.remindersConfigured
+      ? capabilities.facade.sessionVisibleRemindersAvailable
+        ? "- Async reminders: configured and a session-visible reminder surface is available."
+        : "- Async reminders: configured, but dormant because no session-visible reminder surface is available in this runtime."
+      : "- Async reminders: disabled by config.",
   ];
 
   return sections.join("\n");

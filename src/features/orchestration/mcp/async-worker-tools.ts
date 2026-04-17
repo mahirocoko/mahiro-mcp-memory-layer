@@ -26,8 +26,13 @@ export interface AsyncWorkerStartResponse {
   readonly taskId: string;
   readonly kind: WorkerJob["kind"];
   readonly status: "running";
+  readonly executionMode: "async";
   readonly pollIntervalMs: number;
   readonly resultTool: string;
+  readonly nextArgs: {
+    readonly requestId: string;
+  };
+  readonly warning: string;
 }
 
 export interface AsyncWorkerRunningResponse {
@@ -35,12 +40,22 @@ export interface AsyncWorkerRunningResponse {
   readonly taskId: string;
   readonly kind: WorkerJob["kind"];
   readonly status: "running";
+  readonly executionMode: "async";
   readonly pollIntervalMs: number;
   readonly configuredRetries?: number;
   readonly configuredRetryDelayMs?: number;
   readonly workflowStatus: "running";
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly resultTool: string;
+  readonly nextArgs: {
+    readonly requestId: string;
+  };
+  readonly warning: string;
+}
+
+function buildAsyncWorkerRunningWarning(resultTool: string): string {
+  return `This async worker is still running. Treat status=running as healthy in-progress state and keep polling ${resultTool} until terminal; do not switch to a synchronous/local worker run just because the async job has not finished yet or a bounded wait timed out.`;
 }
 
 export interface AsyncWorkerFailedResponse {
@@ -146,8 +161,13 @@ export function createAsyncWorkerTools<TStartShape extends ZodRawShape, TJob ext
           taskId: job.input.taskId,
           kind: options.kind,
           status: "running",
+          executionMode: "async",
           pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
           resultTool: options.getToolName,
+          nextArgs: {
+            requestId,
+          },
+          warning: buildAsyncWorkerRunningWarning(options.getToolName),
         };
 
         return response;
@@ -165,7 +185,7 @@ export function createAsyncWorkerTools<TStartShape extends ZodRawShape, TJob ext
           return null;
         }
 
-        return mapAsyncWorkerResultRecord(record, options.kind);
+        return mapAsyncWorkerResultRecord(record, options.kind, options.getToolName);
       },
     },
   ];
@@ -174,6 +194,7 @@ export function createAsyncWorkerTools<TStartShape extends ZodRawShape, TJob ext
 function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorWorkerResult>(
   record: OrchestrationResultRecord,
   expectedKind: WorkerJob["kind"],
+  resultTool: string,
 ): AsyncWorkerResultResponse<TResult> {
   const taskIdFromMetadata = record.metadata.taskIds[0] ?? "";
   const primaryJobMetadata = record.metadata.jobs?.find((job) => job.taskId === taskIdFromMetadata);
@@ -184,6 +205,7 @@ function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorW
       taskId: taskIdFromMetadata,
       kind: expectedKind,
       status: "running",
+      executionMode: "async",
       pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
       ...(typeof primaryJobMetadata?.configuredRetries === "number"
         ? { configuredRetries: primaryJobMetadata.configuredRetries }
@@ -194,6 +216,11 @@ function mapAsyncWorkerResultRecord<TResult extends GeminiWorkerResult | CursorW
       workflowStatus: record.status,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
+      resultTool,
+      nextArgs: {
+        requestId: record.requestId,
+      },
+      warning: buildAsyncWorkerRunningWarning(resultTool),
     };
   }
 
