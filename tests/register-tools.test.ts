@@ -218,6 +218,7 @@ describe("getRegisteredOrchestrationTools", () => {
       route: {
         workerKind: "cursor",
         model: "composer-2",
+        reason: "default_quick_lane",
         workerRuntime: "mcp",
       },
       pollWith: "get_orchestration_result",
@@ -242,6 +243,17 @@ describe("getRegisteredOrchestrationTools", () => {
 
     await Promise.resolve();
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
+    expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: expect.objectContaining({
+          jobs: [
+            expect.objectContaining({
+              routeReason: "default_quick_lane",
+            }),
+          ],
+        }),
+      }),
+    );
   });
 
   it("executes the orchestration tool with normalized workflow input", async () => {

@@ -117,6 +117,7 @@ export function getRegisteredStartAgentTaskTool(input: {
         route: {
           workerKind: job.kind,
           model: job.input.model,
+          ...(job.routeReason ? { reason: job.routeReason } : {}),
           ...(job.workerRuntime ? { workerRuntime: job.workerRuntime } : {}),
         },
       };

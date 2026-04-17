@@ -20,6 +20,7 @@ export interface AgentTaskRoute {
   readonly category: AgentTaskCategory;
   readonly workerKind: WorkerJob["kind"];
   readonly model: string;
+  readonly reason: string;
   readonly workerRuntime?: WorkerRuntimeSelection;
 }
 
@@ -95,11 +96,21 @@ export function resolveAgentTaskRoute(input: ResolveAgentTaskRouteInput): AgentT
   const preset = defaultAgentTaskRoutePresets[input.category];
   const override = input.routeOverrides?.[input.category];
   const inventoryBackedModel = resolveInventoryBackedModel(preset.preferredModels, input.runtimeModelInventory);
+  const explicitModel = normalizeOptionalString(input.model);
+  const overrideModel = normalizeOptionalString(override?.model);
+  const model = explicitModel ?? overrideModel ?? inventoryBackedModel;
 
   return {
     category: input.category,
     workerKind: preset.workerKind,
-    model: normalizeOptionalString(input.model) ?? normalizeOptionalString(override?.model) ?? inventoryBackedModel,
+    model,
+    reason: explicitModel
+      ? "explicit_model_override"
+      : overrideModel
+        ? "config_route_override"
+        : inventoryBackedModel === preset.preferredModels[0]
+          ? `default_${input.category}_lane`
+          : "runtime_fallback_missing_primary_model",
     ...(input.workerRuntime ?? override?.workerRuntime
       ? { workerRuntime: input.workerRuntime ?? override?.workerRuntime }
       : {}),
@@ -121,6 +132,7 @@ export function resolveEscalatedAgentTaskRoute(input: ResolveAgentTaskRouteInput
   return {
     ...baseRoute,
     model: resolveInventoryBackedModel(preferredEscalatedModels, input.runtimeModelInventory),
+    reason: buildEscalationReason(baseRoute.workerKind, currentModel, input.signals),
   };
 }
 
@@ -177,6 +189,7 @@ export function buildAgentTaskWorkerJob(input: BuildAgentTaskWorkerJobInput): Wo
     return {
       kind: "gemini",
       input: geminiInput,
+      routeReason: route.reason,
       ...(route.workerRuntime ? { workerRuntime: route.workerRuntime } : {}),
       ...(input.retries !== undefined ? { retries: input.retries } : {}),
       ...(input.retryDelayMs !== undefined ? { retryDelayMs: input.retryDelayMs } : {}),
@@ -199,6 +212,7 @@ export function buildAgentTaskWorkerJob(input: BuildAgentTaskWorkerJobInput): Wo
   return {
     kind: "cursor",
     input: cursorInput,
+    routeReason: route.reason,
     ...(route.workerRuntime ? { workerRuntime: route.workerRuntime } : {}),
     ...(input.retries !== undefined ? { retries: input.retries } : {}),
     ...(input.retryDelayMs !== undefined ? { retryDelayMs: input.retryDelayMs } : {}),
@@ -270,4 +284,48 @@ function resolvePreferredEscalatedModels(
   }
 
   return [];
+}
+
+function buildEscalationReason(
+  workerKind: AgentTaskRoute["workerKind"],
+  currentModel: string,
+  signals: EscalationSignals,
+): string {
+  if (workerKind === "cursor") {
+    if (currentModel === "composer-2" && signals.requiresDeepReasoning) {
+      return "deep_reasoning_escalation";
+    }
+
+    if (currentModel === "composer-2" && signals.previousAttemptFailed) {
+      return "failed_attempt_escalation";
+    }
+
+    if (currentModel === "composer-2" && signals.verificationRisk) {
+      return "verification_risk_escalation";
+    }
+
+    if (currentModel === "composer-2" && signals.uncertaintyLevel === "high") {
+      return "high_uncertainty_escalation";
+    }
+
+    if (currentModel === "claude-opus-4-7-high" && signals.requiresDeepReasoning) {
+      return "deep_reasoning_escalation";
+    }
+  }
+
+  if (currentModel === "gemini-3-flash") {
+    if (signals.requiresHigherQualityGemini) {
+      return "higher_quality_gemini_escalation";
+    }
+
+    if (signals.verificationRisk) {
+      return "verification_risk_escalation";
+    }
+
+    if (signals.uncertaintyLevel === "high") {
+      return "high_uncertainty_escalation";
+    }
+  }
+
+  return "adaptive_escalation";
 }

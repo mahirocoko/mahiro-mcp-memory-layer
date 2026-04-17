@@ -61,6 +61,7 @@ function buildJobModelsFromWorkerResults(
         errorClass: classifyWorkerJobError(item),
         requestedModel,
         ...(reportedModel !== undefined ? { reportedModel } : {}),
+        ...(configuredTelemetry?.routeReason ? { routeReason: configuredTelemetry.routeReason } : {}),
       };
     }
 
@@ -136,10 +137,11 @@ export function buildRunnerFailedOrchestrationTraceEntry(
       taskId: job.input.taskId,
       status: "runner_failed",
       ...(jobTelemetryByTaskId.get(job.input.taskId) ?? {}),
-      retryCount: 0,
-      errorClass: "infra_failure",
-      requestedModel: job.input.model,
-    })),
+        retryCount: 0,
+        errorClass: "infra_failure",
+        requestedModel: job.input.model,
+        ...(job.routeReason ? { routeReason: job.routeReason } : {}),
+      })),
     totalJobs: jobs.length,
     finishedJobs: 0,
     completedJobs: 0,
@@ -155,13 +157,14 @@ export function buildRunnerFailedOrchestrationTraceEntry(
 
 function buildJobTelemetryByTaskId(
   spec: OrchestrateWorkflowSpec,
-): Map<string, Pick<OrchestrationJobModelTelemetry, "configuredRetries" | "configuredRetryDelayMs">> {
+): Map<string, Pick<OrchestrationJobModelTelemetry, "configuredRetries" | "configuredRetryDelayMs" | "routeReason">> {
   return new Map(
     getConcreteJobs(spec).map((job) => [
       job.input.taskId,
       {
         ...(typeof job.retries === "number" ? { configuredRetries: job.retries } : {}),
         ...(typeof job.retryDelayMs === "number" ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
+        ...(job.routeReason ? { routeReason: job.routeReason } : {}),
       },
     ]),
   );

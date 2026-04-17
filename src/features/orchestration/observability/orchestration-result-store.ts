@@ -20,6 +20,7 @@ interface OrchestrationResultJobMetadata {
   readonly workerRuntime?: "shell" | "mcp";
   readonly configuredRetries?: number;
   readonly configuredRetryDelayMs?: number;
+  readonly routeReason?: string;
 }
 
 interface BaseOrchestrationResultRecord {
@@ -157,6 +158,7 @@ function buildMetadata(spec: OrchestrateWorkflowSpec): OrchestrationResultMetada
     ...(job.workerRuntime !== undefined ? { workerRuntime: job.workerRuntime } : {}),
     ...(typeof job.retries === "number" ? { configuredRetries: job.retries } : {}),
     ...(typeof job.retryDelayMs === "number" ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
+    ...(job.routeReason ? { routeReason: job.routeReason } : {}),
   }));
 
   if (spec.mode === "parallel") {

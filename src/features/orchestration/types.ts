@@ -12,6 +12,7 @@ export interface GeminiWorkerJob {
   readonly input: GeminiWorkerInput;
   /** When set on a normalized workflow job, selects shell vs MCP worker runtime; overrides env-based selection. */
   readonly workerRuntime?: WorkerRuntimeSelection;
+  readonly routeReason?: string;
   readonly dependencies?: RunGeminiWorkerDependencies;
   readonly retries?: number;
   readonly retryDelayMs?: number;
@@ -23,6 +24,7 @@ export interface CursorWorkerJob {
   readonly input: CursorWorkerInput;
   /** When set on a normalized workflow job, selects shell vs MCP worker runtime; overrides env-based selection. */
   readonly workerRuntime?: WorkerRuntimeSelection;
+  readonly routeReason?: string;
   readonly dependencies?: RunCursorWorkerDependencies;
   readonly retries?: number;
   readonly retryDelayMs?: number;
@@ -114,6 +116,8 @@ export interface OrchestrationJobModelTelemetry {
   readonly requestedModel: string;
   /** Model reported by the worker runtime when available. */
   readonly reportedModel?: string;
+  /** Why the orchestrator selected or escalated this route. */
+  readonly routeReason?: string;
 }
 
 export interface OrchestrationTraceEntry {

@@ -37,6 +37,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "visual-engineering",
       workerKind: "gemini",
       model: "gemini-3.1-pro",
+      reason: "default_visual-engineering_lane",
     });
   });
 
@@ -45,6 +46,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "ultrabrain",
       workerKind: "cursor",
       model: "claude-opus-4-7-thinking-high",
+      reason: "default_ultrabrain_lane",
     });
   });
 
@@ -53,11 +55,13 @@ describe("resolveAgentTaskRoute", () => {
       category: "deep",
       workerKind: "cursor",
       model: "claude-opus-4-7-high",
+      reason: "default_deep_lane",
     });
     expect(resolveAgentTaskRoute({ category: "unspecified-high" })).toEqual({
       category: "unspecified-high",
       workerKind: "cursor",
       model: "claude-opus-4-7-high",
+      reason: "default_unspecified-high_lane",
     });
   });
 
@@ -66,6 +70,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "artistry",
       workerKind: "gemini",
       model: "gemini-3-flash",
+      reason: "default_artistry_lane",
     });
   });
 
@@ -74,11 +79,13 @@ describe("resolveAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "composer-2",
+      reason: "default_quick_lane",
     });
     expect(resolveAgentTaskRoute({ category: "writing" })).toEqual({
       category: "writing",
       workerKind: "cursor",
       model: "composer-2",
+      reason: "default_writing_lane",
     });
   });
 
@@ -93,6 +100,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "artistry",
       workerKind: "gemini",
       model: "gemini-3-flash",
+      reason: "explicit_model_override",
       workerRuntime: "mcp",
     });
   });
@@ -112,6 +120,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "claude-opus-4-7-high",
+      reason: "config_route_override",
       workerRuntime: "mcp",
     });
   });
@@ -126,6 +135,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "composer-2",
+      reason: "default_quick_lane",
     });
   });
 
@@ -139,6 +149,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "ultrabrain",
       workerKind: "cursor",
       model: "claude-4.6-opus-high",
+      reason: "runtime_fallback_missing_primary_model",
     });
 
     expect(
@@ -150,6 +161,7 @@ describe("resolveAgentTaskRoute", () => {
       category: "artistry",
       workerKind: "gemini",
       model: "gemini-3.1-pro",
+      reason: "runtime_fallback_missing_primary_model",
     });
   });
 });
@@ -181,6 +193,7 @@ describe("buildAgentTaskWorkerJob", () => {
         approvalMode: "plan",
         allowedMcpServerNames: ["context7"],
       },
+      routeReason: "default_visual-engineering_lane",
       retries: 2,
       retryDelayMs: 750,
     });
@@ -209,6 +222,7 @@ describe("buildAgentTaskWorkerJob", () => {
         trust: true,
         force: false,
       },
+      routeReason: "default_quick_lane",
       continueOnFailure: true,
     });
   });
@@ -225,6 +239,7 @@ describe("buildAgentTaskWorkerJob", () => {
       }),
     ).toEqual({
       kind: "cursor",
+      routeReason: "explicit_model_override",
       workerRuntime: "mcp",
         input: {
           taskId: "deep-task",
@@ -251,6 +266,7 @@ describe("buildAgentTaskWorkerJob", () => {
       }),
     ).toEqual({
       kind: "cursor",
+      routeReason: "config_route_override",
       workerRuntime: "mcp",
         input: {
           taskId: "doc-task",
@@ -272,6 +288,7 @@ describe("buildAgentTaskWorkerJob", () => {
       }),
     ).toEqual({
       kind: "cursor",
+      routeReason: "runtime_fallback_missing_primary_model",
       input: {
         taskId: "debug-task",
         prompt: "Explain the root cause.",
@@ -297,6 +314,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "claude-opus-4-7-high",
+      reason: "failed_attempt_escalation",
     });
   });
 
@@ -314,6 +332,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "deep",
       workerKind: "cursor",
       model: "claude-opus-4-7-thinking-high",
+      reason: "deep_reasoning_escalation",
     });
   });
 
@@ -331,6 +350,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "artistry",
       workerKind: "gemini",
       model: "gemini-3.1-pro",
+      reason: "higher_quality_gemini_escalation",
     });
   });
 
@@ -348,6 +368,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "claude-4.6-opus-high",
+      reason: "verification_risk_escalation",
     });
 
     expect(
@@ -363,6 +384,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "ultrabrain",
       workerKind: "cursor",
       model: "claude-4.6-opus-high",
+      reason: "deep_reasoning_escalation",
     });
   });
 
@@ -379,6 +401,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
       category: "quick",
       workerKind: "cursor",
       model: "composer-2",
+      reason: "default_quick_lane",
     });
   });
 });
