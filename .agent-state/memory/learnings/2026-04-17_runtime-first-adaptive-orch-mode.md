@@ -1,0 +1,5 @@
+# Runtime-first adaptive orch mode
+
+Tags: orchestration, operator, runtime-models, telemetry, retention
+
+The durable lesson from this session is that orchestration quality improved most when the repo stopped treating models and capabilities as abstract doctrine and started treating local runtime truth as the first-class input. `agent models`, `agent --help`, and `runtime_capabilities` should come before routing policy, not after it. Once routing and escalation decisions were tied to runtime-backed inventory, the operator story became sharper: Composer as the default doer, Opus as escalation, Gemini lanes for fast vs stronger visual/exploratory work. The second durable lesson is that observability must stay proportional. Adding route reasons and richer trace telemetry was valuable, but it immediately increased persistence volume and inspection complexity, which made a retention slice necessary. Thin façades, runtime-first routing, explainable decisions, and bounded trace growth belong together; doing one without the others leaves the system lopsided.
