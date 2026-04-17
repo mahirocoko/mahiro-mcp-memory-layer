@@ -705,6 +705,7 @@ describe("getRegisteredOrchestrationTools", () => {
       metadata: {
         mode: "parallel",
         taskIds: ["cursor_123"],
+        jobs: [{ taskId: "cursor_123", routeReason: "default_quick_lane" }],
       },
       status: "running",
       createdAt: "2026-04-05T00:00:00.000Z",
@@ -731,6 +732,11 @@ describe("getRegisteredOrchestrationTools", () => {
       nextArgs: {
         requestId,
       },
+      routeSummary: {
+        primaryReason: "default_quick_lane",
+        uniqueReasons: ["default_quick_lane"],
+        jobsWithReasons: 1,
+      },
     });
     expect(result).toHaveProperty(
       "warning",
@@ -750,6 +756,7 @@ describe("getRegisteredOrchestrationTools", () => {
       metadata: {
         mode: "parallel",
         taskIds: ["cursor_fail"],
+        jobs: [{ taskId: "cursor_fail", routeReason: "verification_risk_escalation" }],
       },
       status: "failed",
       result: {
@@ -781,6 +788,11 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(result).toMatchObject({
       requestId,
       status: "failed",
+      routeSummary: {
+        primaryReason: "verification_risk_escalation",
+        uniqueReasons: ["verification_risk_escalation"],
+        jobsWithReasons: 1,
+      },
       result: expect.objectContaining({
         status: "failed",
         summary: expect.objectContaining({
@@ -788,6 +800,56 @@ describe("getRegisteredOrchestrationTools", () => {
           completedJobs: 0,
         }),
       }),
+    });
+  });
+
+  it("summarizes mixed route reasons on terminal orchestration records", async () => {
+    const requestId = "workflow_abcdabcdabcdabcdabcdabcdabcdabcd";
+    orchestrationResultStoreMock.read.mockResolvedValueOnce({
+      requestId,
+      source: "mcp",
+      metadata: {
+        mode: "parallel",
+        taskIds: ["cursor_1", "cursor_2"],
+        jobs: [
+          { taskId: "cursor_1", routeReason: "default_quick_lane" },
+          { taskId: "cursor_2", routeReason: "verification_risk_escalation" },
+        ],
+      },
+      status: "completed",
+      result: {
+        requestId,
+        mode: "parallel",
+        status: "completed",
+        results: [],
+        summary: {
+          totalJobs: 2,
+          finishedJobs: 2,
+          completedJobs: 2,
+          failedJobs: 0,
+          skippedJobs: 0,
+          startedAt: "2026-04-05T00:00:00.000Z",
+          finishedAt: "2026-04-05T00:00:01.000Z",
+          durationMs: 1000,
+        },
+      },
+      createdAt: "2026-04-05T00:00:00.000Z",
+      updatedAt: "2026-04-05T00:00:01.000Z",
+    });
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "get_orchestration_result");
+
+    const result = await tool?.execute({ requestId });
+
+    expect(result).toMatchObject({
+      requestId,
+      status: "completed",
+      routeSummary: {
+        primaryReason: "default_quick_lane",
+        uniqueReasons: ["default_quick_lane", "verification_risk_escalation"],
+        jobsWithReasons: 2,
+      },
     });
   });
 
@@ -897,7 +959,7 @@ describe("getRegisteredOrchestrationTools", () => {
       status: "running",
       resultTool: "get_orchestration_supervision_result",
     });
-    expect(orchestrationSupervisionStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
+    expect(orchestrationSupervisionStoreMock.writeRunning).toHaveBeenCalledTimes(1);
   });
 
   it("reads a stored supervision result by supervisor request id", async () => {

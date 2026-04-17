@@ -51,6 +51,14 @@ export function enrichRunningWorkflowResult<TRecord extends object>(input: {
   readonly requestId: string;
   readonly record: TRecord;
 }) {
+  const routeSummary = summarizeRouteReasonsFromRecord(input.record as {
+    readonly metadata?: {
+      readonly jobs?: readonly {
+        readonly routeReason?: string;
+      }[];
+    };
+  });
+
   return {
     ...input.record,
     executionMode: "async",
@@ -64,5 +72,36 @@ export function enrichRunningWorkflowResult<TRecord extends object>(input: {
     },
     warning: ORCHESTRATION_RUNNING_WARNING,
     message: ORCHESTRATION_RUNNING_MESSAGE,
+    ...(routeSummary ? { routeSummary } : {}),
+  };
+}
+
+export function summarizeRouteReasonsFromRecord(input: {
+  readonly metadata?: {
+    readonly jobs?: readonly {
+      readonly routeReason?: string;
+    }[];
+  };
+}):
+  | {
+      readonly primaryReason: string;
+      readonly uniqueReasons: readonly string[];
+      readonly jobsWithReasons: number;
+    }
+  | undefined {
+  const reasons = (input.metadata?.jobs ?? [])
+    .map((job) => job.routeReason)
+    .filter((reason): reason is string => typeof reason === "string" && reason.length > 0);
+
+  if (reasons.length === 0) {
+    return undefined;
+  }
+
+  const uniqueReasons = Array.from(new Set(reasons));
+
+  return {
+    primaryReason: uniqueReasons[0] ?? reasons[0]!,
+    uniqueReasons,
+    jobsWithReasons: reasons.length,
   };
 }

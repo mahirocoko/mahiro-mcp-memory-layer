@@ -8,7 +8,7 @@ import { OrchestrationResultStore } from "../observability/orchestration-result-
 import { OrchestrationSupervisionStore } from "../observability/orchestration-supervision-store.js";
 import { OrchestrationTraceStore } from "../observability/orchestration-trace.js";
 import { runOrchestrationWorkflow } from "../run-orchestration-workflow.js";
-import { enrichRunningWorkflowResult, buildAsyncWorkflowStartEnvelope } from "./async-workflow-envelope.js";
+import { enrichRunningWorkflowResult, buildAsyncWorkflowStartEnvelope, summarizeRouteReasonsFromRecord } from "./async-workflow-envelope.js";
 import {
   getOrchestrationSupervisionResultInputSchema,
   listOrchestrationTracesInputSchema,
@@ -120,7 +120,17 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
         const record = await orchestrationResultStore.read(parsed.requestId);
 
         if (!record || record.status !== "running") {
-          return record;
+          if (!record) {
+            return record;
+          }
+
+          const routeSummary = summarizeRouteReasonsFromRecord(record);
+          return routeSummary
+            ? {
+                ...record,
+                routeSummary,
+              }
+            : record;
         }
 
         return enrichRunningWorkflowResult({ requestId: parsed.requestId, record });
