@@ -4,6 +4,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool";
 
 import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
 import type { OpenCodePluginConfig } from "./config.js";
+import { createOpenCodeAsyncTaskTracker, type OpenCodeAsyncTaskTracker } from "./async-task-reminder-bridge.js";
 import {
   applyCompactionContinuity,
   createCompactionEvent,
@@ -20,6 +21,7 @@ import { logPluginLifecycle, toErrorMessage } from "./runtime-logging.js";
 import {
   buildOpenCodePluginStartupBrief,
   resolveOpenCodePluginRuntimeCapabilities,
+  resolveOpenCodePluginRuntimeCapabilitiesSync,
   type OpenCodePluginRuntimeCapabilities,
 } from "./runtime-capabilities.js";
 import {
@@ -76,6 +78,7 @@ export interface OpenCodePluginServerOptions {
 export interface OpenCodePluginRuntime {
   readonly messageDebounceMs: number;
   readonly config: OpenCodePluginConfig;
+  readonly orchestrationFacadeAvailable: boolean;
   readonly ensureBackend: () => Promise<OpenCodePluginMemoryBackend>;
   readonly handleEvent: (event: OpenCodePluginEvent) => Promise<void>;
   readonly handleSessionCreated: (event: OpenCodePluginEvent) => Promise<void>;
@@ -92,6 +95,10 @@ export interface OpenCodePluginRuntime {
     args: Record<string, unknown>,
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<unknown>;
+  readonly trackAsyncTaskStart: (
+    result: unknown,
+    context: OpenCodePluginToolExecutionContext,
+  ) => Promise<void>;
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
 }
 
@@ -101,13 +108,26 @@ export function createOpenCodePluginRuntime(
   config: OpenCodePluginConfig,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
-  const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
+  const syncCapabilities = resolveOpenCodePluginRuntimeCapabilitiesSync({
     standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
-    sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable,
+    sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable ?? false,
     facadeConfig: {
       remindersEnabled: config.runtime.remindersEnabled,
       categoryRoutes: config.routing.categoryRoutes,
     },
+  });
+  const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
+    standaloneMcpAvailable: syncCapabilities.orchestration.available,
+    sessionVisibleRemindersAvailable: syncCapabilities.facade.sessionVisibleRemindersAvailable,
+    facadeConfig: {
+      remindersEnabled: config.runtime.remindersEnabled,
+      categoryRoutes: config.routing.categoryRoutes,
+    },
+  });
+  const asyncTaskTracker: OpenCodeAsyncTaskTracker = createOpenCodeAsyncTaskTracker({
+    context,
+    capabilities: () => runtimeCapabilitiesPromise,
+    remindersEnabled: config.runtime.remindersEnabled,
   });
 
   const routeEvent = async (
@@ -456,6 +476,7 @@ export function createOpenCodePluginRuntime(
   return {
     messageDebounceMs: config.runtime.messageDebounceMs,
     config,
+    orchestrationFacadeAvailable: syncCapabilities.orchestration.available,
     ensureBackend: () => getOpenCodePluginMemoryBackend(options.__test),
     handleEvent: async (event) => {
       switch (event.type) {
@@ -532,6 +553,17 @@ export function createOpenCodePluginRuntime(
           containerId: scope.containerId,
           sessionId: scope.sessionId,
         },
+      });
+    },
+    trackAsyncTaskStart: async (result, toolContext) => {
+      const resultRecord =
+        typeof result === "object" && result !== null ? (result as Record<string, unknown>) : undefined;
+
+      await asyncTaskTracker.trackAsyncTask({
+        parentSessionId: resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties),
+        requestId: typeof resultRecord?.requestId === "string" ? resultRecord.requestId : undefined,
+        status: typeof resultRecord?.status === "string" ? resultRecord.status : undefined,
+        resultTool: typeof resultRecord?.pollWith === "string" ? resultRecord.pollWith : undefined,
       });
     },
     readRuntimeCapabilities: () => runtimeCapabilitiesPromise,

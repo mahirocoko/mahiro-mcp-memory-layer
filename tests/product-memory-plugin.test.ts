@@ -327,12 +327,8 @@ async function createPluginHarness(options?: {
     ...(options?.createMemoryBackend ? {} : { memory }),
     ...(options?.createMemoryBackend ? { createMemoryBackend: options.createMemoryBackend } : {}),
     messageDebounceMs: options?.messageDebounceMs ?? 25,
-    ...(options?.standaloneMcpAvailable === undefined
-      ? {}
-      : { standaloneMcpAvailable: options.standaloneMcpAvailable }),
-    ...(options?.sessionVisibleRemindersAvailable === undefined
-      ? {}
-      : { sessionVisibleRemindersAvailable: options.sessionVisibleRemindersAvailable }),
+    standaloneMcpAvailable: options?.standaloneMcpAvailable ?? false,
+    sessionVisibleRemindersAvailable: options?.sessionVisibleRemindersAvailable ?? false,
   };
   const hooks = await module.server(
     {
@@ -473,7 +469,24 @@ describe("product memory OpenCode plugin contract", () => {
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
       "orchestrate_workflow",
     );
+    expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
+      "start_agent_task",
+    );
     expectNoSelfSpawn(harness);
+  });
+
+  it("exposes orchestration tools on the plugin path when MCP-backed orchestration is available", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: true,
+    });
+
+    expect(harness.hooks.tool?.start_agent_task?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.get_orchestration_result?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.supervise_orchestration_result?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.get_orchestration_supervision_result?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.orchestrate_workflow).toBeUndefined();
+    expect(harness.hooks.tool?.wait_for_orchestration_result).toBeUndefined();
+    expect(harness.hooks.tool?.list_orchestration_traces).toBeUndefined();
   });
 
   it("serves the native memory_context tool from cached singleton runtime state", async () => {
@@ -780,7 +793,7 @@ describe("product memory OpenCode plugin contract", () => {
         lastEventType: "message.part.updated",
         cached: {
           wakeUp: {
-            wakeUpContext: "profile\n\n---\n\nrecent",
+            wakeUpContext: expect.stringContaining("Runtime startup brief"),
           },
         },
       },

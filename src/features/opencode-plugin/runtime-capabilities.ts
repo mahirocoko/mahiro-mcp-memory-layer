@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +13,7 @@ export const standaloneMcpServerName = "mahiro-mcp-memory-layer";
 
 const orchestrationToolNames = [
   "orchestrate_workflow",
+  "start_agent_task",
   "get_orchestration_result",
   "supervise_orchestration_result",
   "get_orchestration_supervision_result",
@@ -54,13 +56,42 @@ export interface OpenCodePluginRuntimeCapabilityOptions {
   readonly facadeConfig?: OpenCodePluginFacadeConfigSnapshot;
 }
 
+export function resolveOpenCodePluginRuntimeCapabilitiesSync(
+  options: OpenCodePluginRuntimeCapabilityOptions = {},
+): Pick<OpenCodePluginRuntimeCapabilities, "mode" | "orchestration" | "facade"> {
+  const standaloneMcpAvailable = options.standaloneMcpAvailable ?? existsSync(standaloneMcpServerEntryPath);
+  const remindersConfigured = options.facadeConfig?.remindersEnabled ?? false;
+  const sessionVisibleRemindersAvailable = options.sessionVisibleRemindersAvailable ?? false;
+
+  return {
+    mode: standaloneMcpAvailable ? "plugin-native+mcp" : "plugin-native",
+    orchestration: standaloneMcpAvailable
+      ? {
+          available: true,
+          serverName: standaloneMcpServerName,
+          toolNames: orchestrationToolNames,
+          activation: "source-checkout-mcp-injection",
+        }
+      : {
+          available: false,
+          toolNames: [],
+          activation: "unavailable",
+        },
+    facade: {
+      categoryRoutingAvailable: true,
+      categoryRoutes: options.facadeConfig?.categoryRoutes ?? {},
+      remindersConfigured,
+      sessionVisibleRemindersAvailable,
+    },
+  };
+}
+
 export async function resolveOpenCodePluginRuntimeCapabilities(
   options: OpenCodePluginRuntimeCapabilityOptions = {},
 ): Promise<OpenCodePluginRuntimeCapabilities> {
+  const syncCapabilities = resolveOpenCodePluginRuntimeCapabilitiesSync(options);
   const standaloneMcpAvailable =
-    options.standaloneMcpAvailable ?? (await standaloneMcpServerExists());
-  const remindersConfigured = options.facadeConfig?.remindersEnabled ?? false;
-  const sessionVisibleRemindersAvailable = options.sessionVisibleRemindersAvailable ?? false;
+    options.standaloneMcpAvailable ?? (syncCapabilities.orchestration.available || (await standaloneMcpServerExists()));
 
   return {
     mode: standaloneMcpAvailable ? "plugin-native+mcp" : "plugin-native",
@@ -85,9 +116,9 @@ export async function resolveOpenCodePluginRuntimeCapabilities(
         },
     facade: {
       categoryRoutingAvailable: true,
-      categoryRoutes: options.facadeConfig?.categoryRoutes ?? {},
-      remindersConfigured,
-      sessionVisibleRemindersAvailable,
+      categoryRoutes: syncCapabilities.facade.categoryRoutes,
+      remindersConfigured: syncCapabilities.facade.remindersConfigured,
+      sessionVisibleRemindersAvailable: syncCapabilities.facade.sessionVisibleRemindersAvailable,
     },
   };
 }

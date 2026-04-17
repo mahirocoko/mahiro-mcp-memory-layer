@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Tabs App</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="ocean">
+    <main class="app">
+      <header class="hero">
+        <p class="eyebrow">Sandbox Demo</p>
+        <h1>Simple Tabs App</h1>
+        <p class="subtitle">Three lightweight tabs with distinct content and styling.</p>
+      </header>
+
+      <section class="tabs" aria-label="Tabbed content">
+        <div class="tab-list" role="tablist" aria-label="Views">
+          <button class="tab is-active" id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview" data-theme="ocean">
+            Overview
+          </button>
+          <button class="tab" id="tab-gallery" role="tab" aria-selected="false" aria-controls="panel-gallery" data-tab="gallery" data-theme="sunset" tabindex="-1">
+            Gallery
+          </button>
+          <button class="tab" id="tab-notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-tab="notes" data-theme="forest" tabindex="-1">
+            Notes
+          </button>
+        </div>
+
+        <section class="panel is-active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+          <h2>Overview</h2>
+          <p>Start here for a quick snapshot of the app. This tab uses cool blue tones and a clean summary layout.</p>
+          <div class="card-grid">
+            <article class="card stat-card">
+              <span class="card-label">Focus</span>
+              <strong>Minimal UI</strong>
+            </article>
+            <article class="card stat-card">
+              <span class="card-label">Stack</span>
+              <strong>HTML, CSS, JS</strong>
+            </article>
+            <article class="card stat-card">
+              <span class="card-label">Tabs</span>
+              <strong>3 distinct views</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel panel-gallery" id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
+          <h2>Gallery</h2>
+          <p>This tab shifts to warm sunset colors and shows a simple visual grid.</p>
+          <div class="swatch-grid" aria-label="Color gallery">
+            <div class="swatch swatch-1"></div>
+            <div class="swatch swatch-2"></div>
+            <div class="swatch swatch-3"></div>
+            <div class="swatch swatch-4"></div>
+          </div>
+        </section>
+
+        <section class="panel panel-notes" id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
+          <h2>Notes</h2>
+          <p>This tab moves into a green notebook-style view with a short checklist.</p>
+          <ul class="notes-list">
+            <li>Plain JavaScript handles tab state.</li>
+            <li>Each tab changes the page accent colors.</li>
+            <li>The layout stays lightweight and responsive.</li>
+          </ul>
+        </section>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

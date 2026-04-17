@@ -143,13 +143,89 @@ describe("getRegisteredOrchestrationTools", () => {
   it("registers the orchestration workflow MCP tool", () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
+    const categoryTool = tools.find((item) => item.name === "start_agent_task");
 
     expect(tool).toBeDefined();
+    expect(categoryTool).toBeDefined();
     expect(tool?.description).toContain("parallel or sequential worker workflow");
     expect(tool?.description).toContain("async-first");
     expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["spec", "cwd", "waitForCompletion"]),
     );
+    expect(Object.keys(categoryTool?.inputSchema ?? {})).toEqual(
+      expect.arrayContaining(["category", "prompt"]),
+    );
+  });
+
+  it("starts a category-routed async task through the workflow engine", async () => {
+    let resolveRun: ((value: Awaited<ReturnType<typeof runOrchestrationWorkflow>>) => void) | undefined;
+
+    vi.mocked(runOrchestrationWorkflow).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    const result = await tool?.execute({
+      category: "quick",
+      prompt: "Review this diff.",
+      workerRuntime: "mcp",
+      mode: "plan",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
+    const forwardedSpec = vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0];
+
+    expect(forwardedSpec).toMatchObject({
+      mode: "parallel",
+      jobs: [
+        {
+          kind: "cursor",
+          workerRuntime: "mcp",
+          input: {
+            prompt: "Review this diff.",
+            model: "composer-2",
+            mode: "plan",
+          },
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      requestId: expect.stringMatching(/^workflow_/),
+      status: "running",
+      surface: "agent-category",
+      category: "quick",
+      route: {
+        workerKind: "cursor",
+        model: "composer-2",
+        workerRuntime: "mcp",
+      },
+      pollWith: "get_orchestration_result",
+    });
+
+    resolveRun?.({
+      requestId: "workflow_category",
+      mode: "parallel",
+      status: "completed",
+      results: [],
+      summary: {
+        totalJobs: 1,
+        finishedJobs: 1,
+        completedJobs: 1,
+        failedJobs: 0,
+        skippedJobs: 0,
+        startedAt: "2026-04-05T00:00:00.000Z",
+        finishedAt: "2026-04-05T00:00:00.000Z",
+        durationMs: 0,
+      },
+    });
+
+    await Promise.resolve();
+    expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
   });
 
   it("executes the orchestration tool with normalized workflow input", async () => {

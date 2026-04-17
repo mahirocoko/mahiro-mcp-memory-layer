@@ -1,4 +1,6 @@
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
+import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
+import { getRegisteredPluginFacadeTools } from "../orchestration/mcp/plugin-facade-tools.js";
 
 import type {
   OpenCodePluginHooks,
@@ -28,8 +30,26 @@ export function createOpenCodePluginTools(
     ]),
   );
 
+  const orchestrationTools = runtime.orchestrationFacadeAvailable
+    ? Object.fromEntries(
+        getRegisteredPluginFacadeTools(getRegisteredOrchestrationTools()).map((tool) => [
+          tool.name,
+          {
+            description: tool.description,
+            args: tool.inputSchema,
+            execute: async (args: Record<string, unknown>, toolContext: Record<string, unknown>) => {
+              const result = await tool.execute(args);
+              await runtime.trackAsyncTaskStart(result, toolContext);
+              return serializeOpenCodeToolResult(result);
+            },
+          },
+        ]),
+      )
+    : {};
+
   return {
     ...memoryTools,
+    ...orchestrationTools,
     runtime_capabilities: {
       description: "Read the active OpenCode runtime capability contract for memory and optional orchestration surfaces.",
       args: {},
