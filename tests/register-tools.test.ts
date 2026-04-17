@@ -25,6 +25,20 @@ vi.mock("../src/features/orchestration/observability/list-orchestration-traces.j
   listOrchestrationTraces: vi.fn(async () => []),
 }));
 
+vi.mock("../src/features/orchestration/runtime-model-inventory.js", () => ({
+  loadRuntimeModelInventory: vi.fn(async () => ({
+    source: "live",
+    fetchedAt: "2026-04-17T13:47:00.000Z",
+    cursor: {
+      models: ["composer-2", "claude-opus-4-7-high", "gemini-3-flash", "gemini-3.1-pro"],
+      modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
+      supportsPrint: true,
+      supportsCloud: true,
+      supportsAcp: true,
+    },
+  })),
+}));
+
 const orchestrationTraceStoreMock = {
   append: vi.fn(async () => undefined),
 };
@@ -134,6 +148,7 @@ vi.mock("../src/features/orchestration/observability/orchestration-supervision-s
 import { getRegisteredOrchestrationTools } from "../src/features/orchestration/mcp/register-tools.js";
 import { listOrchestrationTraces } from "../src/features/orchestration/observability/list-orchestration-traces.js";
 import { runOrchestrationWorkflow } from "../src/features/orchestration/run-orchestration-workflow.js";
+import { loadRuntimeModelInventory } from "../src/features/orchestration/runtime-model-inventory.js";
 
 describe("getRegisteredOrchestrationTools", () => {
   beforeEach(() => {
@@ -177,6 +192,7 @@ describe("getRegisteredOrchestrationTools", () => {
       mode: "plan",
     });
 
+    expect(vi.mocked(loadRuntimeModelInventory)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
     const forwardedSpec = vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0];
 

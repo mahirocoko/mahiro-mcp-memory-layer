@@ -93,7 +93,7 @@ describe("loadOpenCodePluginConfig", () => {
         "routing": {
           "categories": {
             "quick": {
-              "model": "claude-4.6-opus-high"
+              "model": "claude-opus-4-7-high"
             }
           }
         },
@@ -129,7 +129,7 @@ describe("loadOpenCodePluginConfig", () => {
       routing: {
         categoryRoutes: {
           quick: {
-            model: "claude-4.6-opus-high",
+            model: "claude-opus-4-7-high",
             workerRuntime: "mcp",
           },
         },

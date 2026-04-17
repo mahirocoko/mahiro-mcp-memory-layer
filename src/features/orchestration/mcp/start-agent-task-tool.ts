@@ -7,6 +7,7 @@ import {
 } from "../agent-category-routing.js";
 import type { OrchestrationLifecycle } from "../observability/orchestration-lifecycle.js";
 import type { OrchestrationTraceStore } from "../observability/orchestration-trace.js";
+import { loadRuntimeModelInventory, type RuntimeModelInventorySnapshot } from "../runtime-model-inventory.js";
 import { runOrchestrationWorkflow } from "../run-orchestration-workflow.js";
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
 import { buildAsyncWorkflowStartEnvelope } from "./async-workflow-envelope.js";
@@ -34,6 +35,7 @@ const startAgentTaskInputSchema = z.object({
 export function getRegisteredStartAgentTaskTool(input: {
   readonly orchestrationLifecycle: OrchestrationLifecycle;
   readonly orchestrationTraceStore: OrchestrationTraceStore;
+  readonly runtimeModelInventoryLoader?: () => Promise<RuntimeModelInventorySnapshot>;
 }): RegisteredTool {
   return {
     name: "start_agent_task",
@@ -45,10 +47,12 @@ export function getRegisteredStartAgentTaskTool(input: {
       const requestId = newId("workflow");
       const startedAt = new Date().toISOString();
       const taskId = parsed.taskId?.trim() || `${parsed.category}_${requestId.slice("workflow_".length, "workflow_".length + 12)}`;
+      const runtimeModelInventory = await (input.runtimeModelInventoryLoader ?? loadRuntimeModelInventory)();
       const job = buildAgentTaskWorkerJob({
         category: parsed.category,
         taskId,
         prompt: parsed.prompt,
+        runtimeModelInventory,
         ...(parsed.cwd ? { cwd: parsed.cwd } : {}),
         ...(parsed.timeoutMs !== undefined ? { timeoutMs: parsed.timeoutMs } : {}),
         ...(parsed.binaryPath ? { binaryPath: parsed.binaryPath } : {}),

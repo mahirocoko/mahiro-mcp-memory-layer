@@ -1,6 +1,7 @@
 import type { CursorWorkerInput } from "../cursor/types.js";
 import type { GeminiAllowedMcpServerNames, GeminiApprovalMode, GeminiTaskKind, GeminiWorkerInput } from "../gemini/types.js";
 import type { WorkerJob, WorkerRuntimeSelection } from "./types.js";
+import type { RuntimeModelInventorySnapshot } from "./runtime-model-inventory.js";
 
 export const agentTaskCategories = [
   "visual-engineering",
@@ -31,41 +32,46 @@ export type AgentTaskRouteOverrides = Partial<Record<AgentTaskCategory, AgentTas
 
 interface AgentTaskRoutePreset {
   readonly workerKind: WorkerJob["kind"];
-  readonly model: string;
+  readonly preferredModels: readonly string[];
 }
 
 const defaultAgentTaskRoutePresets: Record<AgentTaskCategory, AgentTaskRoutePreset> = {
   "visual-engineering": {
     workerKind: "gemini",
-    model: "gemini-3.1-pro-preview",
+    preferredModels: ["gemini-3.1-pro", "gemini-3-flash"],
   },
   artistry: {
     workerKind: "gemini",
-    model: "gemini-3.1-pro-preview",
+    preferredModels: ["gemini-3-flash", "gemini-3.1-pro"],
   },
   ultrabrain: {
     workerKind: "cursor",
-    model: "claude-4.6-opus-high",
+    preferredModels: [
+      "claude-opus-4-7-thinking-high",
+      "claude-opus-4-7-high",
+      "claude-4.6-opus-high",
+      "claude-4.6-sonnet-medium",
+    ],
   },
   deep: {
     workerKind: "cursor",
-    model: "composer-2",
+    preferredModels: ["claude-opus-4-7-high", "composer-2", "claude-4.6-opus-high", "claude-4.6-sonnet-medium"],
   },
   quick: {
     workerKind: "cursor",
-    model: "composer-2",
+    preferredModels: ["composer-2", "claude-4.6-sonnet-medium"],
   },
   "unspecified-low": {
     workerKind: "cursor",
-    model: "composer-2",
+    preferredModels: ["composer-2", "claude-4.6-sonnet-medium"],
   },
   "unspecified-high": {
     workerKind: "cursor",
-    model: "composer-2",
+    preferredModels: ["claude-opus-4-7-high", "composer-2", "claude-4.6-opus-high", "claude-4.6-sonnet-medium"],
   },
   writing: {
     workerKind: "cursor",
-    model: "composer-2",
+    preferredModels: ["composer-2", "claude-4.6-sonnet-medium"],
   },
 };
 
@@ -74,19 +80,47 @@ export interface ResolveAgentTaskRouteInput {
   readonly model?: string;
   readonly workerRuntime?: WorkerRuntimeSelection;
   readonly routeOverrides?: AgentTaskRouteOverrides;
+  readonly runtimeModelInventory?: RuntimeModelInventorySnapshot;
+}
+
+export interface EscalationSignals {
+  readonly uncertaintyLevel?: "low" | "medium" | "high";
+  readonly previousAttemptFailed?: boolean;
+  readonly verificationRisk?: boolean;
+  readonly requiresDeepReasoning?: boolean;
+  readonly requiresHigherQualityGemini?: boolean;
 }
 
 export function resolveAgentTaskRoute(input: ResolveAgentTaskRouteInput): AgentTaskRoute {
   const preset = defaultAgentTaskRoutePresets[input.category];
   const override = input.routeOverrides?.[input.category];
+  const inventoryBackedModel = resolveInventoryBackedModel(preset.preferredModels, input.runtimeModelInventory);
 
   return {
     category: input.category,
     workerKind: preset.workerKind,
-    model: normalizeOptionalString(input.model) ?? normalizeOptionalString(override?.model) ?? preset.model,
+    model: normalizeOptionalString(input.model) ?? normalizeOptionalString(override?.model) ?? inventoryBackedModel,
     ...(input.workerRuntime ?? override?.workerRuntime
       ? { workerRuntime: input.workerRuntime ?? override?.workerRuntime }
       : {}),
+  };
+}
+
+export function resolveEscalatedAgentTaskRoute(input: ResolveAgentTaskRouteInput & {
+  readonly currentModel?: string;
+  readonly signals: EscalationSignals;
+}): AgentTaskRoute {
+  const baseRoute = resolveAgentTaskRoute(input);
+  const currentModel = normalizeOptionalString(input.currentModel) ?? baseRoute.model;
+  const preferredEscalatedModels = resolvePreferredEscalatedModels(baseRoute.workerKind, currentModel, input.signals);
+
+  if (preferredEscalatedModels.length === 0 || preferredEscalatedModels[0] === currentModel) {
+    return baseRoute;
+  }
+
+  return {
+    ...baseRoute,
+    model: resolveInventoryBackedModel(preferredEscalatedModels, input.runtimeModelInventory),
   };
 }
 
@@ -100,6 +134,7 @@ export interface BuildAgentTaskWorkerJobBaseInput {
   readonly model?: string;
   readonly workerRuntime?: WorkerRuntimeSelection;
   readonly routeOverrides?: AgentTaskRouteOverrides;
+  readonly runtimeModelInventory?: RuntimeModelInventorySnapshot;
   readonly retries?: number;
   readonly retryDelayMs?: number;
   readonly continueOnFailure?: boolean;
@@ -178,4 +213,61 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
 
   const normalizedValue = value.trim();
   return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
+function resolveInventoryBackedModel(
+  preferredModels: readonly string[],
+  runtimeModelInventory: RuntimeModelInventorySnapshot | undefined,
+): string {
+  const availableModels = new Set(runtimeModelInventory?.cursor.models ?? []);
+
+  if (availableModels.size === 0) {
+    return preferredModels[0] ?? "composer-2";
+  }
+
+  for (const model of preferredModels) {
+    if (availableModels.has(model)) {
+      return model;
+    }
+  }
+
+  return preferredModels[0] ?? "composer-2";
+}
+
+function resolvePreferredEscalatedModels(
+  workerKind: AgentTaskRoute["workerKind"],
+  currentModel: string,
+  signals: EscalationSignals,
+): readonly string[] {
+  if (workerKind === "cursor") {
+    if (currentModel === "composer-2") {
+      if (signals.requiresDeepReasoning) {
+        return [
+          "claude-opus-4-7-thinking-high",
+          "claude-opus-4-7-high",
+          "claude-4.6-opus-high",
+          "claude-4.6-sonnet-medium",
+          currentModel,
+        ];
+      }
+
+      if (signals.previousAttemptFailed || signals.verificationRisk || signals.uncertaintyLevel === "high") {
+        return ["claude-opus-4-7-high", "claude-4.6-opus-high", "claude-4.6-sonnet-medium", currentModel];
+      }
+    }
+
+    if (currentModel === "claude-opus-4-7-high" && signals.requiresDeepReasoning) {
+      return ["claude-opus-4-7-thinking-high", "claude-4.6-opus-high", "claude-4.6-sonnet-medium", currentModel];
+    }
+
+    return [];
+  }
+
+  if (currentModel === "gemini-3-flash") {
+    if (signals.requiresHigherQualityGemini || signals.verificationRisk || signals.uncertaintyLevel === "high") {
+      return ["gemini-3.1-pro", currentModel];
+    }
+  }
+
+  return [];
 }

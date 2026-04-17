@@ -71,7 +71,7 @@ Example plugin-local façade config:
   "routing": {
     "categories": {
       "quick": {
-        "model": "claude-4.6-opus-high",
+        "model": "claude-opus-4-7-high",
         "workerRuntime": "mcp"
       }
     }
@@ -158,6 +158,7 @@ Example shape:
 {
   "category": "quick",
   "prompt": "Review this diff for obvious regressions.",
+  "model": "claude-opus-4-7-high",
   "workerRuntime": "mcp",
   "mode": "plan"
 }

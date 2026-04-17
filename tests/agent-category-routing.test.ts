@@ -2,15 +2,41 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAgentTaskWorkerJob,
+  resolveEscalatedAgentTaskRoute,
   resolveAgentTaskRoute,
 } from "../src/features/orchestration/agent-category-routing.js";
+import type { RuntimeModelInventorySnapshot } from "../src/features/orchestration/runtime-model-inventory.js";
+
+const sampleRuntimeModelInventory: RuntimeModelInventorySnapshot = {
+  source: "live",
+  fetchedAt: "2026-04-17T13:47:00.000Z",
+  cursor: {
+    models: ["composer-2", "claude-opus-4-7-high", "claude-opus-4-7-thinking-high", "gemini-3-flash", "gemini-3.1-pro"],
+    modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
+    supportsPrint: true,
+    supportsCloud: true,
+    supportsAcp: true,
+  },
+};
+
+const fallbackOnlyRuntimeModelInventory: RuntimeModelInventorySnapshot = {
+  source: "live",
+  fetchedAt: "2026-04-17T13:47:00.000Z",
+  cursor: {
+    models: ["composer-2", "claude-4.6-sonnet-medium", "claude-4.6-opus-high", "gemini-3.1-pro"],
+    modes: ["agent", "plan", "ask", "print"],
+    supportsPrint: true,
+    supportsCloud: false,
+    supportsAcp: false,
+  },
+};
 
 describe("resolveAgentTaskRoute", () => {
   it("routes visual-engineering to Gemini Pro by default", () => {
     expect(resolveAgentTaskRoute({ category: "visual-engineering" })).toEqual({
       category: "visual-engineering",
       workerKind: "gemini",
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3.1-pro",
     });
   });
 
@@ -18,7 +44,28 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "ultrabrain" })).toEqual({
       category: "ultrabrain",
       workerKind: "cursor",
-      model: "claude-4.6-opus-high",
+      model: "claude-opus-4-7-thinking-high",
+    });
+  });
+
+  it("routes deep and unspecified-high categories to the primary Opus lane", () => {
+    expect(resolveAgentTaskRoute({ category: "deep" })).toEqual({
+      category: "deep",
+      workerKind: "cursor",
+      model: "claude-opus-4-7-high",
+    });
+    expect(resolveAgentTaskRoute({ category: "unspecified-high" })).toEqual({
+      category: "unspecified-high",
+      workerKind: "cursor",
+      model: "claude-opus-4-7-high",
+    });
+  });
+
+  it("routes artistry to the Gemini fast lane by default", () => {
+    expect(resolveAgentTaskRoute({ category: "artistry" })).toEqual({
+      category: "artistry",
+      workerKind: "gemini",
+      model: "gemini-3-flash",
     });
   });
 
@@ -39,13 +86,13 @@ describe("resolveAgentTaskRoute", () => {
     expect(
       resolveAgentTaskRoute({
         category: "artistry",
-        model: "gemini-3-flash-preview",
+        model: "gemini-3-flash",
         workerRuntime: "mcp",
       }),
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-flash",
       workerRuntime: "mcp",
     });
   });
@@ -56,7 +103,7 @@ describe("resolveAgentTaskRoute", () => {
         category: "quick",
         routeOverrides: {
           quick: {
-            model: "claude-4.6-opus-high",
+            model: "claude-opus-4-7-high",
             workerRuntime: "mcp",
           },
         },
@@ -64,8 +111,45 @@ describe("resolveAgentTaskRoute", () => {
     ).toEqual({
       category: "quick",
       workerKind: "cursor",
-      model: "claude-4.6-opus-high",
+      model: "claude-opus-4-7-high",
       workerRuntime: "mcp",
+    });
+  });
+
+  it("accepts a runtime model inventory snapshot without changing current defaults", () => {
+    expect(
+      resolveAgentTaskRoute({
+        category: "quick",
+        runtimeModelInventory: sampleRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "quick",
+      workerKind: "cursor",
+      model: "composer-2",
+    });
+  });
+
+  it("falls back to compatibility lanes when preferred models are unavailable at runtime", () => {
+    expect(
+      resolveAgentTaskRoute({
+        category: "ultrabrain",
+        runtimeModelInventory: fallbackOnlyRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "ultrabrain",
+      workerKind: "cursor",
+      model: "claude-4.6-opus-high",
+    });
+
+    expect(
+      resolveAgentTaskRoute({
+        category: "artistry",
+        runtimeModelInventory: fallbackOnlyRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "artistry",
+      workerKind: "gemini",
+      model: "gemini-3.1-pro",
     });
   });
 });
@@ -90,7 +174,7 @@ describe("buildAgentTaskWorkerJob", () => {
       input: {
         taskId: "ui-task",
         prompt: "Design the sidebar.",
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3.1-pro",
         cwd: "/repo",
         timeoutMs: 30_000,
         taskKind: "general",
@@ -135,20 +219,20 @@ describe("buildAgentTaskWorkerJob", () => {
         category: "deep",
         taskId: "deep-task",
         prompt: "Investigate this architecture.",
-        model: "claude-4.6-opus-high",
+        model: "claude-opus-4-7-high",
         workerRuntime: "mcp",
         mode: "plan",
       }),
     ).toEqual({
       kind: "cursor",
       workerRuntime: "mcp",
-      input: {
-        taskId: "deep-task",
-        prompt: "Investigate this architecture.",
-        model: "claude-4.6-opus-high",
-        mode: "plan",
-      },
-    });
+        input: {
+          taskId: "deep-task",
+          prompt: "Investigate this architecture.",
+          model: "claude-opus-4-7-high",
+          mode: "plan",
+        },
+      });
   });
 
   it("uses route overrides when no explicit model/runtime is provided", () => {
@@ -159,7 +243,7 @@ describe("buildAgentTaskWorkerJob", () => {
         prompt: "Write release notes.",
         routeOverrides: {
           writing: {
-            model: "claude-4.6-opus-high",
+            model: "claude-opus-4-7-high",
             workerRuntime: "mcp",
           },
         },
@@ -168,12 +252,133 @@ describe("buildAgentTaskWorkerJob", () => {
     ).toEqual({
       kind: "cursor",
       workerRuntime: "mcp",
+        input: {
+          taskId: "doc-task",
+          prompt: "Write release notes.",
+          model: "claude-opus-4-7-high",
+          mode: "plan",
+        },
+      });
+  });
+
+  it("uses runtime-backed fallback selection when building worker jobs", () => {
+    expect(
+      buildAgentTaskWorkerJob({
+        category: "ultrabrain",
+        taskId: "debug-task",
+        prompt: "Explain the root cause.",
+        runtimeModelInventory: fallbackOnlyRuntimeModelInventory,
+        mode: "plan",
+      }),
+    ).toEqual({
+      kind: "cursor",
       input: {
-        taskId: "doc-task",
-        prompt: "Write release notes.",
+        taskId: "debug-task",
+        prompt: "Explain the root cause.",
         model: "claude-4.6-opus-high",
         mode: "plan",
       },
+    });
+  });
+});
+
+describe("resolveEscalatedAgentTaskRoute", () => {
+  it("escalates composer-2 to Opus high for failed or high-risk cursor work", () => {
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "quick",
+        currentModel: "composer-2",
+        signals: {
+          previousAttemptFailed: true,
+        },
+        runtimeModelInventory: sampleRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "quick",
+      workerKind: "cursor",
+      model: "claude-opus-4-7-high",
+    });
+  });
+
+  it("escalates Opus high to thinking-high when deep reasoning is required", () => {
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "deep",
+        currentModel: "claude-opus-4-7-high",
+        signals: {
+          requiresDeepReasoning: true,
+        },
+        runtimeModelInventory: sampleRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "deep",
+      workerKind: "cursor",
+      model: "claude-opus-4-7-thinking-high",
+    });
+  });
+
+  it("escalates gemini-3-flash to gemini-3.1-pro when higher quality is needed", () => {
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "artistry",
+        currentModel: "gemini-3-flash",
+        signals: {
+          requiresHigherQualityGemini: true,
+        },
+        runtimeModelInventory: sampleRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "artistry",
+      workerKind: "gemini",
+      model: "gemini-3.1-pro",
+    });
+  });
+
+  it("falls back to compatibility lanes during escalation when preferred models are unavailable", () => {
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "quick",
+        currentModel: "composer-2",
+        signals: {
+          verificationRisk: true,
+        },
+        runtimeModelInventory: fallbackOnlyRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "quick",
+      workerKind: "cursor",
+      model: "claude-4.6-opus-high",
+    });
+
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "ultrabrain",
+        currentModel: "claude-opus-4-7-high",
+        signals: {
+          requiresDeepReasoning: true,
+        },
+        runtimeModelInventory: fallbackOnlyRuntimeModelInventory,
+      }),
+    ).toEqual({
+      category: "ultrabrain",
+      workerKind: "cursor",
+      model: "claude-4.6-opus-high",
+    });
+  });
+
+  it("keeps the current route when no escalation signal is present", () => {
+    expect(
+      resolveEscalatedAgentTaskRoute({
+        category: "quick",
+        currentModel: "composer-2",
+        signals: {
+          uncertaintyLevel: "low",
+        },
+      }),
+    ).toEqual({
+      category: "quick",
+      workerKind: "cursor",
+      model: "composer-2",
     });
   });
 });
