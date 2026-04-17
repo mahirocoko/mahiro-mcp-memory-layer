@@ -1,10 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { getAppEnv } from "../../../config/env.js";
 import { isWorkflowRequestId } from "../../../lib/ids.js";
 import type { OrchestrationRunResult } from "../run-orchestration-workflow.js";
 import type { WorkerJob } from "../types.js";
 import type { OrchestrateWorkflowSpec } from "../workflow-spec.js";
+import { pruneExpiredOrchestrationResultRecords } from "./orchestration-retention.js";
 
 interface OrchestrationResultMetadata {
   readonly mode: OrchestrateWorkflowSpec["mode"];
@@ -130,6 +132,10 @@ export class OrchestrationResultStore {
   private async writeRecord(record: OrchestrationResultRecord): Promise<void> {
     await mkdir(this.directoryPath, { recursive: true });
     await writeFile(this.resolveConfinedPath(record.requestId), JSON.stringify(record, null, 2), "utf8");
+    await pruneExpiredOrchestrationResultRecords({
+      directoryPath: this.directoryPath,
+      ttlMs: getAppEnv().orchestrationRetention.ttlMs,
+    });
   }
 
   private resolveConfinedPath(requestId: string): string {

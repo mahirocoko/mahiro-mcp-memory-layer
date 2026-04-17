@@ -1,8 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { getAppEnv } from "../../../config/env.js";
 import { isSupervisorRequestId } from "../../../lib/ids.js";
 import type { OrchestrationResultRecord } from "./orchestration-result-store.js";
+import { pruneExpiredOrchestrationSupervisionRecords } from "./orchestration-retention.js";
 
 interface BaseOrchestrationSupervisionRecord {
   readonly requestId: string;
@@ -152,6 +154,10 @@ export class OrchestrationSupervisionStore {
   private async writeRecord(record: OrchestrationSupervisionRecord): Promise<void> {
     await mkdir(this.directoryPath, { recursive: true });
     await writeFile(this.resolveConfinedPath(record.requestId), JSON.stringify(record, null, 2), "utf8");
+    await pruneExpiredOrchestrationSupervisionRecords({
+      directoryPath: this.directoryPath,
+      ttlMs: getAppEnv().orchestrationRetention.ttlMs,
+    });
   }
 
   private resolveConfinedPath(requestId: string): string {

@@ -24,6 +24,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
             errorClass: "none",
             requestedModel: "gemini-3-flash-preview",
             reportedModel: "gemini-3-flash-preview",
+            routeReason: "default_visual-engineering_lane",
           },
           {
             kind: "cursor",
@@ -34,6 +35,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
             errorClass: "rate_limited",
             requestedModel: "composer-2",
             reportedModel: "composer-2",
+            routeReason: "verification_risk_escalation",
           },
         ],
         totalJobs: 2,
@@ -52,6 +54,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
       traceCount: 1,
       jobCount: 2,
       byWorkerKind: { gemini: 1, cursor: 1 },
+      byRouteReason: { "default_visual-engineering_lane": 1, verification_risk_escalation: 1 },
       byRequestedModel: { "gemini-3-flash-preview": 1, "composer-2": 1 },
       byReportedModel: { "gemini-3-flash-preview": 1, "composer-2": 1 },
       bySource: { cli: 1 },
@@ -108,6 +111,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
     expect(summary.traceCount).toBe(1);
     expect(summary.jobCount).toBe(3);
     expect(summary.byWorkerKind).toEqual({ gemini: 2, cursor: 1 });
+    expect(summary.byRouteReason).toEqual({});
     expect(summary.byRequestedModel).toEqual({});
     expect(summary.byReportedModel).toEqual({});
     expect(summary.bySource).toEqual({ mcp: 1 });
@@ -142,7 +146,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
         status: "completed",
         jobKinds: ["gemini"],
         taskIds: ["t1"],
-        jobModels: [{ kind: "gemini", taskId: "t1", status: "runner_failed", retryCount: 1, durationMs: 500, cached: false, cachedTokens: 0, errorClass: "infra_failure", requestedModel: "gemini-3-flash-preview" }],
+        jobModels: [{ kind: "gemini", taskId: "t1", status: "runner_failed", retryCount: 1, durationMs: 500, cached: false, cachedTokens: 0, errorClass: "infra_failure", requestedModel: "gemini-3-flash-preview", routeReason: "runtime_fallback_missing_primary_model" }],
         totalJobs: 1,
         finishedJobs: 1,
         completedJobs: 0,
@@ -156,6 +160,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
     ]);
 
     expect(summary.byRequestedModel).toEqual({ "gemini-3-flash-preview": 1 });
+    expect(summary.byRouteReason).toEqual({ runtime_fallback_missing_primary_model: 1 });
     expect(summary.byReportedModel).toEqual({});
     expect(summary.byWorkflowStatus).toEqual({ failed: 1 });
     expect(summary.byJobStatus).toEqual({ runner_failed: 1 });
@@ -195,6 +200,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
     ]);
 
     expect(summary.byRequestedModel).toEqual({ "composer-2": 1 });
+    expect(summary.byRouteReason).toEqual({});
     expect(summary.byJobStatus).toEqual({});
     expect(summary.byErrorClass).toEqual({});
     expect(summary.bySourceErrorClass).toEqual({});
@@ -222,6 +228,7 @@ describe("summarizeOrchestrationTraceUsage", () => {
             status: "completed",
             requestedModel: "gemini-3-flash-preview",
             reportedModel: "gemini-3.1-pro-preview",
+            routeReason: "higher_quality_gemini_escalation",
           },
         ],
         totalJobs: 1,
@@ -237,5 +244,6 @@ describe("summarizeOrchestrationTraceUsage", () => {
     ]);
 
     expect(summary.modelMismatchOutcome).toEqual({ comparableJobs: 1, modelMismatchCount: 1, modelMismatchRate: 1 });
+    expect(summary.byRouteReason).toEqual({ higher_quality_gemini_escalation: 1 });
   });
 });

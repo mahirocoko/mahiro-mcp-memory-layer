@@ -1,11 +1,13 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
+import { getAppEnv } from "../../../config/env.js";
 import { getEffectiveOrchestrationTraceStatus } from "./effective-orchestration-trace-status.js";
 import { classifyWorkerJobError } from "../job-error-class.js";
 import type { OrchestrationRunResult } from "../run-orchestration-workflow.js";
 import type { OrchestrateWorkflowSpec } from "../workflow-spec.js";
 import type { OrchestrationJobModelTelemetry, OrchestrationTraceEntry, WorkerJob, WorkerJobResult } from "../types.js";
+import { pruneExpiredOrchestrationTraceEntries } from "./orchestration-retention.js";
 
 export class OrchestrationTraceStore {
   public constructor(private readonly filePath: string) {}
@@ -13,6 +15,10 @@ export class OrchestrationTraceStore {
   public async append(entry: OrchestrationTraceEntry): Promise<void> {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     await appendFile(this.filePath, `${JSON.stringify(entry)}\n`, "utf8");
+    await pruneExpiredOrchestrationTraceEntries({
+      filePath: this.filePath,
+      ttlMs: getAppEnv().orchestrationRetention.ttlMs,
+    });
   }
 }
 

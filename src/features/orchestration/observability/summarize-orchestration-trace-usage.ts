@@ -70,6 +70,7 @@ export interface OrchestrationTraceUsageSummary {
   readonly traceCount: number;
   readonly jobCount: number;
   readonly byWorkerKind: Readonly<Record<string, number>>;
+  readonly byRouteReason: Readonly<Record<string, number>>;
   readonly byRequestedModel: Readonly<Record<string, number>>;
   readonly byReportedModel: Readonly<Record<string, number>>;
   readonly bySource: Readonly<Record<string, number>>;
@@ -109,6 +110,7 @@ export function summarizeOrchestrationTraceUsage(
   traces: readonly OrchestrationTraceEntry[],
 ): OrchestrationTraceUsageSummary {
   const byWorkerKind: Record<string, number> = {};
+  const byRouteReason: Record<string, number> = {};
   const byRequestedModel: Record<string, number> = {};
   const byReportedModel: Record<string, number> = {};
   const bySource: Record<string, number> = {};
@@ -156,6 +158,9 @@ export function summarizeOrchestrationTraceUsage(
       for (const job of normalizedTrace.jobModels) {
         jobCount += 1;
         byWorkerKind[job.kind] = (byWorkerKind[job.kind] ?? 0) + 1;
+        if (typeof job.routeReason === "string") {
+          byRouteReason[job.routeReason] = (byRouteReason[job.routeReason] ?? 0) + 1;
+        }
         byRequestedModel[job.requestedModel] = (byRequestedModel[job.requestedModel] ?? 0) + 1;
         const jobStatus = typeof job.status === "string" ? job.status : undefined;
         const errorClass = jobStatus ? classifyJobErrorFromTelemetry({ status: jobStatus, errorClass: job.errorClass }) : undefined;
@@ -255,6 +260,7 @@ export function summarizeOrchestrationTraceUsage(
     traceCount: traces.length,
     jobCount,
     byWorkerKind,
+    byRouteReason,
     byRequestedModel,
     byReportedModel,
     bySource,
