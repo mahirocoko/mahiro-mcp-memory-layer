@@ -43,7 +43,7 @@ Use the plugin-native memory surface first for memory work. Do not assume orches
 - **Plugin-native memory work**: use the memory tools above
 - **MCP orchestration / worker work**: use only when the host/runtime actually exposes those tools
 
-If the current tool list contains `orchestrate_workflow`, `get_orchestration_result`, `supervise_orchestration_result`, or `wait_for_orchestration_result`, you are on an MCP-capable path.
+If the current tool list contains `orchestrate_workflow`, `start_agent_task`, `get_orchestration_result`, `supervise_orchestration_result`, or `wait_for_orchestration_result`, you are on an MCP-capable path.
 
 If you want a structured answer instead of inferring from the tool list, call `runtime_capabilities` on the plugin path.
 
@@ -60,6 +60,24 @@ Important posture:
 - this is a **plugin-local control-plane layer**, not a second orchestration engine
 - these settings do **not** imply orchestration is available on the standard plugin path; continue to gate on `runtime_capabilities`
 - categories compile down to the repo’s existing worker/runtime/model choices rather than replacing the current workflow/result/supervision primitives
+
+Example plugin-local façade config:
+
+```jsonc
+{
+  "runtime": {
+    "remindersEnabled": true
+  },
+  "routing": {
+    "categories": {
+      "quick": {
+        "model": "claude-4.6-opus-high",
+        "workerRuntime": "mcp"
+      }
+    }
+  }
+}
+```
 
 ## Memory-side task flows
 
@@ -115,12 +133,35 @@ Recommended conservative write flow:
 
 When the MCP orchestration surface is available, these are the primary tools:
 
+- `start_agent_task`
 - `orchestrate_workflow`
 - `get_orchestration_result`
 - `supervise_orchestration_result`
 - `get_orchestration_supervision_result`
 - `wait_for_orchestration_result`
 - `list_orchestration_traces`
+
+### `start_agent_task`
+
+Use this when you want the thin OMOA-style public façade instead of constructing a raw workflow spec yourself.
+
+Important posture:
+
+- it accepts task intent through `category` plus a `prompt`
+- it compiles to a one-job workflow using the repo’s existing worker/runtime/model routing rules
+- it returns the same async contract as background workflow starts (`requestId`, `status`, `pollWith`, `recommendedFollowUp`, `nextArgs`, etc.)
+- on the plugin path, this is part of the intentionally narrowed orchestration façade; the plugin does **not** expose the full raw orchestration surface
+
+Example shape:
+
+```json
+{
+  "category": "quick",
+  "prompt": "Review this diff for obvious regressions.",
+  "workerRuntime": "mcp",
+  "mode": "plan"
+}
+```
 
 ### `orchestrate_workflow`
 

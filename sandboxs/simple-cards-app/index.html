@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Cards App</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <p class="eyebrow">Sandbox Demo</p>
+        <h1>Simple Card Gallery</h1>
+        <p class="subtitle">A lightweight gallery with four cards and a small filter button group.</p>
+      </header>
+
+      <section class="controls" aria-label="Card filters">
+        <button class="filter is-active" data-filter="all">All</button>
+        <button class="filter" data-filter="design">Design</button>
+        <button class="filter" data-filter="code">Code</button>
+      </section>
+
+      <section class="card-grid" aria-label="Gallery cards">
+        <article class="card" data-category="design">
+          <span class="badge badge-design">Design</span>
+          <h2>Palette Study</h2>
+          <p>Warm gradients and soft spacing for a quick visual concept.</p>
+        </article>
+
+        <article class="card" data-category="code">
+          <span class="badge badge-code">Code</span>
+          <h2>UI Script</h2>
+          <p>A small interaction layer for buttons, states, and simple filtering.</p>
+        </article>
+
+        <article class="card" data-category="design">
+          <span class="badge badge-design">Design</span>
+          <h2>Poster Draft</h2>
+          <p>Bold shapes and contrast experiments collected into one compact card.</p>
+        </article>
+
+        <article class="card" data-category="code">
+          <span class="badge badge-code">Code</span>
+          <h2>Data View</h2>
+          <p>Simple layout ideas for surfacing short summaries and structured items.</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

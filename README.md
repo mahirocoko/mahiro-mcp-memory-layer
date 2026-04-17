@@ -41,7 +41,16 @@ Local development path:
 
 Use the `file://` variant when you want OpenCode to load the plugin directly from your local checkout while debugging or iterating on the source.
 
-When the plugin is loaded from a real source checkout like the `file://` path above, it also injects a local MCP entry for this repo's standalone server through the plugin `config` hook. That makes MCP-backed tools such as `orchestrate_workflow`, `get_orchestration_result`, and `list_orchestration_traces` available without adding a manual `mcp` block yourself.
+When the plugin is loaded from a real source checkout like the `file://` path above, it also injects a local MCP entry for this repo's standalone server through the plugin `config` hook. That makes MCP-backed orchestration available without adding a manual `mcp` block yourself.
+
+On the **plugin hook path itself**, the exposed orchestration surface stays intentionally thin:
+
+- `start_agent_task`
+- `get_orchestration_result`
+- `supervise_orchestration_result`
+- `get_orchestration_supervision_result`
+
+This keeps the plugin path aligned with the new façade model instead of exposing the full raw orchestration tool set inside the interactive plugin UI.
 
 That MCP injection is intentionally source-checkout only. The standard package-name install should be treated as the plugin-native memory path first.
 
@@ -56,7 +65,16 @@ Example plugin config:
 ```jsonc
 {
   "runtime": {
-    "messageDebounceMs": 150
+    "messageDebounceMs": 150,
+    "remindersEnabled": true
+  },
+  "routing": {
+    "categories": {
+      "quick": {
+        "model": "claude-4.6-opus-high",
+        "workerRuntime": "mcp"
+      }
+    }
   }
 }
 ```
@@ -102,7 +120,19 @@ The memory side now has two distinct loops:
 Plugin override knob:
 
 - `MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS` controls the OpenCode plugin's message debounce window.
+- `MAHIRO_OPENCODE_PLUGIN_REMINDERS_ENABLED=true|false` overrides the plugin-local async reminder gate.
 - `MAHIRO_OPENCODE_PLUGIN_DEBUG_STDERR=1` mirrors plugin lifecycle logging to stderr when the OpenCode app logger is unavailable or failing, which is useful for debugging live hook delivery and wake-up caching.
+
+### Thin async façade
+
+When the MCP orchestration surface is available, `start_agent_task` is now the smallest public category-driven async start surface.
+
+- it accepts a task `category` and `prompt`
+- it compiles that category to the repo’s existing worker/runtime/model routing
+- it returns the same async polling contract as workflow starts (`requestId`, `status`, `pollWith`, `recommendedFollowUp`, etc.)
+- it does **not** create a second orchestration engine or a second persistence lifecycle
+
+Use it when you want OMOA-style category routing without constructing raw workflow specs yourself.
 
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 

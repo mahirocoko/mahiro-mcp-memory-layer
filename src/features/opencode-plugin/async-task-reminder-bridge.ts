@@ -85,6 +85,10 @@ async function emitReminderLog(
     readonly requestId: string;
     readonly status: string;
     readonly resultTool: string;
+    readonly recommendedFollowUp: string;
+    readonly nextArgs: {
+      readonly requestId: string;
+    };
     readonly message: string;
   },
 ): Promise<void> {
@@ -104,6 +108,8 @@ async function emitReminderLog(
         requestId: reminder.requestId,
         status: reminder.status,
         resultTool: reminder.resultTool,
+        recommendedFollowUp: reminder.recommendedFollowUp,
+        nextArgs: reminder.nextArgs,
       },
     },
     query: {

@@ -21,6 +21,7 @@ export interface OpenCodeAsyncTaskReminder {
   readonly requestId: string;
   readonly status: AsyncTaskTerminalStatus;
   readonly resultTool: string;
+  readonly recommendedFollowUp: string;
   readonly nextArgs: {
     readonly requestId: string;
   };
@@ -101,6 +102,7 @@ export function consumeOpenCodeAsyncTaskReminder(
     requestId: input.requestId,
     status: input.status,
     resultTool: input.resultTool,
+    recommendedFollowUp: input.resultTool,
     nextArgs: {
       requestId: input.requestId,
     },

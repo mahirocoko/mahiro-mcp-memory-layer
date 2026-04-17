@@ -100,6 +100,7 @@ describe("consumeOpenCodeAsyncTaskReminder", () => {
       requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       status: "completed",
       resultTool: "get_orchestration_result",
+      recommendedFollowUp: "get_orchestration_result",
       nextArgs: {
         requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       },
