@@ -76,6 +76,7 @@ Current delivery posture:
 
 - when the plugin client exposes `session.promptAsync`, the plugin treats that as a usable session-visible continuation surface
 - `sessionVisibleRemindersAvailable` therefore means “the plugin can inject reminder continuations back into the active session,” not only “the host has a separate native reminder UI”
+- `sessionTaskFlowAvailable` means the plugin can inject a visible `Task — ...` start message into the active session when `orch:` auto-dispatch begins and MCP orchestration is actually available on that runtime
 - `tui.showToast` is optional best-effort acknowledgement only; reminder continuation delivery depends on `session.promptAsync`
 
 Important posture:

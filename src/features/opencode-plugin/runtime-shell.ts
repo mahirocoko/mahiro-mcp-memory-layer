@@ -26,6 +26,7 @@ import {
   type OpenCodePluginRuntimeCapabilities,
 } from "./runtime-capabilities.js";
 import { detectOpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
+import { deliverSessionTaskStart } from "./session-task-presenter.js";
 import { resolveOpenCodePluginOrchAutoDispatchRequest } from "./orch-auto-dispatch.js";
 import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
 import {
@@ -198,9 +199,12 @@ export function createOpenCodePluginRuntime(
     sessionState: OpenCodePluginSessionState,
     result: unknown,
     prompt: string,
+    sourceMessageId: string,
   ): Promise<void> => {
     const resultRecord =
       typeof result === "object" && result !== null ? (result as Record<string, unknown>) : undefined;
+    const requestId = typeof resultRecord?.requestId === "string" ? resultRecord.requestId : undefined;
+    const taskId = typeof resultRecord?.taskId === "string" ? resultRecord.taskId : undefined;
 
     applyOperatorTaskUpdate(sessionState, resultRecord, {
       toolName: "start_agent_task",
@@ -211,10 +215,27 @@ export function createOpenCodePluginRuntime(
       },
     });
 
+    if (requestId && sessionState.lastPresentedTaskStartMessageId !== sourceMessageId) {
+      try {
+        await deliverSessionTaskStart({
+          context,
+          support: sessionReminderSupport,
+          sessionId: sessionState.sessionId,
+          requestId,
+          taskId,
+          prompt,
+        });
+      } catch {
+        // fail open: the task already started and should not respawn on a repeated same-message event
+      } finally {
+        sessionState.lastPresentedTaskStartMessageId = sourceMessageId;
+      }
+    }
+
     await asyncTaskTracker.trackAsyncTask({
       parentSessionId: sessionState.sessionId,
-      requestId: typeof resultRecord?.requestId === "string" ? resultRecord.requestId : undefined,
-      taskId: typeof resultRecord?.taskId === "string" ? resultRecord.taskId : undefined,
+      requestId,
+      taskId,
       status: typeof resultRecord?.status === "string" ? resultRecord.status : undefined,
       resultTool: typeof resultRecord?.pollWith === "string" ? resultRecord.pollWith : undefined,
     });
@@ -479,6 +500,7 @@ export function createOpenCodePluginRuntime(
       startAgentTaskTool,
       syncCapabilities.orchestration.available,
       context.directory,
+      sessionReminderSupport,
       trackAutoDispatchedTaskStart,
     );
     scheduleMessageUpdatedPrecompute(sessionState, event);
@@ -919,13 +941,15 @@ async function maybeAutoDispatchOrchTask(
   startAgentTaskTool: OpenCodePluginStartAgentTaskExecutor | undefined,
   orchestrationFacadeAvailable: boolean,
   contextDirectory: string,
+  sessionReminderSupport: ReturnType<typeof detectOpenCodePluginSessionReminderSupport>,
   trackAutoDispatchedTaskStart: (
     sessionState: OpenCodePluginSessionState,
     result: unknown,
     prompt: string,
+    sourceMessageId: string,
   ) => Promise<void>,
 ): Promise<void> {
-  if (!sessionState || !startAgentTaskTool || !orchestrationFacadeAvailable) {
+  if (!sessionState || !startAgentTaskTool || !orchestrationFacadeAvailable || !sessionReminderSupport.sessionPromptAsyncAvailable) {
     return;
   }
 
@@ -941,7 +965,12 @@ async function maybeAutoDispatchOrchTask(
     cwd: contextDirectory,
   });
 
-  await trackAutoDispatchedTaskStart(sessionState, result, dispatchRequest.prompt);
+  await trackAutoDispatchedTaskStart(
+    sessionState,
+    result,
+    dispatchRequest.prompt,
+    dispatchRequest.sourceMessageId,
+  );
   sessionState.lastAutoDispatchMessageId = dispatchRequest.sourceMessageId;
 }
 

@@ -91,6 +91,7 @@ export interface OpenCodePluginSessionState {
   pendingPrepareHostTurnKey?: string;
   lastHandledPrepareHostTurnKey?: string;
   lastAutoDispatchMessageId?: string;
+  lastPresentedTaskStartMessageId?: string;
   startupBrief?: string;
   capabilities?: OpenCodePluginRuntimeCapabilities;
   wakeUp?: WakeUpMemoryResult;
@@ -167,6 +168,7 @@ export function syncSessionStateFromEvent(
     pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
     lastAutoDispatchMessageId: existingState?.lastAutoDispatchMessageId,
+    lastPresentedTaskStartMessageId: existingState?.lastPresentedTaskStartMessageId,
     startupBrief: existingState?.startupBrief,
     capabilities: existingState?.capabilities,
     wakeUp: existingState?.wakeUp,

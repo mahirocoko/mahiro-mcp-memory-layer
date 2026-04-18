@@ -47,6 +47,7 @@ export interface OpenCodePluginRuntimeCapabilities {
     readonly categoryRoutes: OpenCodePluginFacadeConfigSnapshot["categoryRoutes"];
     readonly remindersConfigured: boolean;
     readonly sessionVisibleRemindersAvailable: boolean;
+    readonly sessionTaskFlowAvailable: boolean;
   };
 }
 
@@ -64,6 +65,7 @@ export function resolveOpenCodePluginRuntimeCapabilitiesSync(
   const remindersConfigured = options.facadeConfig?.remindersEnabled ?? false;
   const sessionVisibleRemindersAvailable =
     options.sessionVisibleRemindersAvailable ?? options.sessionReminderSupport?.sessionPromptAsyncAvailable ?? false;
+  const sessionTaskFlowAvailable = standaloneMcpAvailable && sessionVisibleRemindersAvailable;
 
   return {
     mode: standaloneMcpAvailable ? "plugin-native+mcp" : "plugin-native",
@@ -84,6 +86,7 @@ export function resolveOpenCodePluginRuntimeCapabilitiesSync(
       categoryRoutes: options.facadeConfig?.categoryRoutes ?? {},
       remindersConfigured,
       sessionVisibleRemindersAvailable,
+      sessionTaskFlowAvailable,
     },
   };
 }
@@ -121,6 +124,7 @@ export async function resolveOpenCodePluginRuntimeCapabilities(
       categoryRoutes: syncCapabilities.facade.categoryRoutes,
       remindersConfigured: syncCapabilities.facade.remindersConfigured,
       sessionVisibleRemindersAvailable: syncCapabilities.facade.sessionVisibleRemindersAvailable,
+      sessionTaskFlowAvailable: syncCapabilities.facade.sessionTaskFlowAvailable,
     },
   };
 }
@@ -146,6 +150,9 @@ export function buildOpenCodePluginStartupBrief(
         ? "- Async reminders: configured and the plugin can inject reminder continuations back into the active session."
         : "- Async reminders: configured, but dormant because no session-visible continuation surface is available in this runtime."
       : "- Async reminders: disabled by config.",
+    capabilities.facade.sessionTaskFlowAvailable
+      ? "- Session task flow: visible Task-style starts are available on the plugin path."
+      : "- Session task flow: unavailable.",
   ];
 
   return sections.join("\n");

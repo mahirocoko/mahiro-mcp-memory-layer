@@ -16,7 +16,11 @@ export function resolveOpenCodePluginOrchAutoDispatchRequest(
     return null;
   }
 
-  if (recentConversation.startsWith("<system-reminder>")) {
+  if (
+    recentConversation.startsWith("<system-reminder>") ||
+    recentConversation.startsWith("Task — ") ||
+    recentConversation.startsWith("Task - ")
+  ) {
     return null;
   }
 

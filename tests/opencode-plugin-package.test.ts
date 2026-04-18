@@ -425,11 +425,12 @@ describe("OpenCode plugin package", () => {
               available: false,
             },
             facade: {
-              categoryRoutingAvailable: true,
-              categoryRoutes: {},
-              remindersConfigured: false,
-              sessionVisibleRemindersAvailable: false,
-            },
+        categoryRoutingAvailable: true,
+        categoryRoutes: {},
+        remindersConfigured: false,
+        sessionVisibleRemindersAvailable: false,
+        sessionTaskFlowAvailable: false,
+      },
           },
           cached: {
             wakeUp: expect.objectContaining({

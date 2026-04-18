@@ -122,10 +122,14 @@ describe("OpenCode plugin operator loop", () => {
   });
 
   it("auto-dispatches explicit orch prompts into tracked start_agent_task execution", async () => {
+    const promptAsync = vi.fn().mockResolvedValue(undefined);
     const runtime = createOpenCodePluginRuntime(
       {
         directory: "/repo",
-        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+        client: {
+          session: { promptAsync },
+          app: { log: vi.fn().mockResolvedValue(undefined) },
+        },
       } as never,
       {
         __test: {
@@ -150,6 +154,20 @@ describe("OpenCode plugin operator loop", () => {
       operatorStatus: "awaiting_resume",
       resultTool: "get_orchestration_result",
     });
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          parts: [
+            expect.objectContaining({
+              text: expect.stringContaining("Task — Review this diff"),
+              metadata: expect.objectContaining({
+                kind: "async-task-start",
+              }),
+            }),
+          ],
+        },
+      }),
+    );
   });
 
   it("tracks call_worker starts in the operator ledger", async () => {
@@ -199,10 +217,14 @@ describe("OpenCode plugin operator loop", () => {
   });
 
   it("auto-dispatches the next actionable turn after orch: on without respawning the same message twice", async () => {
+    const promptAsync = vi.fn().mockResolvedValue(undefined);
     const runtime = createOpenCodePluginRuntime(
       {
         directory: "/repo",
-        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+        client: {
+          session: { promptAsync },
+          app: { log: vi.fn().mockResolvedValue(undefined) },
+        },
       } as never,
       {
         __test: {
@@ -243,13 +265,72 @@ describe("OpenCode plugin operator loop", () => {
       currentMode: "sticky-on",
     });
     expect(tasks).toHaveLength(1);
+    const taskStartCalls = promptAsync.mock.calls.filter(
+      ([input]) => input?.body?.parts?.[0]?.metadata?.kind === "async-task-start",
+    );
+
+    expect(taskStartCalls).toHaveLength(1);
   });
 
-  it("does not auto-dispatch when orchestration facade is unavailable", async () => {
+  it("does not respawn the same task when visible task-start injection fails", async () => {
+    const promptAsync = vi.fn().mockRejectedValue(new Error("prompt failed"));
     const runtime = createOpenCodePluginRuntime(
       {
         directory: "/repo",
-        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+        client: {
+          session: { promptAsync },
+          app: { log: vi.fn().mockResolvedValue(undefined) },
+        },
+      } as never,
+      {
+        __test: {
+          memory: createMemoryBackend() as never,
+          standaloneMcpAvailable: true,
+          sessionVisibleRemindersAvailable: true,
+        },
+      },
+      createConfig(),
+    );
+
+    await runtime.handleSessionCreated(createSessionCreatedEvent());
+    await runtime.handleMessageUpdated({
+      type: "message.updated",
+      properties: {
+        sessionID: "session-1",
+        messageID: "session-1-message-2",
+        parts: [{ type: "text", text: "orch: review this diff" }],
+      },
+    });
+    await runtime.handleMessageUpdated({
+      type: "message.updated",
+      properties: {
+        sessionID: "session-1",
+        messageID: "session-1-message-2",
+        parts: [{ type: "text", text: "orch: review this diff" }],
+      },
+    });
+    await flushMicrotasks();
+
+    const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
+    expect(memoryContext.status).toBe("ready");
+    const tasks = memoryContext.status === "ready" ? Object.values(memoryContext.session.operator?.tasks ?? {}) : [];
+    const taskStartCalls = promptAsync.mock.calls.filter(
+      ([input]) => input?.body?.parts?.[0]?.metadata?.kind === "async-task-start",
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(taskStartCalls).toHaveLength(1);
+  });
+
+  it("does not auto-dispatch when orchestration facade is unavailable", async () => {
+    const promptAsync = vi.fn().mockResolvedValue(undefined);
+    const runtime = createOpenCodePluginRuntime(
+      {
+        directory: "/repo",
+        client: {
+          session: { promptAsync },
+          app: { log: vi.fn().mockResolvedValue(undefined) },
+        },
       } as never,
       {
         __test: {
@@ -268,6 +349,7 @@ describe("OpenCode plugin operator loop", () => {
     const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
     expect(memoryContext.status).toBe("ready");
     expect(memoryContext.status === "ready" ? Object.keys(memoryContext.session.operator?.tasks ?? {}) : []).toHaveLength(0);
+    expect(promptAsync).not.toHaveBeenCalled();
   });
 
   it("creates a tracked ledger entry for sticky or request-only orch tasks and transitions through resume and verification", async () => {

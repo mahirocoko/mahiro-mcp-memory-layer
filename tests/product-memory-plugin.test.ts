@@ -467,6 +467,7 @@ describe("product memory OpenCode plugin contract", () => {
         categoryRoutes: {},
         remindersConfigured: false,
         sessionVisibleRemindersAvailable: false,
+        sessionTaskFlowAvailable: false,
       },
     });
     expectNoSelfSpawn(harness);
@@ -516,6 +517,27 @@ describe("product memory OpenCode plugin contract", () => {
     expect(result).toMatchObject({
       facade: {
         sessionVisibleRemindersAvailable: true,
+        sessionTaskFlowAvailable: true,
+      },
+    });
+  });
+
+  it("does not advertise session task flow when prompt injection exists without MCP orchestration", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: false,
+      sessionPromptAsyncAvailable: true,
+    });
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
+
+    expect(result).toMatchObject({
+      mode: "plugin-native",
+      orchestration: {
+        available: false,
+      },
+      facade: {
+        sessionVisibleRemindersAvailable: true,
+        sessionTaskFlowAvailable: false,
       },
     });
   });
@@ -578,6 +600,7 @@ describe("product memory OpenCode plugin contract", () => {
         categoryRoutes: {},
         remindersConfigured: false,
         sessionVisibleRemindersAvailable: false,
+        sessionTaskFlowAvailable: false,
       },
     });
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(

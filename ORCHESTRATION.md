@@ -74,6 +74,7 @@ Sticky-mode notes:
 On the plugin path, the orchestrator posture now has a thin session-local operator loop layered on top of the existing orchestration primitives.
 
 - `start_agent_task` can create a tracked session task when orch mode is active
+- `orch:` can now inject a visible `Task — ...` start into the same session on the plugin path before the underlying workflow finishes
 - terminal async reminders can bring `requestId`, `taskId`, and reminder-token context back into the main session
 - `get_orchestration_result` is the normal resume step after a reminder, not just a passive polling read
 - completed workflow output is not treated as operator-complete until it passes the verification step

@@ -19,6 +19,8 @@ First check `runtime_capabilities`.
 - Keep the work minimal, verify results, and report which runtime mode is active before major actions.
 
 On current plugin-capable runtimes, that session-visible reminder can be a plugin-local continuation injected through `session.promptAsync`, not only a separate host reminder UI.
+
+When visible task flow is available, `orch:` should also create a `Task — ...` style start message in the same session before the terminal reminder comes back.
 ```
 
 ## Alternative Template
