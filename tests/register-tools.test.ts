@@ -159,9 +159,11 @@ describe("getRegisteredOrchestrationTools", () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
     const categoryTool = tools.find((item) => item.name === "start_agent_task");
+    const workerTool = tools.find((item) => item.name === "call_worker");
 
     expect(tool).toBeDefined();
     expect(categoryTool).toBeDefined();
+    expect(workerTool).toBeDefined();
     expect(tool?.description).toContain("parallel or sequential worker workflow");
     expect(tool?.description).toContain("async-first");
     expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
@@ -170,6 +172,106 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(Object.keys(categoryTool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["category", "prompt"]),
     );
+    expect(Object.keys(workerTool?.inputSchema ?? {})).toEqual(
+      expect.arrayContaining(["worker", "prompt"]),
+    );
+  });
+
+  it("starts an explicit worker-lane async task through the workflow engine", async () => {
+    let resolveRun: ((value: Awaited<ReturnType<typeof runOrchestrationWorkflow>>) => void) | undefined;
+
+    vi.mocked(runOrchestrationWorkflow).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "call_worker");
+
+    const result = await tool?.execute({
+      worker: "gemini",
+      prompt: "Summarize this issue.",
+      workerRuntime: "mcp",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
+    const forwardedSpec = vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0];
+
+    expect(forwardedSpec).toMatchObject({
+      mode: "parallel",
+      jobs: [
+        {
+          kind: "gemini",
+          workerRuntime: "mcp",
+          routeReason: "explicit_worker_lane",
+          input: {
+            prompt: "Summarize this issue.",
+            model: "gemini-3-pro-preview",
+          },
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      requestId: expect.stringMatching(/^workflow_/),
+      status: "running",
+      surface: "worker-lane",
+      worker: "gemini",
+      route: {
+        workerKind: "gemini",
+        model: "gemini-3-pro-preview",
+        reason: "explicit_worker_lane",
+        workerRuntime: "mcp",
+      },
+      pollWith: "get_orchestration_result",
+    });
+
+    resolveRun?.({
+      requestId: "workflow_worker",
+      mode: "parallel",
+      status: "completed",
+      results: [],
+      summary: {
+        totalJobs: 1,
+        finishedJobs: 1,
+        completedJobs: 1,
+        failedJobs: 0,
+        skippedJobs: 0,
+        startedAt: "2026-04-05T00:00:00.000Z",
+        finishedAt: "2026-04-05T00:00:00.000Z",
+        durationMs: 0,
+      },
+    });
+
+    await Promise.resolve();
+    expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects lane-specific cursor fields on gemini worker calls", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "call_worker");
+
+    await expect(
+      tool?.execute({
+        worker: "gemini",
+        prompt: "Summarize this issue.",
+        mode: "ask",
+      }),
+    ).rejects.toThrow(/mode is only valid for cursor worker/i);
+  });
+
+  it("rejects timeout values above worker contract limits", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "call_worker");
+
+    await expect(
+      tool?.execute({
+        worker: "cursor",
+        prompt: "Summarize this issue.",
+        timeoutMs: 300_001,
+      }),
+    ).rejects.toThrow(/too_big|less than or equal to 300000/i);
   });
 
   it("starts a category-routed async task through the workflow engine", async () => {

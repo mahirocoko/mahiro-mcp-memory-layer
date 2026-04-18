@@ -14,6 +14,7 @@ export const standaloneMcpServerName = "mahiro-mcp-memory-layer";
 
 const orchestrationToolNames = [
   "orchestrate_workflow",
+  "call_worker",
   "start_agent_task",
   "get_orchestration_result",
   "supervise_orchestration_result",

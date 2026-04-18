@@ -1,6 +1,7 @@
 import type { RegisteredTool } from "../../../lib/mcp/registered-tool.js";
 
 const pluginFacadeToolNames = new Set([
+  "call_worker",
   "start_agent_task",
   "get_orchestration_result",
   "supervise_orchestration_result",

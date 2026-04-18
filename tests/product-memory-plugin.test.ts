@@ -547,6 +547,9 @@ describe("product memory OpenCode plugin contract", () => {
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
       "start_agent_task",
     );
+    expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
+      "call_worker",
+    );
     expectNoSelfSpawn(harness);
   });
 
@@ -556,6 +559,7 @@ describe("product memory OpenCode plugin contract", () => {
     });
 
     expect(harness.hooks.tool?.start_agent_task?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.call_worker?.execute).toEqual(expect.any(Function));
     expect(harness.hooks.tool?.get_orchestration_result?.execute).toEqual(expect.any(Function));
     expect(harness.hooks.tool?.supervise_orchestration_result?.execute).toEqual(expect.any(Function));
     expect(harness.hooks.tool?.get_orchestration_supervision_result?.execute).toEqual(expect.any(Function));

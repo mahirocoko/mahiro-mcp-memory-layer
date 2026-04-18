@@ -16,6 +16,7 @@ import {
   waitForOrchestrationResultInputSchema,
 } from "../schemas.js";
 import { getRegisteredStartAgentTaskTool } from "./start-agent-task-tool.js";
+import { getRegisteredCallWorkerTool } from "./call-worker-tool.js";
 import { getOrchestrationSupervisionResult, startOrchestrationSupervision } from "../supervise-orchestration-result.js";
 import { waitForOrchestrationResult } from "../wait-for-orchestration-result.js";
 import { normalizeWorkflowSpec, orchestrateToolInputSchema } from "../workflow-spec.js";
@@ -137,6 +138,10 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
       },
     },
     getRegisteredStartAgentTaskTool({
+      orchestrationLifecycle,
+      orchestrationTraceStore,
+    }),
+    getRegisteredCallWorkerTool({
       orchestrationLifecycle,
       orchestrationTraceStore,
     }),

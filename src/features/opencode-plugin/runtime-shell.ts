@@ -840,7 +840,7 @@ function applyOperatorTaskUpdate(
   const existingTask = operator.tasks[requestId];
   const currentMode = resolveEffectiveOperatorMode(operator);
 
-  if (metadata.toolName === "start_agent_task") {
+  if (metadata.toolName === "start_agent_task" || metadata.toolName === "call_worker") {
     if (currentMode === "off") {
       return;
     }

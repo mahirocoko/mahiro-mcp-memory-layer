@@ -152,6 +152,52 @@ describe("OpenCode plugin operator loop", () => {
     });
   });
 
+  it("tracks call_worker starts in the operator ledger", async () => {
+    const runtime = createOpenCodePluginRuntime(
+      {
+        directory: "/repo",
+        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+      } as never,
+      {
+        __test: {
+          memory: createMemoryBackend() as never,
+          standaloneMcpAvailable: true,
+          sessionVisibleRemindersAvailable: true,
+        },
+      },
+      createConfig(),
+    );
+
+    await runtime.handleSessionCreated(createSessionCreatedEvent());
+    await runtime.handleMessageUpdated(createMessageUpdatedEvent("session-1", "orch: on"));
+    await runtime.trackAsyncTaskStart(
+      {
+        requestId: "workflow_callworkeraaaaaaaaaaaaaaaaaaaa",
+        taskId: "gemini_callworker",
+        status: "running",
+        pollWith: "get_orchestration_result",
+      },
+      { sessionID: "session-1" },
+      {
+        toolName: "call_worker",
+        args: {
+          worker: "gemini",
+          prompt: "Summarize this issue.",
+        },
+      },
+    );
+
+    await flushMicrotasks();
+
+    const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
+    expect(memoryContext.status).toBe("ready");
+    expect(memoryContext.status === "ready" ? memoryContext.session.operator?.tasks.workflow_callworkeraaaaaaaaaaaaaaaaaaaa : undefined).toMatchObject({
+      taskId: "gemini_callworker",
+      operatorStatus: "awaiting_resume",
+      resultTool: "get_orchestration_result",
+    });
+  });
+
   it("auto-dispatches the next actionable turn after orch: on without respawning the same message twice", async () => {
     const runtime = createOpenCodePluginRuntime(
       {
