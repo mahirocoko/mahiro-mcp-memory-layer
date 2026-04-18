@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrchestrationResultRecord } from "../src/features/orchestration/observability/orchestration-result-store.js";
@@ -92,6 +93,14 @@ describe("getRegisteredGeminiWorkerTools", () => {
     expect(tools.find((item) => item.name === "run_gemini_worker")).toBeUndefined();
     expect(tools.find((item) => item.name === "run_gemini_worker_async")).toBeDefined();
     expect(tools.find((item) => item.name === "get_gemini_worker_result")).toBeDefined();
+  });
+
+  it("exposes JSON-schema-safe public input schemas", () => {
+    const tools = getRegisteredGeminiWorkerTools();
+
+    for (const tool of tools) {
+      expect(() => z.toJSONSchema(z.object(tool.inputSchema))).not.toThrow();
+    }
   });
 
   it("registers an async Gemini worker start tool backed by orchestration", async () => {

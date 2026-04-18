@@ -18,19 +18,8 @@ export const geminiWorkerInputSchema = z.object({
   taskKind: z.enum(geminiTaskKinds).optional(),
   approvalMode: z.enum(geminiApprovalModes).optional(),
   allowedMcpServerNames: z.union([
-    trimmedNonEmptyStringSchema.transform((value, ctx) => {
-      if (value === "none") {
-        return "none" as const;
-      }
-
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "allowedMcpServerNames string form only supports 'none'.",
-      });
-
-      return z.NEVER;
-    }),
-    z.array(geminiAllowedMcpServerNameSchema).min(1).transform((value) => value as [string, ...string[]]),
+    z.literal("none"),
+    z.array(geminiAllowedMcpServerNameSchema).min(1),
   ]).optional(),
 });
 

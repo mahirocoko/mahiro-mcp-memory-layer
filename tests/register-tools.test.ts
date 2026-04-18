@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrchestrationResultRecord } from "../src/features/orchestration/observability/orchestration-result-store.js";
 import type { OrchestrationSupervisionRecord } from "../src/features/orchestration/observability/orchestration-supervision-store.js";
@@ -175,6 +176,14 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(Object.keys(workerTool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["worker", "prompt"]),
     );
+  });
+
+  it("exposes JSON-schema-safe orchestration tool input schemas", () => {
+    const tools = getRegisteredOrchestrationTools();
+
+    for (const tool of tools) {
+      expect(() => z.toJSONSchema(z.object(tool.inputSchema))).not.toThrow();
+    }
   });
 
   it("starts an explicit worker-lane async task through the workflow engine", async () => {
