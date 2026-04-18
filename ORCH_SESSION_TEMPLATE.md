@@ -52,3 +52,37 @@ If the runtime does not expose orchestration, continue with the available memory
 - `memory_context` can expose plugin-side `operator` state for tracked tasks.
 - `mark_orchestration_task_verification` is the plugin-local finalize step after verification.
 - `running` means in-progress, not stale or failed.
+
+## Human-Facing Examples
+
+Use the simple forms below. The agent should handle reminder/resume, verification, and explicit worker selection on its own unless you ask for a specific lane or model.
+
+```text
+orch: on
+
+Review this repo and propose the safest refactor plan.
+```
+
+```text
+orch: on
+
+Implement the feature end-to-end and keep working until verification is complete.
+```
+
+```text
+orch: Fix the failing test and explain the root cause.
+```
+
+```text
+orch: Investigate this bug first, then implement the minimal fix.
+```
+
+If you want explicit worker control, ask for it directly:
+
+```text
+orch: Use Gemini for this visual/UI task.
+```
+
+```text
+orch: Use Cursor for this refactor and code review pass.
+```
