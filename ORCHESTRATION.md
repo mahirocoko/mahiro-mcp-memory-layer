@@ -79,6 +79,11 @@ On the plugin path, the orchestrator posture now has a thin session-local operat
 - completed workflow output is not treated as operator-complete until it passes the verification step
 - `mark_orchestration_task_verification` is the plugin-local finalize step for closing tracked tasks as `completed` or `needs_attention`
 
+Current delivery posture:
+
+- on the plugin path, that session-visible reminder path can be provided by plugin-local continuation injection through `client.session.promptAsync`
+- `client.tui.showToast` is optional UX acknowledgement only and does not define availability by itself
+
 Important posture:
 
 - this is a **thin control-plane loop**, not a second orchestration engine

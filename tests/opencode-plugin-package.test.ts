@@ -334,6 +334,7 @@ describe("OpenCode plugin package", () => {
             memory: sharedMemoryBackend,
             messageDebounceMs: 0,
             standaloneMcpAvailable: false,
+            opencodeConfigDirectory: path.join(repoRoot, ".opencode-plugin-test-user-config"),
           },
         } as unknown as Record<string, unknown>,
       );

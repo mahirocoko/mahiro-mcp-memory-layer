@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
 import type { OpenCodePluginFacadeConfigSnapshot } from "./config.js";
+import type { OpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
 
 const standaloneMcpServerEntryPath = fileURLToPath(new URL("../../index.ts", import.meta.url));
 const memoryMcpServerPath = fileURLToPath(new URL("../memory/mcp/server.ts", import.meta.url));
@@ -53,6 +54,7 @@ export interface OpenCodePluginRuntimeCapabilities {
 export interface OpenCodePluginRuntimeCapabilityOptions {
   readonly standaloneMcpAvailable?: boolean;
   readonly sessionVisibleRemindersAvailable?: boolean;
+  readonly sessionReminderSupport?: OpenCodePluginSessionReminderSupport;
   readonly facadeConfig?: OpenCodePluginFacadeConfigSnapshot;
 }
 
@@ -61,7 +63,8 @@ export function resolveOpenCodePluginRuntimeCapabilitiesSync(
 ): Pick<OpenCodePluginRuntimeCapabilities, "mode" | "orchestration" | "facade"> {
   const standaloneMcpAvailable = options.standaloneMcpAvailable ?? existsSync(standaloneMcpServerEntryPath);
   const remindersConfigured = options.facadeConfig?.remindersEnabled ?? false;
-  const sessionVisibleRemindersAvailable = options.sessionVisibleRemindersAvailable ?? false;
+  const sessionVisibleRemindersAvailable =
+    options.sessionVisibleRemindersAvailable ?? options.sessionReminderSupport?.sessionPromptAsyncAvailable ?? false;
 
   return {
     mode: standaloneMcpAvailable ? "plugin-native+mcp" : "plugin-native",
@@ -141,8 +144,8 @@ export function buildOpenCodePluginStartupBrief(
       : "- Facade routing overrides: none configured.",
     capabilities.facade.remindersConfigured
       ? capabilities.facade.sessionVisibleRemindersAvailable
-        ? "- Async reminders: configured and a session-visible reminder surface is available."
-        : "- Async reminders: configured, but dormant because no session-visible reminder surface is available in this runtime."
+        ? "- Async reminders: configured and the plugin can inject reminder continuations back into the active session."
+        : "- Async reminders: configured, but dormant because no session-visible continuation surface is available in this runtime."
       : "- Async reminders: disabled by config.",
   ];
 

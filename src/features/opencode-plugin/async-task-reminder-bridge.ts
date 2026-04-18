@@ -2,11 +2,14 @@ import { getAppEnv } from "../../config/env.js";
 import { OrchestrationResultStore } from "../orchestration/observability/orchestration-result-store.js";
 import { waitForOrchestrationResult } from "../orchestration/wait-for-orchestration-result.js";
 import {
-  consumeOpenCodeAsyncTaskReminder,
+  buildOpenCodeAsyncTaskReminder,
   createOpenCodeAsyncTaskReminderRegistry,
+  markOpenCodeAsyncTaskReminderDelivered,
 } from "./async-task-reminders.js";
 import type { OpenCodePluginContext } from "./resolve-scope.js";
 import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
+import { deliverSessionReminder } from "./session-reminder-delivery.js";
+import { detectOpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
 
 const DEFAULT_ASYNC_TASK_REMINDER_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_ASYNC_TASK_REMINDER_POLL_INTERVAL_MS = 1_000;
@@ -58,7 +61,7 @@ export function createOpenCodeAsyncTaskTracker(input: {
         timeoutMs: DEFAULT_ASYNC_TASK_REMINDER_TIMEOUT_MS,
       })
         .then(async (response) => {
-          const reminder = consumeOpenCodeAsyncTaskReminder(reminderRegistry, {
+          const reminder = buildOpenCodeAsyncTaskReminder(reminderRegistry, {
             parentSessionId: task.parentSessionId,
             requestId,
             taskId: task.taskId,
@@ -71,6 +74,18 @@ export function createOpenCodeAsyncTaskTracker(input: {
           if (!reminder) {
             return;
           }
+
+          const deliverySupport = detectOpenCodePluginSessionReminderSupport(input.context, {
+            sessionVisibleRemindersAvailable: capabilities.facade.sessionVisibleRemindersAvailable,
+          });
+
+          const delivered = await deliverSessionReminder(input.context, reminder, deliverySupport).catch(() => false);
+
+          if (!delivered) {
+            return;
+          }
+
+          markOpenCodeAsyncTaskReminderDelivered(reminderRegistry, reminder);
 
           await emitReminderLog(input.context, reminder);
           await input.onReminder?.(reminder);

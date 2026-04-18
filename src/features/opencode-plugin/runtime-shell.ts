@@ -24,6 +24,7 @@ import {
   resolveOpenCodePluginRuntimeCapabilitiesSync,
   type OpenCodePluginRuntimeCapabilities,
 } from "./runtime-capabilities.js";
+import { detectOpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
 import {
   buildMemoryContextResult,
   buildPrepareHostTurnKey,
@@ -119,9 +120,12 @@ export function createOpenCodePluginRuntime(
   config: OpenCodePluginConfig,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
+  const sessionReminderSupport = detectOpenCodePluginSessionReminderSupport(context, {
+    sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable,
+  });
   const syncCapabilities = resolveOpenCodePluginRuntimeCapabilitiesSync({
     standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
-    sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable ?? false,
+    sessionReminderSupport,
     facadeConfig: {
       remindersEnabled: config.runtime.remindersEnabled,
       categoryRoutes: config.routing.categoryRoutes,
@@ -129,7 +133,7 @@ export function createOpenCodePluginRuntime(
   });
   const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
     standaloneMcpAvailable: syncCapabilities.orchestration.available,
-    sessionVisibleRemindersAvailable: syncCapabilities.facade.sessionVisibleRemindersAvailable,
+    sessionReminderSupport,
     facadeConfig: {
       remindersEnabled: config.runtime.remindersEnabled,
       categoryRoutes: config.routing.categoryRoutes,

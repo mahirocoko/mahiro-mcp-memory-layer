@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildOpenCodeAsyncTaskReminder,
   canEmitOpenCodeAsyncTaskReminder,
   consumeOpenCodeAsyncTaskReminder,
   createOpenCodeAsyncTaskReminderRegistry,
+  markOpenCodeAsyncTaskReminderDelivered,
 } from "../src/features/opencode-plugin/async-task-reminders.js";
 
 const pluginOnlyCapabilities = {
@@ -107,6 +109,12 @@ describe("consumeOpenCodeAsyncTaskReminder", () => {
       },
       message:
         "Background task workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa completed. Use get_orchestration_result with this requestId to inspect the stored result.",
+      sessionPrompt: `<system-reminder>
+[BACKGROUND TASK COMPLETED]
+requestId: workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+status: completed
+Use get_orchestration_result with this requestId to inspect the stored result and continue the operator loop in this same session.
+</system-reminder>`,
     });
   });
 
@@ -165,6 +173,42 @@ describe("consumeOpenCodeAsyncTaskReminder", () => {
         parentSessionId: "session-1",
         requestId: "workflow_duplicate",
         status: "runner_failed",
+        resultTool: "get_orchestration_result",
+        capabilities: pluginPlusMcpCapabilities,
+        remindersEnabled: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("marks reminders as delivered only after explicit delivery finalization", () => {
+    const registry = createOpenCodeAsyncTaskReminderRegistry();
+    const reminder = buildOpenCodeAsyncTaskReminder(registry, {
+      parentSessionId: "session-1",
+      requestId: "workflow_delivery",
+      status: "completed",
+      resultTool: "get_orchestration_result",
+      capabilities: pluginPlusMcpCapabilities,
+      remindersEnabled: true,
+    });
+
+    expect(reminder).not.toBeNull();
+    expect(
+      buildOpenCodeAsyncTaskReminder(registry, {
+        parentSessionId: "session-1",
+        requestId: "workflow_delivery",
+        status: "completed",
+        resultTool: "get_orchestration_result",
+        capabilities: pluginPlusMcpCapabilities,
+        remindersEnabled: true,
+      }),
+    ).not.toBeNull();
+
+    expect(markOpenCodeAsyncTaskReminderDelivered(registry, reminder!)).toBe(true);
+    expect(
+      buildOpenCodeAsyncTaskReminder(registry, {
+        parentSessionId: "session-1",
+        requestId: "workflow_delivery",
+        status: "completed",
         resultTool: "get_orchestration_result",
         capabilities: pluginPlusMcpCapabilities,
         remindersEnabled: true,

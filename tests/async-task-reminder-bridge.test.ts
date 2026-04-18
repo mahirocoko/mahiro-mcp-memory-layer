@@ -43,11 +43,19 @@ describe("createOpenCodeAsyncTaskTracker", () => {
 
   it("emits a host log reminder for a tracked running workflow request", async () => {
     const log = vi.fn().mockResolvedValue(undefined);
+    const promptAsync = vi.fn().mockResolvedValue(undefined);
+    const showToast = vi.fn().mockResolvedValue(true);
     const onReminder = vi.fn();
     const tracker = createOpenCodeAsyncTaskTracker({
       context: {
         directory: "/repo",
         client: {
+          session: {
+            promptAsync,
+          },
+          tui: {
+            showToast,
+          },
           app: {
             log,
           },
@@ -68,45 +76,51 @@ describe("createOpenCodeAsyncTaskTracker", () => {
 
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
 
-    expect(log).toHaveBeenCalledWith({
+    expect(promptAsync).toHaveBeenCalledWith({
+      path: {
+        id: "session-1",
+      },
       body: {
-        service: "opencode-async-task-reminder",
-        level: "info",
-        message:
-          "Background task workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa completed. Use get_orchestration_result with this requestId to inspect the stored result.",
-        extra: {
-          parentSessionId: "session-1",
-          requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
-          taskId: "quick_aaaaaaaaaaaa",
-          status: "completed",
-          resultTool: "get_orchestration_result",
-          recommendedFollowUp: "get_orchestration_result",
-          nextArgs: {
-            requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        parts: [
+          {
+            type: "text",
+            text: `<system-reminder>
+[BACKGROUND TASK COMPLETED]
+requestId: workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+taskId: quick_aaaaaaaaaaaa
+status: completed
+Use get_orchestration_result with this requestId to inspect the stored result and continue the operator loop in this same session.
+</system-reminder>`,
+            synthetic: true,
+            metadata: {
+              source: "mahiro-mcp-memory-layer",
+              kind: "async-task-reminder",
+              requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
+              taskId: "quick_aaaaaaaaaaaa",
+            },
           },
-        },
+        ],
       },
       query: {
         directory: "/repo",
       },
     });
-    expect(onReminder).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        taskId: "quick_aaaaaaaaaaaa",
-        reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
-      }),
-    );
+    expect(showToast).toHaveBeenCalled();
   });
 
   it("stays dormant when reminders are disabled or session-visible reminders are unavailable", async () => {
     const log = vi.fn().mockResolvedValue(undefined);
+    const promptAsync = vi.fn().mockResolvedValue(undefined);
     const tracker = createOpenCodeAsyncTaskTracker({
       context: {
         directory: "/repo",
         client: {
+          session: {
+            promptAsync,
+          },
           app: {
             log,
           },
@@ -131,5 +145,6 @@ describe("createOpenCodeAsyncTaskTracker", () => {
 
     await Promise.resolve();
     expect(log).not.toHaveBeenCalled();
+    expect(promptAsync).not.toHaveBeenCalled();
   });
 });

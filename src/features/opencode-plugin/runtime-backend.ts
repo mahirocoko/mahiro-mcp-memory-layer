@@ -9,6 +9,8 @@ export interface OpenCodePluginTestOptions {
   readonly messageDebounceMs?: number;
   readonly standaloneMcpAvailable?: boolean;
   readonly sessionVisibleRemindersAvailable?: boolean;
+  readonly homeDirectory?: string;
+  readonly opencodeConfigDirectory?: string;
 }
 
 let singletonMemoryBackendPromise: Promise<OpenCodePluginMemoryBackend> | undefined;

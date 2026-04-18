@@ -28,10 +28,11 @@ export interface OpenCodeAsyncTaskReminder {
     readonly requestId: string;
   };
   readonly message: string;
+  readonly sessionPrompt: string;
 }
 
 export interface OpenCodeAsyncTaskReminderRegistry {
-  readonly emittedReminderKeys: Set<string>;
+  readonly deliveredReminderKeys: Set<string>;
 }
 
 export interface BuildOpenCodeAsyncTaskReminderInput {
@@ -46,7 +47,7 @@ export interface BuildOpenCodeAsyncTaskReminderInput {
 
 export function createOpenCodeAsyncTaskReminderRegistry(): OpenCodeAsyncTaskReminderRegistry {
   return {
-    emittedReminderKeys: new Set<string>(),
+    deliveredReminderKeys: new Set<string>(),
   };
 }
 
@@ -66,7 +67,7 @@ export function canEmitOpenCodeAsyncTaskReminder(input: {
   return Boolean(input.capabilities?.facade.sessionVisibleRemindersAvailable);
 }
 
-export function consumeOpenCodeAsyncTaskReminder(
+export function buildOpenCodeAsyncTaskReminder(
   registry: OpenCodeAsyncTaskReminderRegistry,
   input: BuildOpenCodeAsyncTaskReminderInput,
 ): OpenCodeAsyncTaskReminder | null {
@@ -92,11 +93,9 @@ export function consumeOpenCodeAsyncTaskReminder(
 
   const dedupeKey = `${parentSessionId}:${input.requestId}:${input.status}`;
 
-  if (registry.emittedReminderKeys.has(dedupeKey)) {
+  if (registry.deliveredReminderKeys.has(dedupeKey)) {
     return null;
   }
-
-  registry.emittedReminderKeys.add(dedupeKey);
 
   return {
     reminderId: `async-task:${dedupeKey}`,
@@ -112,7 +111,39 @@ export function consumeOpenCodeAsyncTaskReminder(
       requestId: input.requestId,
     },
     message: buildAsyncTaskReminderMessage(input.requestId, input.status, input.resultTool),
+    sessionPrompt: buildAsyncTaskReminderPrompt({
+      requestId: input.requestId,
+      taskId: input.taskId,
+      status: input.status,
+      resultTool: input.resultTool,
+    }),
   };
+}
+
+export function markOpenCodeAsyncTaskReminderDelivered(
+  registry: OpenCodeAsyncTaskReminderRegistry,
+  reminder: OpenCodeAsyncTaskReminder,
+): boolean {
+  if (registry.deliveredReminderKeys.has(reminder.dedupeKey)) {
+    return false;
+  }
+
+  registry.deliveredReminderKeys.add(reminder.dedupeKey);
+  return true;
+}
+
+export function consumeOpenCodeAsyncTaskReminder(
+  registry: OpenCodeAsyncTaskReminderRegistry,
+  input: BuildOpenCodeAsyncTaskReminderInput,
+): OpenCodeAsyncTaskReminder | null {
+  const reminder = buildOpenCodeAsyncTaskReminder(registry, input);
+
+  if (!reminder) {
+    return null;
+  }
+
+  markOpenCodeAsyncTaskReminderDelivered(registry, reminder);
+  return reminder;
 }
 
 function buildAsyncTaskReminderMessage(
@@ -125,4 +156,23 @@ function buildAsyncTaskReminderMessage(
   }
 
   return `Background task ${requestId} reached terminal status ${status}. Use ${resultTool} with this requestId to inspect the stored result before deciding on follow-up work.`;
+}
+
+function buildAsyncTaskReminderPrompt(input: {
+  readonly requestId: string;
+  readonly taskId?: string;
+  readonly status: AsyncTaskTerminalStatus;
+  readonly resultTool: string;
+}): string {
+  const lines = [
+    "<system-reminder>",
+    "[BACKGROUND TASK COMPLETED]",
+    `requestId: ${input.requestId}`,
+    ...(input.taskId ? [`taskId: ${input.taskId}`] : []),
+    `status: ${input.status}`,
+    `Use ${input.resultTool} with this requestId to inspect the stored result and continue the operator loop in this same session.`,
+    "</system-reminder>",
+  ];
+
+  return lines.join("\n");
 }

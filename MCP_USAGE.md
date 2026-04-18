@@ -72,6 +72,12 @@ When the plugin path has orchestration plus reminders available, the plugin now 
 - `get_orchestration_result` moves tracked completed tasks into an `awaiting_verification` operator state
 - `mark_orchestration_task_verification` is the plugin-local finalize step for closing a tracked task as `completed` or `needs_attention`
 
+Current delivery posture:
+
+- when the plugin client exposes `session.promptAsync`, the plugin treats that as a usable session-visible continuation surface
+- `sessionVisibleRemindersAvailable` therefore means “the plugin can inject reminder continuations back into the active session,” not only “the host has a separate native reminder UI”
+- `tui.showToast` is optional best-effort acknowledgement only; reminder continuation delivery depends on `session.promptAsync`
+
 Important posture:
 
 - this operator state is **session-local control-plane state**, not a replacement for the workflow result store

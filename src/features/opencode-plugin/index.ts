@@ -1,3 +1,5 @@
+import os from "node:os";
+
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { loadOpenCodePluginConfig } from "./config-loader.js";
@@ -17,6 +19,8 @@ export async function server(
 ): Promise<OpenCodePluginHooks> {
   const runtimeConfig = await loadOpenCodePluginConfig({
     contextDirectory: context.directory,
+    homeDirectory: options.__test?.homeDirectory ?? os.homedir(),
+    opencodeConfigDirectory: options.__test?.opencodeConfigDirectory,
   });
   const runtime = createOpenCodePluginRuntime(
     context,

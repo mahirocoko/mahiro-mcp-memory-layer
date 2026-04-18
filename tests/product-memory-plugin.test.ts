@@ -1,3 +1,4 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import * as childProcess from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -307,6 +308,10 @@ async function createPluginHarness(options?: {
   readonly messageDebounceMs?: number;
   readonly standaloneMcpAvailable?: boolean;
   readonly sessionVisibleRemindersAvailable?: boolean;
+  readonly sessionPromptAsyncAvailable?: boolean;
+  readonly tuiShowToastAvailable?: boolean;
+  readonly homeDirectory?: string;
+  readonly opencodeConfigDirectory?: string;
   readonly resetModules?: boolean;
 }) {
   const resetModules = (vi as typeof vi & { resetModules?: () => void }).resetModules;
@@ -317,10 +322,13 @@ async function createPluginHarness(options?: {
 
   const shell = vi.fn(async (...args: unknown[]) => args);
   const log = vi.fn().mockResolvedValue(undefined);
+  const promptAsync = vi.fn().mockResolvedValue(undefined);
+  const showToast = vi.fn().mockResolvedValue(true);
   const childProcessSpawn = childProcess.spawn as unknown as MockInstance;
   const bunSpawn = createOptionalBunSpawnSpy();
 
   const memory = createToolTestMemoryBackend(options?.memoryOverrides);
+  const isolatedUserConfigDirectory = path.join(repoRoot, ".opencode-plugin-test-user-config");
 
   const module = await importPluginModule();
   const testOptions = {
@@ -328,7 +336,10 @@ async function createPluginHarness(options?: {
     ...(options?.createMemoryBackend ? { createMemoryBackend: options.createMemoryBackend } : {}),
     messageDebounceMs: options?.messageDebounceMs ?? 25,
     standaloneMcpAvailable: options?.standaloneMcpAvailable ?? false,
-    sessionVisibleRemindersAvailable: options?.sessionVisibleRemindersAvailable ?? false,
+    sessionVisibleRemindersAvailable: options?.sessionVisibleRemindersAvailable,
+    homeDirectory: options?.homeDirectory,
+    opencodeConfigDirectory:
+      options?.opencodeConfigDirectory ?? (options?.homeDirectory ? undefined : isolatedUserConfigDirectory),
   };
   const hooks = await module.server(
     {
@@ -341,6 +352,20 @@ async function createPluginHarness(options?: {
       worktree: repoRoot,
       serverUrl: new URL("http://localhost:4096"),
       client: {
+        ...(options?.sessionPromptAsyncAvailable
+          ? {
+              session: {
+                promptAsync,
+              },
+            }
+          : {}),
+        ...(options?.tuiShowToastAvailable
+          ? {
+              tui: {
+                showToast,
+              },
+            }
+          : {}),
         app: {
           log,
         },
@@ -359,6 +384,8 @@ async function createPluginHarness(options?: {
     memory,
     shell,
     log,
+    promptAsync,
+    showToast,
     childProcessSpawn,
     bunSpawn,
   };
@@ -443,6 +470,54 @@ describe("product memory OpenCode plugin contract", () => {
       },
     });
     expectNoSelfSpawn(harness);
+  });
+
+  it("loads user-level plugin config through the plugin server entrypoint", async () => {
+    const homeDirectory = await mkdtemp(path.join(os.tmpdir(), "opencode-plugin-home-"));
+
+    try {
+      const userConfigDirectory = path.join(homeDirectory, ".config", "opencode");
+      await mkdir(userConfigDirectory, { recursive: true });
+      await writeFile(
+        path.join(userConfigDirectory, "mahiro-mcp-memory-layer.jsonc"),
+        JSON.stringify({
+          runtime: {
+            remindersEnabled: true,
+          },
+        }),
+      );
+
+      const harness = await createPluginHarness({
+        homeDirectory,
+        standaloneMcpAvailable: true,
+      });
+      const capabilities = parsePluginToolResult(
+        await harness.hooks.tool?.runtime_capabilities?.execute?.({}, { sessionID: "session-1" }),
+      );
+
+      expect(capabilities).toMatchObject({
+        facade: {
+          remindersConfigured: true,
+        },
+      });
+    } finally {
+      await rm(homeDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("reports session-visible reminder support when session prompt injection is available", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: true,
+      sessionPromptAsyncAvailable: true,
+    });
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
+
+    expect(result).toMatchObject({
+      facade: {
+        sessionVisibleRemindersAvailable: true,
+      },
+    });
   });
 
   it("reports MCP-capable capabilities when standalone orchestration is available", async () => {

@@ -15,6 +15,8 @@ First check `runtime_capabilities`.
 - When a session-visible reminder arrives with `requestId`/`taskId`, resume through `get_orchestration_result` instead of starting over.
 - When a tracked task reaches `awaiting_verification`, finish the operator loop with `mark_orchestration_task_verification` after verification.
 - Keep the work minimal, verify results, and report which runtime mode is active before major actions.
+
+On current plugin-capable runtimes, that session-visible reminder can be a plugin-local continuation injected through `session.promptAsync`, not only a separate host reminder UI.
 ```
 
 ## Alternative Template
