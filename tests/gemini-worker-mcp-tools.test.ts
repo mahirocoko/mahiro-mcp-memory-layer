@@ -79,7 +79,6 @@ vi.mock("../src/features/orchestration/run-orchestration-workflow.js", () => ({
 }));
 
 import { getRegisteredGeminiWorkerTools } from "../src/features/gemini/mcp/register-gemini-worker-tools.js";
-import { shellGeminiRuntime } from "../src/features/gemini/runtime/shell/shell-gemini-runtime.js";
 import { runOrchestrationWorkflow } from "../src/features/orchestration/run-orchestration-workflow.js";
 
 describe("getRegisteredGeminiWorkerTools", () => {
@@ -87,40 +86,12 @@ describe("getRegisteredGeminiWorkerTools", () => {
     vi.clearAllMocks();
   });
 
-  it("registers run_gemini_worker backed by the shell runtime", async () => {
+  it("registers only async Gemini worker MCP tools", async () => {
     const tools = getRegisteredGeminiWorkerTools();
-    const tool = tools.find((item) => item.name === "run_gemini_worker");
 
-    expect(tool).toBeDefined();
-    expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
-      expect.arrayContaining(["taskId", "prompt", "model"]),
-    );
-
-    const result = await tool?.execute({
-      taskId: "t1",
-      prompt: "ping",
-      model: "gemini-3-flash-preview",
-      approvalMode: "plan",
-      allowedMcpServerNames: "none",
-    });
-
-    expect(result).toMatchObject({
-      executionMode: "sync",
-      preferredAsyncTool: "run_gemini_worker_async",
-      resultTool: "get_gemini_worker_result",
-      warning:
-        "This tool blocks until the worker finishes. For long-running Gemini jobs, prefer run_gemini_worker_async and poll get_gemini_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Gemini job is still running or a bounded wait timed out.",
-    });
-
-    expect(shellGeminiRuntime.run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        taskId: "t1",
-        prompt: "ping",
-        model: "gemini-3-flash-preview",
-        approvalMode: "plan",
-        allowedMcpServerNames: "none",
-      }),
-    );
+    expect(tools.find((item) => item.name === "run_gemini_worker")).toBeUndefined();
+    expect(tools.find((item) => item.name === "run_gemini_worker_async")).toBeDefined();
+    expect(tools.find((item) => item.name === "get_gemini_worker_result")).toBeDefined();
   });
 
   it("registers an async Gemini worker start tool backed by orchestration", async () => {

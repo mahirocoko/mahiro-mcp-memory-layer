@@ -70,7 +70,6 @@ vi.mock("../src/features/orchestration/run-orchestration-workflow.js", () => ({
 }));
 
 import { getRegisteredCursorWorkerTools } from "../src/features/cursor/mcp/register-cursor-worker-tools.js";
-import { shellCursorRuntime } from "../src/features/cursor/runtime/shell/shell-cursor-runtime.js";
 import { runOrchestrationWorkflow } from "../src/features/orchestration/run-orchestration-workflow.js";
 
 describe("getRegisteredCursorWorkerTools", () => {
@@ -78,36 +77,12 @@ describe("getRegisteredCursorWorkerTools", () => {
     vi.clearAllMocks();
   });
 
-  it("registers run_cursor_worker backed by the shell runtime", async () => {
+  it("registers only async Cursor worker MCP tools", async () => {
     const tools = getRegisteredCursorWorkerTools();
-    const tool = tools.find((item) => item.name === "run_cursor_worker");
 
-    expect(tool).toBeDefined();
-    expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
-      expect.arrayContaining(["taskId", "prompt", "model"]),
-    );
-
-    const result = await tool?.execute({
-      taskId: "t1",
-      prompt: "ping",
-      model: "composer-2",
-    });
-
-    expect(result).toMatchObject({
-      executionMode: "sync",
-      preferredAsyncTool: "run_cursor_worker_async",
-      resultTool: "get_cursor_worker_result",
-      warning:
-        "This tool blocks until the worker finishes. For long-running Cursor jobs, prefer run_cursor_worker_async and poll get_cursor_worker_result with the returned workflow requestId. Do not switch to this sync tool just because an async Cursor job is still running or a bounded wait timed out.",
-    });
-
-    expect(shellCursorRuntime.run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        taskId: "t1",
-        prompt: "ping",
-        model: "composer-2",
-      }),
-    );
+    expect(tools.find((item) => item.name === "run_cursor_worker")).toBeUndefined();
+    expect(tools.find((item) => item.name === "run_cursor_worker_async")).toBeDefined();
+    expect(tools.find((item) => item.name === "get_cursor_worker_result")).toBeDefined();
   });
 
   it("registers an async Cursor worker start tool backed by orchestration", async () => {

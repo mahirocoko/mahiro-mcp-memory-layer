@@ -8,7 +8,7 @@ Use this when starting a new session and you want the agent to combine strict or
 orch: Work as a strict orchestrator.
 
 First check `runtime_capabilities`.
-- If MCP orchestration is available on the plugin path, turn on sticky orch mode with `orch: on`, use the thin async façade first (`start_agent_task`), and follow the reminder/resume loop.
+- If MCP orchestration is available on the plugin path, turn on sticky orch mode with `orch: on`, use the thin async façade first (`start_agent_task` or `call_worker`), and follow the reminder/resume loop.
 - If only plugin-native mode is available, use memory tools normally and do not pretend orchestration exists.
 - Never treat `running` as failure.
 - Never switch to sync/local fallback just because async is still running.
@@ -28,6 +28,7 @@ Before doing any implementation or deep investigation:
 1. Check `runtime_capabilities`
 2. If MCP orchestration is available on the plugin path, prefer the thin façade and operator loop first:
    - `orch: on`
+   - `call_worker`
    - `start_agent_task`
    - `get_orchestration_result`
    - `supervise_orchestration_result`
@@ -44,7 +45,8 @@ If the runtime does not expose orchestration, continue with the available memory
 
 ## Notes
 
-- `start_agent_task` is the preferred thin async façade when orchestration is available.
+- `start_agent_task` is the preferred thin async façade for category-routed orchestration when orchestration is available.
+- `call_worker` is the preferred thin async façade when you want explicit `gemini` or `cursor` lane selection.
 - `runtime_capabilities` is the source of truth for whether the current session is plugin-native only or plugin-native plus MCP orchestration.
 - On the plugin path, `orch: on/off/status` is session-scoped operator state, not just prompt convention.
 - `memory_context` can expose plugin-side `operator` state for tracked tasks.

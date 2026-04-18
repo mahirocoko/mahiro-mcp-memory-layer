@@ -20,7 +20,7 @@ describe("local MCP stdio worker tools", () => {
   });
 
   it(
-    "calls run_gemini_worker through the local MCP server",
+    "calls run_gemini_worker_async through the local MCP server",
     async () => {
       transport = new StdioClientTransport({
         command: "bun",
@@ -33,7 +33,7 @@ describe("local MCP stdio worker tools", () => {
       await client.connect(transport);
 
       const result = await client.callTool({
-        name: "run_gemini_worker",
+        name: "run_gemini_worker_async",
         arguments: {
           taskId: "gemini-e2e-1",
           prompt: "Summarize the worker runtime.",
@@ -47,20 +47,17 @@ describe("local MCP stdio worker tools", () => {
       const textContent = result.content.find((item) => item.type === "text");
       expect(textContent?.type).toBe("text");
 
-      const commandResult = JSON.parse((textContent as { text: string }).text) as {
-        stdout: string;
-        exitCode: number | null;
-        timedOut: boolean;
-      };
-      const payload = JSON.parse(commandResult.stdout) as {
-        response: string;
-        stats: { model: string };
+      const asyncResult = JSON.parse((textContent as { text: string }).text) as {
+        requestId: string;
+        status: string;
+        taskId: string;
+        resultTool: string;
       };
 
-      expect(commandResult.exitCode).toBe(0);
-      expect(commandResult.timedOut).toBe(false);
-      expect(payload.response).toContain("Summarize the worker runtime.");
-      expect(payload.stats.model).toBe("gemini-3-flash-preview");
+      expect(asyncResult.requestId).toMatch(/^workflow_/);
+      expect(asyncResult.status).toBe("running");
+      expect(asyncResult.taskId).toBe("gemini-e2e-1");
+      expect(asyncResult.resultTool).toBe("get_gemini_worker_result");
     },
     20000,
   );

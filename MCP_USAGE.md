@@ -157,6 +157,7 @@ Recommended conservative write flow:
 When the MCP orchestration surface is available, these are the primary tools:
 
 - `start_agent_task`
+- `call_worker`
 - `orchestrate_workflow`
 - `get_orchestration_result`
 - `supervise_orchestration_result`
@@ -187,6 +188,18 @@ Example shape:
 }
 ```
 
+### `call_worker`
+
+Use this when you want a thin async direct-invoke surface on an explicit worker lane instead of category routing.
+
+Important posture:
+
+- it accepts `worker: "gemini" | "cursor"` plus a `prompt`
+- it keeps the same async workflow polling contract as the other orchestration start surfaces
+- it is the closest repo-owned analogue to a direct subagent/worker invoke surface, but centered on worker lanes instead of named OMO agents
+- `model` is an optional override; if omitted, the repo uses the lane default (`gemini-3-pro-preview` for Gemini, `composer-2` for Cursor)
+- lane-specific fields are validated at the tool boundary: Gemini-only arguments are rejected on the Cursor lane, and vice versa
+
 ### `orchestrate_workflow`
 
 Use this for multi-job or multi-step workflows, mixed Gemini/Cursor execution, traceable runs, or when you want one request ID for a whole workflow-shaped batch. Do not default to this for a single worker job when the direct async worker tools are enough.
@@ -196,7 +209,7 @@ Important posture:
 - prefer `waitForCompletion: false` for long-running workflows
 - if `waitForCompletion` is omitted, the tool may auto-start in background and return async guidance
 - production default: hand the returned `requestId` to `supervise_orchestration_result`, or to a background poller that calls `get_orchestration_result`
-- synchronous waiting is intentionally narrow and only valid for a single Gemini job or step with no retries
+- `waitForCompletion: true` is no longer supported; orchestration starts are async-only
 
 ### `get_orchestration_result`
 
@@ -267,16 +280,7 @@ That `status: "running"` response is the healthy default for background-first MC
 
 ## Direct worker tools
 
-When the direct worker MCP tools are available, they split into sync and async pairs.
-
-### Sync tools
-
-- `run_gemini_worker`
-- `run_cursor_worker`
-
-Use these only for short direct calls where holding the MCP request open is acceptable.
-
-### Async tools
+When the direct worker MCP tools are available, use the async pair only:
 
 - `run_gemini_worker_async`
 - `get_gemini_worker_result`
@@ -308,11 +312,6 @@ Use direct async worker tools when:
 - you only need one worker job
 - you still want async behavior without keeping a single request open
 - you want the simplest default path for a single Gemini or Cursor task
-
-Use sync worker tools only when:
-
-- the task is short enough that a single blocking call is acceptable
-- you are intentionally choosing a short direct call and can tolerate host/MCP request timeouts
 
 ## Runtime selection
 

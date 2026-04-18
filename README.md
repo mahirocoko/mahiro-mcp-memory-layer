@@ -45,6 +45,7 @@ When the plugin is loaded from a real source checkout like the `file://` path ab
 
 On the **plugin hook path itself**, the exposed orchestration surface stays intentionally thin:
 
+- `call_worker`
 - `start_agent_task`
 - `get_orchestration_result`
 - `supervise_orchestration_result`
@@ -514,7 +515,7 @@ Parallel workflow fields:
 Worker runtime (Cursor / Gemini):
 
 - default remains **shell** (spawn the local `agent` / `gemini` CLIs in-process) when nothing selects MCP
-- `MAHIRO_CURSOR_RUNTIME=mcp` and `MAHIRO_GEMINI_RUNTIME=mcp` opt into the MCP stdio client path for that worker family (out-of-process: connect to this server and call `run_cursor_worker` / `run_gemini_worker`)
+- `MAHIRO_CURSOR_RUNTIME=mcp` and `MAHIRO_GEMINI_RUNTIME=mcp` opt into the MCP stdio client path for that worker family (out-of-process: connect to this server and call `run_cursor_worker_async` / `run_gemini_worker_async` plus result polling)
 - per-job `workerRuntime`: `shell` or `mcp` on `cursor` and `gemini` jobs (parallel) or steps (sequential); explicit job-level selection overrides the env for that job
 - the MCP orchestration path preserves each workflow job's requested `workerRuntime`; omit it to keep the default shell worker behavior, or set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime
 
@@ -643,11 +644,11 @@ MCP tool:
 Use `MCP_USAGE.md` as the shorter AI-facing runtime guide for this section. `README.md` remains the full human-facing reference.
 
 - `orchestrate_workflow` runs the same static workflow spec through the MCP server
-- input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": true }`
+- input shape: `{ "spec": <parallel-or-sequential workflow>, "cwd": "/optional/default/cwd", "waitForCompletion": false }`
 - prefer `orchestrate_workflow` for multi-job, multi-step, mixed-worker, or workflow-trace-oriented tasks; do not default to it for a single worker job when the direct async worker tools are enough
 - set `waitForCompletion: false` for long-running workflows so the tool returns immediately with async polling guidance including `requestId`, `status: "running"`, `executionMode: "async"`, `waitMode: "explicit_async"`, `pollWith: "get_orchestration_result"`, `superviseWith: "supervise_orchestration_result"`, `superviseResultWith: "get_orchestration_supervision_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "supervise_orchestration_result"`, `warning`, and `nextArgs`
 - when `waitForCompletion` is omitted, workflows auto-start in background and return the same polling guidance plus `waitMode: "auto_async"`, `superviseWith: "supervise_orchestration_result"`, `superviseResultWith: "get_orchestration_supervision_result"`, `waitWith: "wait_for_orchestration_result"`, `recommendedFollowUp: "supervise_orchestration_result"`, and `autoAsync: true`
-- `waitForCompletion: true` is supported only for trivial workflows: a single Gemini job or sequential step, with retries unset or `0`; Cursor workflows and multi-job specs must use async mode
+- `waitForCompletion: true` is no longer supported; orchestration starts are async-only
 - `get_orchestration_result` is the primary production follow-up: hand the `requestId` to a background poller and read the stored workflow state/result until terminal
 - `supervise_orchestration_result` starts repo-owned detached supervision for a `workflow_*` request and returns a `supervisor_*` request ID immediately
 - `get_orchestration_supervision_result` polls the latest stored background supervision result by `supervisor_*` request ID
@@ -722,16 +723,14 @@ Only if the host can safely keep a short MCP request open, you can block until t
 
 Direct worker MCP tools:
 
-- `run_gemini_worker` / `run_cursor_worker` are synchronous and best for short direct calls; their MCP responses now include sync guidance fields such as `executionMode: "sync"`, `preferredAsyncTool`, `resultTool`, and `warning`
-- for long-running jobs, prefer the async start/poll pairs below instead of holding one MCP call open
+- the public direct worker MCP surface is async-only
+- for a single explicit worker lane with façade semantics, prefer `call_worker`
 
-When to use sync vs async:
+When to use the async worker surfaces:
 
-- use sync tools when you expect a short, direct worker response and want the full result in one MCP call
 - use async tools when the worker may take noticeable time, when you want explicit polling, or when the host should avoid keeping one MCP request open
 - use `orchestrate_workflow` when you need multiple jobs/steps, workflow-level traces, or mixed Gemini/Cursor execution
 - for a single worker job, prefer `run_gemini_worker_async` or `run_cursor_worker_async` over `orchestrate_workflow`
-- if a sync response includes `warning`, treat it as a hint that the same task shape is a better fit for the async start/poll pair
 - for long-running MCP orchestration, background polling is the default production path because host/MCP request timeouts can be shorter than the workflow runtime
 
 Direct async worker MCP tools:
@@ -740,7 +739,12 @@ Direct async worker MCP tools:
 - `get_gemini_worker_result` / `get_cursor_worker_result` poll the latest stored result for that async worker request
 - these tools are thin aliases over the same orchestration result store used by `orchestrate_workflow`, so they avoid holding one MCP tool call open for the full worker duration and expose configured retry policy plus terminal retry outcomes from that shared store
 - direct async worker tools are shell-pinned internally today, so they stay on the local `agent` / `gemini` CLI path even when `MAHIRO_CURSOR_RUNTIME` or `MAHIRO_GEMINI_RUNTIME` selects MCP for other entrypoints
-- the synchronous `run_gemini_worker` / `run_cursor_worker` tools still exist for short direct calls, but long-running callers should prefer the async variants
+
+Thin worker-lane façade:
+
+- `call_worker` starts one async worker-lane task on explicit `gemini` or `cursor`
+- it returns the same orchestration polling contract as the rest of the async façade
+- use it when you want direct lane selection without dropping down to the raw `run_*_worker_async` tool names
 
 Gemini async MCP example:
 

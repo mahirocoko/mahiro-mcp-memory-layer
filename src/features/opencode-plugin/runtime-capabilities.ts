@@ -25,8 +25,6 @@ const orchestrationToolNames = [
   "get_gemini_worker_result",
   "run_cursor_worker_async",
   "get_cursor_worker_result",
-  "run_gemini_worker",
-  "run_cursor_worker",
 ] as const;
 
 export interface OpenCodePluginRuntimeCapabilities {

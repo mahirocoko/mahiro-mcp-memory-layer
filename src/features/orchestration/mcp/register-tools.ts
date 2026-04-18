@@ -39,14 +39,13 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
     {
       name: "orchestrate_workflow",
       description:
-        "Run a static parallel or sequential worker workflow. Default MCP behavior is async-first and returns background-polling guidance; synchronous wait is limited to a single Gemini job or step with no retries.",
+        "Run a static parallel or sequential worker workflow. MCP orchestration is async-only and returns background-polling guidance.",
       inputSchema: orchestrateToolInputSchema.shape,
       execute: async (input) => {
         const parsed = orchestrateToolInputSchema.parse(input);
         const requestId = newId("workflow");
         const spec = normalizeWorkflowSpec(parsed.spec, parsed.cwd);
         const startedAt = new Date().toISOString();
-        const shouldRunAsync = parsed.waitForCompletion !== true;
         const options = {
           traceStore: orchestrationTraceStore,
           traceSource: "mcp",
@@ -59,57 +58,30 @@ export function getRegisteredOrchestrationTools(): readonly RegisteredTool[] {
           spec,
         });
 
-        if (shouldRunAsync) {
-          const waitMode = parsed.waitForCompletion === false ? "explicit_async" : "auto_async";
+        const waitMode = parsed.waitForCompletion === false ? "explicit_async" : "auto_async";
 
-          void runOrchestrationWorkflow(spec, options)
-            .then(async (result) => {
-              await orchestrationLifecycle.markCompleted({
-                requestId,
-                source: "mcp",
-                spec,
-                result,
-              });
-            })
-            .catch(async (error: unknown) => {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-
-              await orchestrationLifecycle.markRunnerFailed({
-                requestId,
-                source: "mcp",
-                spec,
-                error: errorMessage,
-                startedAt,
-              });
+        void runOrchestrationWorkflow(spec, options)
+          .then(async (result) => {
+            await orchestrationLifecycle.markCompleted({
+              requestId,
+              source: "mcp",
+              spec,
+              result,
             });
+          })
+          .catch(async (error: unknown) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
 
-          return buildAsyncWorkflowStartEnvelope({ requestId, waitMode });
-        }
-
-        try {
-          const result = await runOrchestrationWorkflow(spec, options);
-
-          await orchestrationLifecycle.markCompleted({
-            requestId,
-            source: "mcp",
-            spec,
-            result,
+            await orchestrationLifecycle.markRunnerFailed({
+              requestId,
+              source: "mcp",
+              spec,
+              error: errorMessage,
+              startedAt,
+            });
           });
 
-          return result;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          await orchestrationLifecycle.markRunnerFailed({
-            requestId,
-            source: "mcp",
-            spec,
-            error: errorMessage,
-            startedAt,
-          });
-
-          throw error;
-        }
+        return buildAsyncWorkflowStartEnvelope({ requestId, waitMode });
       },
     },
     {

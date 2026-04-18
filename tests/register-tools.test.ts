@@ -165,7 +165,7 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(categoryTool).toBeDefined();
     expect(workerTool).toBeDefined();
     expect(tool?.description).toContain("parallel or sequential worker workflow");
-    expect(tool?.description).toContain("async-first");
+    expect(tool?.description).toContain("async-only");
     expect(Object.keys(tool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["spec", "cwd", "waitForCompletion"]),
     );
@@ -377,7 +377,7 @@ describe("getRegisteredOrchestrationTools", () => {
         ],
       },
       cwd: "/tmp/project",
-      waitForCompletion: true,
+      waitForCompletion: false,
     });
 
     expect(runOrchestrationWorkflowMock).toHaveBeenCalledTimes(1);
@@ -409,22 +409,12 @@ describe("getRegisteredOrchestrationTools", () => {
       traceStore: orchestrationTraceStoreMock,
     });
     expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
-    expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      requestId: "workflow_mocked",
-      mode: "parallel",
-      status: "completed",
-      results: [],
-      summary: {
-        totalJobs: 0,
-        finishedJobs: 0,
-        completedJobs: 0,
-        failedJobs: 0,
-        skippedJobs: 0,
-        startedAt: "2026-04-05T00:00:00.000Z",
-        finishedAt: "2026-04-05T00:00:00.000Z",
-        durationMs: 0,
-      },
+    expect(result).toMatchObject({
+      requestId: expect.stringMatching(/^workflow_/),
+      status: "running",
+      executionMode: "async",
+      waitMode: "explicit_async",
+      pollWith: "get_orchestration_result",
     });
   });
 
@@ -464,32 +454,29 @@ describe("getRegisteredOrchestrationTools", () => {
     });
   });
 
-  it("allows synchronous execution for a single sequential Gemini step", async () => {
+  it("rejects waitForCompletion: true for a single sequential Gemini step", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
 
-    const result = await tool?.execute({
-      spec: {
-        mode: "sequential",
-        steps: [
-          {
-            kind: "gemini",
-            input: {
-              prompt: "Summarize this repo.",
-              model: "gemini-3-flash-preview",
+    await expect(
+      tool?.execute({
+        spec: {
+          mode: "sequential",
+          steps: [
+            {
+              kind: "gemini",
+              input: {
+                prompt: "Summarize this repo.",
+                model: "gemini-3-flash-preview",
+              },
             },
-          },
-        ],
-      },
-      waitForCompletion: true,
-    });
+          ],
+        },
+        waitForCompletion: true,
+      }),
+    ).rejects.toThrow(/no longer supported|async-only/i);
 
-    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      requestId: "workflow_mocked",
-      mode: "sequential",
-      status: "completed",
-    });
+    expect(vi.mocked(runOrchestrationWorkflow)).not.toHaveBeenCalled();
   });
 
   it("can start orchestration in background and return a request ID immediately", async () => {
@@ -645,7 +632,7 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects synchronous wait for cursor workflows", async () => {
+  it("rejects waitForCompletion: true for cursor workflows", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
     const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
@@ -666,14 +653,12 @@ describe("getRegisteredOrchestrationTools", () => {
         },
         waitForCompletion: true,
       }),
-    ).rejects.toThrowError(
-      "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. Treat running as in-progress state, not failure or staleness. wait_for_orchestration_result is only for short blocking checks, and callers must not fall back to sync/local execution just because async work is still running or a bounded wait timed out.",
-    );
+    ).rejects.toThrowError(/no longer supported|async-only/i);
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
   });
 
-  it("rejects synchronous wait for retried Gemini workflows", async () => {
+  it("rejects waitForCompletion: true for retried Gemini workflows", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");
     const runOrchestrationWorkflowMock = vi.mocked(runOrchestrationWorkflow);
@@ -695,7 +680,7 @@ describe("getRegisteredOrchestrationTools", () => {
         },
         waitForCompletion: true,
       }),
-    ).rejects.toThrowError(/explicit_async/);
+    ).rejects.toThrowError(/no longer supported|async-only/i);
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
   });
@@ -715,34 +700,6 @@ describe("getRegisteredOrchestrationTools", () => {
     ).rejects.toThrowError();
 
     expect(runOrchestrationWorkflowMock).not.toHaveBeenCalled();
-  });
-
-  it("appends a runner-failed trace when synchronous orchestration throws unexpectedly", async () => {
-    vi.mocked(runOrchestrationWorkflow).mockRejectedValueOnce(new Error("boom"));
-
-    const tools = getRegisteredOrchestrationTools();
-    const tool = tools.find((item) => item.name === "orchestrate_workflow");
-
-    await expect(
-      tool?.execute({
-        spec: {
-          mode: "parallel",
-          jobs: [
-            {
-              kind: "gemini",
-              input: {
-                prompt: "Summarize this diff.",
-                model: "gemini-3-flash-preview",
-              },
-            },
-          ],
-        },
-        waitForCompletion: true,
-      }),
-    ).rejects.toThrowError("boom");
-
-    expect(orchestrationTraceStoreMock.append).toHaveBeenCalledTimes(1);
-    expect(orchestrationResultStoreMock.writeRunnerFailed).toHaveBeenCalledTimes(1);
   });
 
   it("persists runner_failed when omitted waitForCompletion async execution rejects", async () => {

@@ -55,19 +55,15 @@ export const orchestrateToolInputSchema = z.object({
   cwd: z.string().trim().min(1).optional(),
   waitForCompletion: z.boolean().optional(),
 }).superRefine((input, ctx) => {
-  if (input.waitForCompletion !== true) {
-    return;
+  if (input.waitForCompletion === true) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["waitForCompletion"],
+      message:
+        "waitForCompletion: true is no longer supported. MCP orchestration is async-only: omit waitForCompletion for auto_async or set it false for explicit_async, then follow the returned requestId with supervise_orchestration_result or get_orchestration_result. Use wait_for_orchestration_result only as a separate short blocking read on an already-started workflow.",
+    });
   }
-
-  if (!isMcpSyncEligibleWorkflowSpec(input.spec)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["waitForCompletion"],
-        message:
-          "Synchronous wait (waitForCompletion: true) is only allowed for a single Gemini job or step with no retries. MCP orchestration is background-first: omit waitForCompletion for auto_async, or set it false for explicit_async, then hand the requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result. Treat running as in-progress state, not failure or staleness. wait_for_orchestration_result is only for short blocking checks, and callers must not fall back to sync/local execution just because async work is still running or a bounded wait timed out.",
-      });
-   }
- });
+});
 
 export type WorkflowSpecInput = z.infer<typeof workflowSpecSchema>;
 
@@ -76,18 +72,6 @@ export type OrchestrateWorkflowSpec =
   | { readonly mode: "sequential"; readonly timeoutMs?: number; readonly defaultTrust?: boolean; readonly steps: readonly SequentialWorkerStep[] };
 
 export type WorkflowControlPlane = "shell" | "mcp";
-
-export function isMcpSyncEligibleWorkflowSpec(spec: WorkflowSpecInput): boolean {
-  const units = spec.mode === "parallel" ? spec.jobs : spec.steps;
-
-  if (units.length !== 1) {
-    return false;
-  }
-
-  const [unit] = units;
-
-  return unit?.kind === "gemini" && (unit.retries ?? 0) === 0;
-}
 
 export function normalizeWorkflowSpec(
   spec: WorkflowSpecInput,
