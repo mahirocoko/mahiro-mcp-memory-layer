@@ -200,6 +200,7 @@ Important posture:
 - `model` is an optional override; if omitted, the repo uses the lane default (`gemini-3-pro-preview` for Gemini, `composer-2` for Cursor)
 - humans usually do not need to manage lane-specific internal args themselves; the agent should compose worker-compatible input automatically
 - if a caller still sends incompatible lane-only fields, `call_worker` strips them and returns a warning instead of failing the whole request
+- if a caller explicitly requested a runtime (`workerRuntime`), the agent should not silently retry on another runtime unless fallback was also explicitly requested
 
 ### `orchestrate_workflow`
 

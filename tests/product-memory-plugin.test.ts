@@ -520,10 +520,49 @@ describe("product memory OpenCode plugin contract", () => {
     });
   });
 
+  it("returns compact plugin-facing call_worker output while preserving warnings", async () => {
+    const harness = await createPluginHarness({
+      standaloneMcpAvailable: true,
+    });
+
+    const result = parsePluginToolResult(
+      await harness.hooks.tool?.call_worker?.execute?.(
+        {
+          worker: "gemini",
+          prompt: "Summarize this repo.",
+          mode: "ask",
+          force: true,
+          trust: false,
+        },
+        { sessionID: "session-1" },
+      ),
+    ) as Record<string, unknown>;
+
+    expect(result).toMatchObject({
+      requestId: expect.stringMatching(/^workflow_/),
+      status: "running",
+      worker: "gemini",
+      ignoredFields: ["mode", "force", "trust"],
+      warning: "Ignored incompatible gemini worker fields: mode, force, trust.",
+    });
+    expect(result).not.toHaveProperty("message");
+    expect(result).not.toHaveProperty("recommendedFollowUp");
+    expect(result).not.toHaveProperty("superviseWith");
+    expect(result).not.toHaveProperty("superviseResultWith");
+    expect(result).not.toHaveProperty("waitWith");
+
+    harness.childProcessSpawn.mockClear();
+    harness.bunSpawn?.mockClear();
+  });
+
   it("reports MCP-capable capabilities when standalone orchestration is available", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: true,
     });
+
+    harness.shell.mockClear();
+    harness.childProcessSpawn.mockClear();
+    harness.bunSpawn?.mockClear();
 
     const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
 

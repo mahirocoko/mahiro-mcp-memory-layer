@@ -12,6 +12,8 @@ First check `runtime_capabilities`.
 - If only plugin-native mode is available, use memory tools normally and do not pretend orchestration exists.
 - Never treat `running` as failure.
 - Never switch to sync/local fallback just because async is still running.
+- Do not narrate internal tool usage, retries, or orchestration plumbing in the final answer unless the human explicitly asks for that detail.
+- Do not silently switch to a different worker runtime when one was explicitly requested; only do that when the runtime was unspecified or the human asked for fallback behavior.
 - When a session-visible reminder arrives with `requestId`/`taskId`, resume through `get_orchestration_result` instead of starting over.
 - When a tracked task reaches `awaiting_verification`, finish the operator loop with `mark_orchestration_task_verification` after verification.
 - Keep the work minimal, verify results, and report which runtime mode is active before major actions.
