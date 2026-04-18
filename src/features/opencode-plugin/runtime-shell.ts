@@ -1,6 +1,7 @@
 import type { ZodRawShape } from "zod";
 import type { Hooks, PluginOptions } from "@opencode-ai/plugin";
 import type { ToolContext } from "@opencode-ai/plugin/tool";
+import type { RegisteredTool } from "../../lib/mcp/registered-tool.js";
 
 import type { OpenCodePluginContext, OpenCodePluginEvent } from "./resolve-scope.js";
 import type { OpenCodePluginConfig } from "./config.js";
@@ -25,6 +26,8 @@ import {
   type OpenCodePluginRuntimeCapabilities,
 } from "./runtime-capabilities.js";
 import { detectOpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
+import { resolveOpenCodePluginOrchAutoDispatchRequest } from "./orch-auto-dispatch.js";
+import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
 import {
   buildMemoryContextResult,
   buildPrepareHostTurnKey,
@@ -114,6 +117,10 @@ export interface OpenCodePluginRuntime {
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
 }
 
+interface OpenCodePluginStartAgentTaskExecutor {
+  execute(input: Record<string, unknown>): Promise<unknown>;
+}
+
 export function createOpenCodePluginRuntime(
   context: OpenCodePluginContext,
   options: OpenCodePluginServerOptions,
@@ -123,6 +130,7 @@ export function createOpenCodePluginRuntime(
   const sessionReminderSupport = detectOpenCodePluginSessionReminderSupport(context, {
     sessionVisibleRemindersAvailable: options.__test?.sessionVisibleRemindersAvailable,
   });
+  const startAgentTaskTool = getStartAgentTaskExecutor();
   const syncCapabilities = resolveOpenCodePluginRuntimeCapabilitiesSync({
     standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
     sessionReminderSupport,
@@ -185,6 +193,32 @@ export function createOpenCodePluginRuntime(
       };
     },
   });
+
+  const trackAutoDispatchedTaskStart = async (
+    sessionState: OpenCodePluginSessionState,
+    result: unknown,
+    prompt: string,
+  ): Promise<void> => {
+    const resultRecord =
+      typeof result === "object" && result !== null ? (result as Record<string, unknown>) : undefined;
+
+    applyOperatorTaskUpdate(sessionState, resultRecord, {
+      toolName: "start_agent_task",
+      args: {
+        category: "unspecified-high",
+        prompt,
+        cwd: context.directory,
+      },
+    });
+
+    await asyncTaskTracker.trackAsyncTask({
+      parentSessionId: sessionState.sessionId,
+      requestId: typeof resultRecord?.requestId === "string" ? resultRecord.requestId : undefined,
+      taskId: typeof resultRecord?.taskId === "string" ? resultRecord.taskId : undefined,
+      status: typeof resultRecord?.status === "string" ? resultRecord.status : undefined,
+      resultTool: typeof resultRecord?.pollWith === "string" ? resultRecord.pollWith : undefined,
+    });
+  };
 
   const routeEvent = async (
     event: OpenCodePluginEvent,
@@ -440,6 +474,13 @@ export function createOpenCodePluginRuntime(
   ): Promise<void> => {
     const sessionState = await routeEvent(event, sourceHook);
     updateOperatorModeFromRecentConversation(sessionState, extractRecentConversation(event));
+    await maybeAutoDispatchOrchTask(
+      sessionState,
+      startAgentTaskTool,
+      syncCapabilities.orchestration.available,
+      context.directory,
+      trackAutoDispatchedTaskStart,
+    );
     scheduleMessageUpdatedPrecompute(sessionState, event);
   };
 
@@ -865,6 +906,43 @@ function resolveEffectiveOperatorMode(operator: OpenCodePluginOperatorState | un
   }
 
   return operator.currentMode;
+}
+
+function getStartAgentTaskExecutor(): OpenCodePluginStartAgentTaskExecutor | undefined {
+  return getRegisteredOrchestrationTools().find(
+    (tool): tool is RegisteredTool & OpenCodePluginStartAgentTaskExecutor => tool.name === "start_agent_task",
+  );
+}
+
+async function maybeAutoDispatchOrchTask(
+  sessionState: OpenCodePluginSessionState | undefined,
+  startAgentTaskTool: OpenCodePluginStartAgentTaskExecutor | undefined,
+  orchestrationFacadeAvailable: boolean,
+  contextDirectory: string,
+  trackAutoDispatchedTaskStart: (
+    sessionState: OpenCodePluginSessionState,
+    result: unknown,
+    prompt: string,
+  ) => Promise<void>,
+): Promise<void> {
+  if (!sessionState || !startAgentTaskTool || !orchestrationFacadeAvailable) {
+    return;
+  }
+
+  const dispatchRequest = resolveOpenCodePluginOrchAutoDispatchRequest(sessionState);
+
+  if (!dispatchRequest || sessionState.lastAutoDispatchMessageId === dispatchRequest.sourceMessageId) {
+    return;
+  }
+
+  const result = await startAgentTaskTool.execute({
+    category: "unspecified-high",
+    prompt: dispatchRequest.prompt,
+    cwd: contextDirectory,
+  });
+
+  await trackAutoDispatchedTaskStart(sessionState, result, dispatchRequest.prompt);
+  sessionState.lastAutoDispatchMessageId = dispatchRequest.sourceMessageId;
 }
 
 function prependStartupBrief(wakeUpContext: string, startupBrief: string | undefined): string {

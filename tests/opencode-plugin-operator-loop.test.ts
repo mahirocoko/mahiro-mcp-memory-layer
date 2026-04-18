@@ -11,6 +11,12 @@ vi.mock("../src/features/orchestration/wait-for-orchestration-result.js", () => 
   })),
 }));
 
+vi.mock("../src/features/orchestration/run-orchestration-workflow.js", () => ({
+  runOrchestrationWorkflow: vi.fn(async () => ({
+    status: "completed",
+  })),
+}));
+
 import type { OpenCodePluginConfig } from "../src/features/opencode-plugin/config.js";
 import { createOpenCodePluginRuntime, resetOpenCodePluginMemoryBackendSingletonForTests } from "../src/features/opencode-plugin/runtime-shell.js";
 
@@ -113,6 +119,109 @@ describe("OpenCode plugin operator loop", () => {
       stickyModeEnabled: true,
       currentMode: "sticky-on",
     });
+  });
+
+  it("auto-dispatches explicit orch prompts into tracked start_agent_task execution", async () => {
+    const runtime = createOpenCodePluginRuntime(
+      {
+        directory: "/repo",
+        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+      } as never,
+      {
+        __test: {
+          memory: createMemoryBackend() as never,
+          standaloneMcpAvailable: true,
+          sessionVisibleRemindersAvailable: true,
+        },
+      },
+      createConfig(),
+    );
+
+    await runtime.handleSessionCreated(createSessionCreatedEvent());
+    await runtime.handleMessageUpdated(createMessageUpdatedEvent("session-1", "orch: review this diff"));
+    await flushMicrotasks();
+
+    const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
+    expect(memoryContext.status).toBe("ready");
+    const tasks = memoryContext.status === "ready" ? Object.values(memoryContext.session.operator?.tasks ?? {}) : [];
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      operatorStatus: "awaiting_resume",
+      resultTool: "get_orchestration_result",
+    });
+  });
+
+  it("auto-dispatches the next actionable turn after orch: on without respawning the same message twice", async () => {
+    const runtime = createOpenCodePluginRuntime(
+      {
+        directory: "/repo",
+        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+      } as never,
+      {
+        __test: {
+          memory: createMemoryBackend() as never,
+          standaloneMcpAvailable: true,
+          sessionVisibleRemindersAvailable: true,
+        },
+      },
+      createConfig(),
+    );
+
+    await runtime.handleSessionCreated(createSessionCreatedEvent());
+    await runtime.handleMessageUpdated(createMessageUpdatedEvent("session-1", "orch: on"));
+    await runtime.handleMessageUpdated({
+      type: "message.updated",
+      properties: {
+        sessionID: "session-1",
+        messageID: "session-1-message-2",
+        parts: [{ type: "text", text: "review this diff" }],
+      },
+    });
+    await runtime.handleMessageUpdated({
+      type: "message.updated",
+      properties: {
+        sessionID: "session-1",
+        messageID: "session-1-message-2",
+        parts: [{ type: "text", text: "review this diff" }],
+      },
+    });
+    await flushMicrotasks();
+
+    const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
+    expect(memoryContext.status).toBe("ready");
+    const tasks = memoryContext.status === "ready" ? Object.values(memoryContext.session.operator?.tasks ?? {}) : [];
+
+    expect(memoryContext.status === "ready" ? memoryContext.session.operator : undefined).toMatchObject({
+      stickyModeEnabled: true,
+      currentMode: "sticky-on",
+    });
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("does not auto-dispatch when orchestration facade is unavailable", async () => {
+    const runtime = createOpenCodePluginRuntime(
+      {
+        directory: "/repo",
+        client: { app: { log: vi.fn().mockResolvedValue(undefined) } },
+      } as never,
+      {
+        __test: {
+          memory: createMemoryBackend() as never,
+          standaloneMcpAvailable: false,
+          sessionVisibleRemindersAvailable: true,
+        },
+      },
+      createConfig(),
+    );
+
+    await runtime.handleSessionCreated(createSessionCreatedEvent());
+    await runtime.handleMessageUpdated(createMessageUpdatedEvent("session-1", "orch: review this diff"));
+    await flushMicrotasks();
+
+    const memoryContext = await runtime.readMemoryContext({ sessionID: "session-1" });
+    expect(memoryContext.status).toBe("ready");
+    expect(memoryContext.status === "ready" ? Object.keys(memoryContext.session.operator?.tasks ?? {}) : []).toHaveLength(0);
   });
 
   it("creates a tracked ledger entry for sticky or request-only orch tasks and transitions through resume and verification", async () => {
