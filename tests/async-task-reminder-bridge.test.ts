@@ -43,6 +43,7 @@ describe("createOpenCodeAsyncTaskTracker", () => {
 
   it("emits a host log reminder for a tracked running workflow request", async () => {
     const log = vi.fn().mockResolvedValue(undefined);
+    const onReminder = vi.fn();
     const tracker = createOpenCodeAsyncTaskTracker({
       context: {
         directory: "/repo",
@@ -54,11 +55,13 @@ describe("createOpenCodeAsyncTaskTracker", () => {
       } as never,
       capabilities: async () => capabilities,
       remindersEnabled: true,
+      onReminder,
     });
 
     await tracker.trackAsyncTask({
       parentSessionId: "session-1",
       requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      taskId: "quick_aaaaaaaaaaaa",
       status: "running",
       resultTool: "get_orchestration_result",
     });
@@ -75,6 +78,8 @@ describe("createOpenCodeAsyncTaskTracker", () => {
         extra: {
           parentSessionId: "session-1",
           requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
+          taskId: "quick_aaaaaaaaaaaa",
           status: "completed",
           resultTool: "get_orchestration_result",
           recommendedFollowUp: "get_orchestration_result",
@@ -87,6 +92,13 @@ describe("createOpenCodeAsyncTaskTracker", () => {
         directory: "/repo",
       },
     });
+    expect(onReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        taskId: "quick_aaaaaaaaaaaa",
+        reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
+      }),
+    );
   });
 
   it("stays dormant when reminders are disabled or session-visible reminders are unavailable", async () => {

@@ -396,7 +396,7 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks["session.idle"]).toEqual(expect.any(Function));
     expect(harness.hooks["experimental.session.compacting"]).toEqual(expect.any(Function));
     expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual(
-      [...sharedMemoryToolNames, "memory_context", "runtime_capabilities"].sort(),
+      [...sharedMemoryToolNames, "mark_orchestration_task_verification", "memory_context", "runtime_capabilities"].sort(),
     );
     for (const sharedMemoryTool of getMemoryToolDefinitions()) {
       expect(harness.hooks.tool?.[sharedMemoryTool.name]?.description).toBe(sharedMemoryTool.description);

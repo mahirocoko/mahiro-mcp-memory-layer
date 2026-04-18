@@ -16,9 +16,11 @@ export type AsyncTaskTerminalStatus =
 
 export interface OpenCodeAsyncTaskReminder {
   readonly reminderId: string;
+  readonly reminderToken: string;
   readonly dedupeKey: string;
   readonly parentSessionId: string;
   readonly requestId: string;
+  readonly taskId?: string;
   readonly status: AsyncTaskTerminalStatus;
   readonly resultTool: string;
   readonly recommendedFollowUp: string;
@@ -35,6 +37,7 @@ export interface OpenCodeAsyncTaskReminderRegistry {
 export interface BuildOpenCodeAsyncTaskReminderInput {
   readonly parentSessionId?: string;
   readonly requestId: string;
+  readonly taskId?: string;
   readonly status: AsyncTaskTerminalStatus | "running";
   readonly resultTool: string;
   readonly capabilities?: OpenCodePluginRuntimeCapabilities;
@@ -97,9 +100,11 @@ export function consumeOpenCodeAsyncTaskReminder(
 
   return {
     reminderId: `async-task:${dedupeKey}`,
+    reminderToken: dedupeKey,
     dedupeKey,
     parentSessionId,
     requestId: input.requestId,
+    ...(input.taskId ? { taskId: input.taskId } : {}),
     status: input.status,
     resultTool: input.resultTool,
     recommendedFollowUp: input.resultTool,

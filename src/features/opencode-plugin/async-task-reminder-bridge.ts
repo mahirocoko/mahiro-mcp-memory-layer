@@ -15,6 +15,7 @@ export interface OpenCodeAsyncTaskTracker {
   trackAsyncTask(input: {
     readonly parentSessionId?: string;
     readonly requestId?: string;
+    readonly taskId?: string;
     readonly status?: string;
     readonly resultTool?: string;
   }): Promise<void>;
@@ -24,6 +25,7 @@ export function createOpenCodeAsyncTaskTracker(input: {
   readonly context: OpenCodePluginContext;
   readonly capabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
   readonly remindersEnabled: boolean;
+  readonly onReminder?: (reminder: OpenCodeAsyncTaskReminderLike) => Promise<void> | void;
 }): OpenCodeAsyncTaskTracker {
   const resultStore = new OrchestrationResultStore(getAppEnv().dataPaths.orchestrationResultDirectory);
   const reminderRegistry = createOpenCodeAsyncTaskReminderRegistry();
@@ -59,6 +61,7 @@ export function createOpenCodeAsyncTaskTracker(input: {
           const reminder = consumeOpenCodeAsyncTaskReminder(reminderRegistry, {
             parentSessionId: task.parentSessionId,
             requestId,
+            taskId: task.taskId,
             status: response.status,
             resultTool,
             capabilities,
@@ -70,6 +73,7 @@ export function createOpenCodeAsyncTaskTracker(input: {
           }
 
           await emitReminderLog(input.context, reminder);
+          await input.onReminder?.(reminder);
         })
         .finally(() => {
           trackedRequestIds.delete(requestId);
@@ -78,19 +82,23 @@ export function createOpenCodeAsyncTaskTracker(input: {
   };
 }
 
+interface OpenCodeAsyncTaskReminderLike {
+  readonly parentSessionId: string;
+  readonly requestId: string;
+  readonly taskId?: string;
+  readonly reminderToken: string;
+  readonly status: string;
+  readonly resultTool: string;
+  readonly recommendedFollowUp: string;
+  readonly nextArgs: {
+    readonly requestId: string;
+  };
+  readonly message: string;
+}
+
 async function emitReminderLog(
   context: OpenCodePluginContext,
-  reminder: {
-    readonly parentSessionId: string;
-    readonly requestId: string;
-    readonly status: string;
-    readonly resultTool: string;
-    readonly recommendedFollowUp: string;
-    readonly nextArgs: {
-      readonly requestId: string;
-    };
-    readonly message: string;
-  },
+  reminder: OpenCodeAsyncTaskReminderLike,
 ): Promise<void> {
   const logFn = context.client.app?.log;
 
@@ -103,12 +111,14 @@ async function emitReminderLog(
       service: "opencode-async-task-reminder",
       level: "info",
       message: reminder.message,
-      extra: {
-        parentSessionId: reminder.parentSessionId,
-        requestId: reminder.requestId,
-        status: reminder.status,
-        resultTool: reminder.resultTool,
-        recommendedFollowUp: reminder.recommendedFollowUp,
+        extra: {
+          parentSessionId: reminder.parentSessionId,
+          requestId: reminder.requestId,
+          reminderToken: reminder.reminderToken,
+          ...(reminder.taskId ? { taskId: reminder.taskId } : {}),
+          status: reminder.status,
+          resultTool: reminder.resultTool,
+          recommendedFollowUp: reminder.recommendedFollowUp,
         nextArgs: reminder.nextArgs,
       },
     },

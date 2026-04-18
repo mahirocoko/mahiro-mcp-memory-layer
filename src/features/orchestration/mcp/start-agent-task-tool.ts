@@ -112,6 +112,7 @@ export function getRegisteredStartAgentTaskTool(input: {
           requestId,
           waitMode: "explicit_async",
         }),
+        taskId,
         surface: "agent-category",
         category: parsed.category,
         route: {

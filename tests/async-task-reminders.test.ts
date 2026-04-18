@@ -95,6 +95,7 @@ describe("consumeOpenCodeAsyncTaskReminder", () => {
       }),
     ).toEqual({
       reminderId: "async-task:session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
+      reminderToken: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
       dedupeKey: "session-1:workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:completed",
       parentSessionId: "session-1",
       requestId: "workflow_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
