@@ -32,27 +32,18 @@ const callWorkerInputShape = {
 } satisfies z.ZodRawShape;
 
 const callWorkerInputSchema = z.object(callWorkerInputShape).superRefine((value, ctx) => {
-  if (value.worker === "gemini") {
-    if (value.mode !== undefined) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["mode"], message: "mode is only valid for cursor worker." });
+  if (value.worker === "gemini" && value.allowedMcpServerNames !== undefined) {
+    if (value.allowedMcpServerNames !== "none" && value.allowedMcpServerNames.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_small,
+        path: ["allowedMcpServerNames"],
+        minimum: 1,
+        inclusive: true,
+        origin: "array",
+        type: "array",
+        message: "Too small: expected array to have >=1 items",
+      });
     }
-    if (value.force !== undefined) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["force"], message: "force is only valid for cursor worker." });
-    }
-    if (value.trust !== undefined) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["trust"], message: "trust is only valid for cursor worker." });
-    }
-    return;
-  }
-
-  if (value.taskKind !== undefined) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["taskKind"], message: "taskKind is only valid for gemini worker." });
-  }
-  if (value.approvalMode !== undefined) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["approvalMode"], message: "approvalMode is only valid for gemini worker." });
-  }
-  if (value.allowedMcpServerNames !== undefined) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["allowedMcpServerNames"], message: "allowedMcpServerNames is only valid for gemini worker." });
   }
 });
 
@@ -72,11 +63,12 @@ export function getRegisteredCallWorkerTool(input: {
     inputSchema: callWorkerInputShape,
     execute: async (rawInput) => {
       const parsed = callWorkerInputSchema.parse(rawInput);
+      const { normalizedInput, strippedFields } = normalizeCallWorkerInput(parsed);
       const requestId = newId("workflow");
       const startedAt = new Date().toISOString();
       const taskId =
-        parsed.taskId?.trim() || `${parsed.worker}_${requestId.slice("workflow_".length, "workflow_".length + 12)}`;
-      const job = buildWorkerJob(parsed, taskId);
+        normalizedInput.taskId?.trim() || `${normalizedInput.worker}_${requestId.slice("workflow_".length, "workflow_".length + 12)}`;
+      const job = buildWorkerJob(normalizedInput, taskId);
       const spec = {
         mode: "parallel" as const,
         jobs: [job],
@@ -120,13 +112,19 @@ export function getRegisteredCallWorkerTool(input: {
         }),
         taskId,
         surface: "worker-lane",
-        worker: parsed.worker,
+        worker: normalizedInput.worker,
         route: {
           workerKind: job.kind,
           model: job.input.model,
           reason: job.routeReason,
           ...(job.workerRuntime ? { workerRuntime: job.workerRuntime } : {}),
         },
+        ...(strippedFields.length > 0
+          ? {
+              ignoredFields: strippedFields,
+              warning: `Ignored incompatible ${normalizedInput.worker} worker fields: ${strippedFields.join(", ")}.`,
+            }
+          : {}),
       };
     },
   };
@@ -180,5 +178,40 @@ function buildWorkerJob(
     ...(parsed.retries !== undefined ? { retries: parsed.retries } : {}),
     ...(parsed.retryDelayMs !== undefined ? { retryDelayMs: parsed.retryDelayMs } : {}),
     ...(parsed.continueOnFailure !== undefined ? { continueOnFailure: parsed.continueOnFailure } : {}),
+  };
+}
+
+function normalizeCallWorkerInput(parsed: z.infer<typeof callWorkerInputSchema>): {
+  normalizedInput: z.infer<typeof callWorkerInputSchema>;
+  strippedFields: string[];
+} {
+  if (parsed.worker === "gemini") {
+    const strippedFields = ["mode", "force", "trust"].filter(
+      (field) => parsed[field as "mode" | "force" | "trust"] !== undefined,
+    );
+
+    return {
+      normalizedInput: {
+        ...parsed,
+        mode: undefined,
+        force: undefined,
+        trust: undefined,
+      },
+      strippedFields,
+    };
+  }
+
+  const strippedFields = ["taskKind", "approvalMode", "allowedMcpServerNames"].filter(
+    (field) => parsed[field as "taskKind" | "approvalMode" | "allowedMcpServerNames"] !== undefined,
+  );
+
+  return {
+    normalizedInput: {
+      ...parsed,
+      taskKind: undefined,
+      approvalMode: undefined,
+      allowedMcpServerNames: undefined,
+    },
+    strippedFields,
   };
 }

@@ -198,7 +198,8 @@ Important posture:
 - it keeps the same async workflow polling contract as the other orchestration start surfaces
 - it is the closest repo-owned analogue to a direct subagent/worker invoke surface, but centered on worker lanes instead of named OMO agents
 - `model` is an optional override; if omitted, the repo uses the lane default (`gemini-3-pro-preview` for Gemini, `composer-2` for Cursor)
-- lane-specific fields are validated at the tool boundary: Gemini-only arguments are rejected on the Cursor lane, and vice versa
+- humans usually do not need to manage lane-specific internal args themselves; the agent should compose worker-compatible input automatically
+- if a caller still sends incompatible lane-only fields, `call_worker` strips them and returns a warning instead of failing the whole request
 
 ### `orchestrate_workflow`
 

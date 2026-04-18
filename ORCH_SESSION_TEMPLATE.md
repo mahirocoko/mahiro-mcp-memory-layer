@@ -47,6 +47,7 @@ If the runtime does not expose orchestration, continue with the available memory
 
 - `start_agent_task` is the preferred thin async façade for category-routed orchestration when orchestration is available.
 - `call_worker` is the preferred thin async façade when you want explicit `gemini` or `cursor` lane selection.
+- humans should not need to hand-compose lane-specific worker args; the agent should choose worker-compatible fields itself and treat internal worker arguments as implementation detail.
 - `runtime_capabilities` is the source of truth for whether the current session is plugin-native only or plugin-native plus MCP orchestration.
 - On the plugin path, `orch: on/off/status` is session-scoped operator state, not just prompt convention.
 - `memory_context` can expose plugin-side `operator` state for tracked tasks.

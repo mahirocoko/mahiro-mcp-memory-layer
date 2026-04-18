@@ -257,17 +257,72 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects lane-specific cursor fields on gemini worker calls", async () => {
+  it("strips lane-specific cursor fields on gemini worker calls and returns a warning", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "call_worker");
 
-    await expect(
-      tool?.execute({
-        worker: "gemini",
-        prompt: "Summarize this issue.",
-        mode: "ask",
-      }),
-    ).rejects.toThrow(/mode is only valid for cursor worker/i);
+    const result = await tool?.execute({
+      worker: "gemini",
+      prompt: "Summarize this issue.",
+      mode: "ask",
+      force: true,
+      trust: false,
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "gemini",
+          input: {
+            prompt: "Summarize this issue.",
+            model: "gemini-3-pro-preview",
+          },
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      worker: "gemini",
+      ignoredFields: ["mode", "force", "trust"],
+    });
+    expect(result).toHaveProperty(
+      "warning",
+      "Ignored incompatible gemini worker fields: mode, force, trust.",
+    );
+  });
+
+  it("strips lane-specific gemini fields on cursor worker calls and returns a warning", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "call_worker");
+
+    const result = await tool?.execute({
+      worker: "cursor",
+      prompt: "Review this issue.",
+      taskKind: "summarize",
+      approvalMode: "plan",
+      allowedMcpServerNames: "none",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "cursor",
+          input: {
+            prompt: "Review this issue.",
+            model: "composer-2",
+          },
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      worker: "cursor",
+      ignoredFields: ["taskKind", "approvalMode", "allowedMcpServerNames"],
+    });
+    expect(result).toHaveProperty(
+      "warning",
+      "Ignored incompatible cursor worker fields: taskKind, approvalMode, allowedMcpServerNames.",
+    );
   });
 
   it("rejects timeout values above worker contract limits", async () => {
