@@ -49,7 +49,7 @@ If you want a structured answer instead of inferring from the tool list, call `r
 
 ## Plugin-local façade config
 
-The OpenCode plugin path now supports a small plugin-local façade layer for category routing and reminder gating.
+The OpenCode plugin path now supports a small plugin-local façade layer for category routing, reminder gating, and a thin operator loop for session-scoped orchestration continuity.
 
 - `runtime.remindersEnabled`: enables the plugin-side async reminder contract when the host/plugin layer actually owns a session-visible reminder surface
 - `routing.categories.<category>.model`: overrides the default model used by the local category façade
@@ -60,6 +60,23 @@ Important posture:
 - this is a **plugin-local control-plane layer**, not a second orchestration engine
 - these settings do **not** imply orchestration is available on the standard plugin path; continue to gate on `runtime_capabilities`
 - categories compile down to the repo’s existing worker/runtime/model choices rather than replacing the current workflow/result/supervision primitives
+
+### Plugin-local operator loop
+
+When the plugin path has orchestration plus reminders available, the plugin now keeps a small session-scoped operator state alongside the existing cached memory state.
+
+- `memory_context` can include an `operator` section showing sticky orch mode plus the current per-session task ledger
+- `orch: on`, `orch: off`, and `orch: status` are now session-scoped plugin behavior toggles rather than docs-only draft language
+- `start_agent_task` starts a tracked session task when orch mode is active and now returns both `requestId` and `taskId`
+- terminal async reminders can carry `requestId`, `taskId`, and a reminder token back to the main session-visible reminder surface
+- `get_orchestration_result` moves tracked completed tasks into an `awaiting_verification` operator state
+- `mark_orchestration_task_verification` is the plugin-local finalize step for closing a tracked task as `completed` or `needs_attention`
+
+Important posture:
+
+- this operator state is **session-local control-plane state**, not a replacement for the workflow result store
+- workflow truth still lives in the orchestration result/supervision stores; the operator ledger is a session view over that truth
+- if reminders are unavailable or orch mode is off, the plugin must degrade cleanly to the older start/poll flow without pretending the closed loop exists
 
 Example plugin-local façade config:
 
@@ -149,7 +166,7 @@ Important posture:
 
 - it accepts task intent through `category` plus a `prompt`
 - it compiles to a one-job workflow using the repo’s existing worker/runtime/model routing rules
-- it returns the same async contract as background workflow starts (`requestId`, `status`, `pollWith`, `recommendedFollowUp`, `nextArgs`, etc.)
+- it returns the same async contract as background workflow starts (`requestId`, `taskId`, `status`, `pollWith`, `recommendedFollowUp`, `nextArgs`, etc.)
 - on the plugin path, this is part of the intentionally narrowed orchestration façade; the plugin does **not** expose the full raw orchestration surface
 
 Example shape:
@@ -180,6 +197,19 @@ Important posture:
 Use this when you want a non-blocking status read of the latest stored workflow record.
 
 This is the primary low-level production follow-up for async orchestration because the workflow keeps running independently in the result store even if the original MCP request ends.
+
+On the plugin path, this is also the resume step that advances a tracked session task from reminder-driven `awaiting_resume` into `awaiting_verification` when the workflow itself completed successfully.
+
+### `mark_orchestration_task_verification`
+
+Use this only on the plugin path when you want to finalize the session-local operator ledger after external verification already happened.
+
+Important posture:
+
+- this is a plugin-local control-plane tool, not an MCP orchestration engine tool
+- it mutates only the session task ledger exposed through `memory_context`
+- it does **not** rewrite workflow result-store records
+- valid outcomes are `completed` and `needs_attention`
 
 ### `supervise_orchestration_result`
 

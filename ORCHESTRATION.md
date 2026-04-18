@@ -48,9 +48,10 @@ When `orch: on` is active, treat every subsequent actionable request as if it ha
 
 Sticky-mode notes:
 
-- Until sticky state is actually implemented, treat `orch: on/off/status` as protocol draft rather than guaranteed runtime behavior.
+- On the plugin path, `orch: on/off/status` is now implemented as session-scoped operator state rather than docs-only draft language.
 - Sticky `orch` mode changes posture, not model routing defaults by itself.
-- If sticky `orch` mode is implemented later, its state should be session-scoped rather than global.
+- Sticky `orch` state is session-scoped rather than global.
+- Continue to gate orchestration claims on `runtime_capabilities`; sticky posture does not imply MCP orchestration is available in every runtime.
 
 ## Core Role
 
@@ -67,6 +68,22 @@ Sticky-mode notes:
 - Keep judgment centralized and execution distributed. The orchestrator decides; workers do.
 - Do not let multiple agents behave like competing orchestrators on the same unit of work.
 - A single workflow may still contain multiple worker jobs; the thing to avoid is multiple orchestrators competing on one decision surface, not multiple execution workers in one workflow.
+
+## Plugin Operator Loop
+
+On the plugin path, the orchestrator posture now has a thin session-local operator loop layered on top of the existing orchestration primitives.
+
+- `start_agent_task` can create a tracked session task when orch mode is active
+- terminal async reminders can bring `requestId`, `taskId`, and reminder-token context back into the main session
+- `get_orchestration_result` is the normal resume step after a reminder, not just a passive polling read
+- completed workflow output is not treated as operator-complete until it passes the verification step
+- `mark_orchestration_task_verification` is the plugin-local finalize step for closing tracked tasks as `completed` or `needs_attention`
+
+Important posture:
+
+- this is a **thin control-plane loop**, not a second orchestration engine
+- workflow execution truth still lives in the workflow result and supervision stores
+- the plugin operator ledger is a session view over that truth so the main agent can resume, verify, and close the loop cleanly
 
 ## Token-Saving Posture
 
