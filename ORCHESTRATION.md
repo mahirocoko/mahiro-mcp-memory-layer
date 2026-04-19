@@ -172,6 +172,15 @@ For workflow composition:
 | Harder implementation, review, or refactor | Cursor-family `agent` | `composer-2` | targeted diff review plus typecheck/tests | stay on `composer-2` first; escalate only with a concrete reason |
 | Complex planning, Opus validation, or very hard execution | Cursor-family `agent` | `claude-opus-4-7-high` | verify against repo constraints | planner with the orchestrator, and escalate to thinking-high when deep reasoning quality is the real bottleneck |
 
+Current category defaults from code:
+
+- `visual-engineering` -> Gemini `gemini-3-pro-preview`
+- `interactive-gemini` -> Gemini `gemini-3-pro-preview` on shell, with the tmux-backed normal-mode runtime injected by default
+- `artistry` -> Gemini `gemini-3-flash-preview`
+- `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
+- `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
+- `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
+
 ## Frontend Task Routing
 
 Frontend tasks split into two shapes:
@@ -242,6 +251,11 @@ Recommended model ladder:
 - `claude-opus-4-7-high` -> primary hard escalation for planning, architecture, and high-risk validation
 - `claude-opus-4-7-thinking-high` -> deep-reasoning escalation when deliberate thinking quality matters more than speed
 - fallback-only: `claude-4.6-sonnet-medium`, `claude-4.6-opus-*`
+
+Current direct worker defaults from code:
+
+- `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
+- `call_worker(worker="cursor")` -> `composer-2`
 
 `--mode plan` is not the default posture. Use it only when the task is complex enough that you need an explicit planning pass.
 

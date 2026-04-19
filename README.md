@@ -143,6 +143,18 @@ Use it when you want OMOA-style category routing without constructing raw workfl
 
 The built-in `interactive-gemini` category is the main example of a category-level runtime distinction in this repo: it still starts through the same async `start_agent_task` surface, but the default shell lane is a tmux-hosted Gemini normal-mode turn rather than the plain headless shell invocation.
 
+Current code-backed defaults:
+
+- direct Gemini lane via `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
+- direct Cursor lane via `call_worker(worker="cursor")` -> `composer-2`
+- category routing via `start_agent_task`:
+  - `visual-engineering` -> Gemini `gemini-3-pro-preview`
+  - `interactive-gemini` -> Gemini `gemini-3-pro-preview` on shell, with tmux-backed normal mode injected unless `workerRuntime: "mcp"` is set
+  - `artistry` -> Gemini `gemini-3-flash-preview`
+  - `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
+  - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
+  - `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
+
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 
 **Wake-up:** `wake_up_memory` — same scope + optional `maxItems` / `maxChars` as `build_context_for_task`, but runs two internal retrieval passes (`profile` and `recent` modes) and returns `wakeUpContext` (combined) plus `profile` and `recent` section objects (each matches one `build_context_for_task` result). No suggestions or policy.

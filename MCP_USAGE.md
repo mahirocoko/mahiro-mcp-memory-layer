@@ -191,6 +191,15 @@ Example shape:
 
 Current special case: this repo also recognizes an `interactive-gemini` category on the category façade. It still returns the same async polling contract as any other `start_agent_task` call, but on the shell lane it injects the repo's tmux-backed Gemini normal-mode runtime instead of the one-shot headless Gemini CLI path. If a caller explicitly sets `workerRuntime: "mcp"`, that explicit runtime wins and the tmux interactive shell path is skipped.
 
+Current category defaults from code:
+
+- `visual-engineering` -> Gemini `gemini-3-pro-preview`
+- `interactive-gemini` -> Gemini `gemini-3-pro-preview` on shell, with the tmux-backed normal-mode runtime injected by default
+- `artistry` -> Gemini `gemini-3-flash-preview`
+- `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
+- `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
+- `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
+
 ### `call_worker`
 
 Use this when you want a thin async direct-invoke surface on an explicit worker lane instead of category routing.
@@ -204,6 +213,11 @@ Important posture:
 - humans usually do not need to manage lane-specific internal args themselves; the agent should compose worker-compatible input automatically
 - if a caller still sends incompatible lane-only fields, `call_worker` strips them and returns a warning instead of failing the whole request
 - if a caller explicitly requested a runtime (`workerRuntime`), the agent should not silently retry on another runtime unless fallback was also explicitly requested
+
+Current direct worker defaults from code:
+
+- `call_worker(worker="gemini")` -> model `gemini-3-pro-preview`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_GEMINI_RUNTIME=mcp` changes it
+- `call_worker(worker="cursor")` -> model `composer-2`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_CURSOR_RUNTIME=mcp` changes it
 
 ### `orchestrate_workflow`
 
