@@ -143,7 +143,7 @@ Use it when you want OMOA-style category routing without constructing raw workfl
 
 The built-in `interactive-gemini` category is the main example of a category-level runtime distinction in this repo: it still starts through the same async `start_agent_task` surface, but the default shell lane is a tmux-hosted Gemini normal-mode turn rather than the plain headless shell invocation.
 
-Current code-backed defaults:
+Current repo code defaults:
 
 - direct Gemini lane via `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
 - direct Cursor lane via `call_worker(worker="cursor")` -> `composer-2`
@@ -154,6 +154,12 @@ Current code-backed defaults:
   - `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
   - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
   - `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
+
+Current local runtime observations:
+
+- `agent models` currently lists Cursor-family runtime models such as `composer-2-fast` (runtime default), `composer-2` (current), `claude-opus-4-7-*`, `gemini-3.1-pro`, and `gemini-3-flash`
+- the Gemini CLI itself currently accepts `gemini-3-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
+- this means the repo's current Gemini route table uses the Gemini CLI naming surface, while the Cursor-family inventory loader currently sees the `agent models` naming surface
 
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 

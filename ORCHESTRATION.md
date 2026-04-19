@@ -181,6 +181,17 @@ Current category defaults from code:
 - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
 - `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
 
+Current direct worker defaults from code:
+
+- `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
+- `call_worker(worker="cursor")` -> `composer-2`
+
+Observed local runtime naming split:
+
+- `agent models` currently advertises Cursor-family inventory names such as `composer-2-fast`, `composer-2`, `gemini-3.1-pro`, and `gemini-3-flash`
+- the Gemini CLI itself currently accepts execution ids such as `gemini-3-pro-preview` and `gemini-3-flash-preview`
+- treat the route defaults in this doc as the repo's current execution defaults, not as a verbatim mirror of the `agent models` output
+
 ## Frontend Task Routing
 
 Frontend tasks split into two shapes:
@@ -251,11 +262,6 @@ Recommended model ladder:
 - `claude-opus-4-7-high` -> primary hard escalation for planning, architecture, and high-risk validation
 - `claude-opus-4-7-thinking-high` -> deep-reasoning escalation when deliberate thinking quality matters more than speed
 - fallback-only: `claude-4.6-sonnet-medium`, `claude-4.6-opus-*`
-
-Current direct worker defaults from code:
-
-- `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
-- `call_worker(worker="cursor")` -> `composer-2`
 
 `--mode plan` is not the default posture. Use it only when the task is complex enough that you need an explicit planning pass.
 

@@ -200,6 +200,12 @@ Current category defaults from code:
 - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
 - `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
 
+Important runtime naming split right now:
+
+- the repo's Gemini execution path currently uses Gemini CLI model ids such as `gemini-3-pro-preview` and `gemini-3-flash-preview`
+- the local Cursor-family inventory path (`agent models`) currently advertises names such as `gemini-3.1-pro`, `gemini-3-flash`, `composer-2-fast`, and `composer-2`
+- so `start_agent_task` route defaults documented here are the repo's current execution defaults, not a verbatim copy of the `agent models` output
+
 ### `call_worker`
 
 Use this when you want a thin async direct-invoke surface on an explicit worker lane instead of category routing.
@@ -218,6 +224,11 @@ Current direct worker defaults from code:
 
 - `call_worker(worker="gemini")` -> model `gemini-3-pro-preview`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_GEMINI_RUNTIME=mcp` changes it
 - `call_worker(worker="cursor")` -> model `composer-2`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_CURSOR_RUNTIME=mcp` changes it
+
+Observed local runtime inventory at the time of writing:
+
+- `agent models` showed `composer-2-fast` as the runtime default and `composer-2` as the current Cursor-family model, plus `claude-opus-4-7-*`, `gemini-3.1-pro`, and `gemini-3-flash`
+- direct Gemini CLI probes succeeded with `gemini-3-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
 
 ### `orchestrate_workflow`
 
