@@ -41,15 +41,15 @@ interface AgentTaskRoutePreset {
 const defaultAgentTaskRoutePresets: Record<AgentTaskCategory, AgentTaskRoutePreset> = {
   "visual-engineering": {
     workerKind: "gemini",
-    preferredModels: ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+    preferredModels: ["gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
   },
   "interactive-gemini": {
     workerKind: "gemini",
-    preferredModels: ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+    preferredModels: ["gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
   },
   artistry: {
     workerKind: "gemini",
-    preferredModels: ["gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
+    preferredModels: ["gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
   },
   ultrabrain: {
     workerKind: "cursor",
@@ -298,7 +298,7 @@ function resolvePreferredEscalatedModels(
 
   if (currentModel === "gemini-3-flash-preview") {
     if (signals.requiresHigherQualityGemini || signals.verificationRisk || signals.uncertaintyLevel === "high") {
-      return ["gemini-3-pro-preview", "gemini-2.5-pro", currentModel, "gemini-2.5-flash"];
+      return ["gemini-3.1-pro-preview", "gemini-2.5-pro", currentModel, "gemini-2.5-flash"];
     }
   }
 

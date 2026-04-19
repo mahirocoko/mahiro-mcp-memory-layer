@@ -31,7 +31,7 @@ vi.mock("../src/features/orchestration/runtime-model-inventory.js", () => ({
     source: "live",
     fetchedAt: "2026-04-17T13:47:00.000Z",
     cursor: {
-      models: ["composer-2", "claude-opus-4-7-high", "gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
+      models: ["composer-2", "claude-opus-4-7-high", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
       modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
       supportsPrint: true,
       supportsCloud: true,
@@ -217,7 +217,7 @@ describe("getRegisteredOrchestrationTools", () => {
           routeReason: "explicit_worker_lane",
           input: {
             prompt: "Summarize this issue.",
-            model: "gemini-3-pro-preview",
+            model: "gemini-3.1-pro-preview",
           },
         },
       ],
@@ -229,7 +229,7 @@ describe("getRegisteredOrchestrationTools", () => {
       worker: "gemini",
       route: {
         workerKind: "gemini",
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
         reason: "explicit_worker_lane",
         workerRuntime: "mcp",
       },
@@ -276,7 +276,7 @@ describe("getRegisteredOrchestrationTools", () => {
           kind: "gemini",
           input: {
             prompt: "Summarize this issue.",
-            model: "gemini-3-pro-preview",
+            model: "gemini-3.1-pro-preview",
           },
         },
       ],
@@ -452,7 +452,7 @@ describe("getRegisteredOrchestrationTools", () => {
           workerRuntime: "shell",
           input: {
             prompt: "Reply once.",
-            model: "gemini-3-pro-preview",
+            model: "gemini-3.1-pro-preview",
             taskKind: "general",
             approvalMode: "plan",
           },
@@ -467,7 +467,7 @@ describe("getRegisteredOrchestrationTools", () => {
       category: "interactive-gemini",
       route: {
         workerKind: "gemini",
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
         reason: "default_interactive-gemini_lane",
         workerRuntime: "shell",
       },

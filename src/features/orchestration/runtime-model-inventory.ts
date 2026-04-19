@@ -36,7 +36,7 @@ const staticRuntimeModelInventorySnapshot: RuntimeModelInventorySnapshot = {
       "claude-4.6-sonnet-medium",
       "claude-4.6-opus-high",
       "gemini-3-flash-preview",
-      "gemini-3-pro-preview",
+      "gemini-3.1-pro-preview",
       "gemini-2.5-flash",
       "gemini-2.5-pro",
     ],

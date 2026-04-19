@@ -48,7 +48,7 @@ const callWorkerInputSchema = z.object(callWorkerInputShape).superRefine((value,
 });
 
 const defaultWorkerModels = {
-  gemini: "gemini-3-pro-preview",
+  gemini: "gemini-3.1-pro-preview",
   cursor: "composer-2",
 } as const;
 

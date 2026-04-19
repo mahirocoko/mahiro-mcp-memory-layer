@@ -76,7 +76,7 @@ Example plugin config:
         "workerRuntime": "mcp"
       },
       "interactive-gemini": {
-        "model": "gemini-3-pro-preview",
+        "model": "gemini-3.1-pro-preview",
         "workerRuntime": "shell"
       }
     }
@@ -145,11 +145,11 @@ The built-in `interactive-gemini` category is the main example of a category-lev
 
 Current repo code defaults:
 
-- direct Gemini lane via `call_worker(worker="gemini")` -> `gemini-3-pro-preview`
+- direct Gemini lane via `call_worker(worker="gemini")` -> `gemini-3.1-pro-preview`
 - direct Cursor lane via `call_worker(worker="cursor")` -> `composer-2`
 - category routing via `start_agent_task`:
-  - `visual-engineering` -> Gemini `gemini-3-pro-preview`
-  - `interactive-gemini` -> Gemini `gemini-3-pro-preview` on shell, with tmux-backed normal mode injected unless `workerRuntime: "mcp"` is set
+  - `visual-engineering` -> Gemini `gemini-3.1-pro-preview`
+  - `interactive-gemini` -> Gemini `gemini-3.1-pro-preview` on shell, with tmux-backed normal mode injected unless `workerRuntime: "mcp"` is set
   - `artistry` -> Gemini `gemini-3-flash-preview`
   - `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
   - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
@@ -157,9 +157,8 @@ Current repo code defaults:
 
 Current local runtime observations:
 
-- `agent models` currently lists Cursor-family runtime models such as `composer-2-fast` (runtime default), `composer-2` (current), `claude-opus-4-7-*`, `gemini-3.1-pro`, and `gemini-3-flash`
-- the Gemini CLI itself currently accepts `gemini-3-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
-- this means the repo's current Gemini route table uses the Gemini CLI naming surface, while the Cursor-family inventory loader currently sees the `agent models` naming surface
+- `agent models` currently lists Cursor-family runtime models such as `composer-2-fast` (runtime default), `composer-2` (current), and `claude-opus-4-7-*`
+- the Gemini CLI currently accepts `gemini-3.1-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
 
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 
@@ -374,7 +373,7 @@ Model selection:
 
 - `--model` is required on every invocation
 - `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
-- `gemini-3-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
+- `gemini-3.1-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
 - `gemini-2.5-flash` / `gemini-2.5-pro` -> stable fallback lanes
 
 Use Gemini when you intentionally want the Gemini family for:
@@ -407,11 +406,11 @@ Caching:
 
 ```bash
 bun run gemini -- --model gemini-3-flash-preview "Summarize this repo"
-bun run gemini -- --model gemini-3-pro-preview "Review this architecture and propose tradeoffs"
+bun run gemini -- --model gemini-3.1-pro-preview "Review this architecture and propose tradeoffs"
 bun run gemini -- --model gemini-3-flash-preview --task summarize "Summarize the latest meeting notes"
 bun run gemini -- --model gemini-3-flash-preview --task timeline "Summarize the project timeline from these notes"
-bun run gemini -- --model gemini-3-pro-preview --timeout-ms 30000 --cwd /path/to/project "Review the current diff"
-bun run gemini -- --model gemini-3-pro-preview --approval-mode plan --allowed-mcp-server-names none "Draft a grounded UI patch"
+bun run gemini -- --model gemini-3.1-pro-preview --timeout-ms 30000 --cwd /path/to/project "Review the current diff"
+bun run gemini -- --model gemini-3.1-pro-preview --approval-mode plan --allowed-mcp-server-names none "Draft a grounded UI patch"
 ```
 
 ## Gemini worker
@@ -477,7 +476,7 @@ This section documents the command shapes. `ORCHESTRATION.md` defines the orches
 - **Unsafe:** Gemini extracts facts → you use those facts to write the Cursor prompt.
 
 ```bash
-bun run gemini -- --model gemini-3-pro-preview --cwd /path/to/repo "Design the new frontend surface" &
+bun run gemini -- --model gemini-3.1-pro-preview --cwd /path/to/repo "Design the new frontend surface" &
 agent -p --model composer-2 --output-format json "Review the unrelated backend diff" &
 wait
 ```
@@ -700,7 +699,7 @@ Async MCP workflow example:
         "workerRuntime": "mcp",
         "input": {
           "prompt": "Summarize the review findings in one paragraph.",
-          "model": "gemini-3-pro-preview",
+          "model": "gemini-3.1-pro-preview",
           "taskKind": "summarize"
         }
       }

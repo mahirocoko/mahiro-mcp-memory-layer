@@ -12,7 +12,7 @@ const sampleRuntimeModelInventory: RuntimeModelInventorySnapshot = {
   source: "live",
   fetchedAt: "2026-04-17T13:47:00.000Z",
   cursor: {
-    models: ["composer-2", "claude-opus-4-7-high", "claude-opus-4-7-thinking-high", "gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
+    models: ["composer-2", "claude-opus-4-7-high", "claude-opus-4-7-thinking-high", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
     modes: ["agent", "plan", "ask", "print", "cloud", "acp"],
     supportsPrint: true,
     supportsCloud: true,
@@ -37,7 +37,7 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "visual-engineering" })).toEqual({
       category: "visual-engineering",
       workerKind: "gemini",
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       reason: "default_visual-engineering_lane",
     });
   });
@@ -46,7 +46,7 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "interactive-gemini" })).toEqual({
       category: "interactive-gemini",
       workerKind: "gemini",
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       reason: "default_interactive-gemini_lane",
     });
   });
@@ -196,7 +196,7 @@ describe("buildAgentTaskWorkerJob", () => {
       input: {
         taskId: "ui-task",
         prompt: "Design the sidebar.",
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
         cwd: "/repo",
         timeoutMs: 30_000,
         taskKind: "general",
@@ -221,7 +221,7 @@ describe("buildAgentTaskWorkerJob", () => {
       input: {
         taskId: "interactive-task",
         prompt: "Reply once.",
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
       },
       routeReason: "default_interactive-gemini_lane",
       workerRuntime: "shell",
@@ -244,7 +244,7 @@ describe("buildAgentTaskWorkerJob", () => {
       input: {
         taskId: "interactive-task",
         prompt: "Reply once.",
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-pro-preview",
       },
       routeReason: "default_interactive-gemini_lane",
       workerRuntime: "mcp",
@@ -388,7 +388,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
     });
   });
 
-  it("escalates gemini-3-flash to gemini-3.1-pro when higher quality is needed", () => {
+  it("escalates gemini-3-flash-preview to gemini-3.1-pro-preview when higher quality is needed", () => {
     expect(
       resolveEscalatedAgentTaskRoute({
         category: "artistry",
@@ -401,7 +401,7 @@ describe("resolveEscalatedAgentTaskRoute", () => {
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       reason: "higher_quality_gemini_escalation",
     });
   });

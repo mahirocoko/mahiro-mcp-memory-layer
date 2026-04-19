@@ -193,8 +193,8 @@ Current special case: this repo also recognizes an `interactive-gemini` category
 
 Current category defaults from code:
 
-- `visual-engineering` -> Gemini `gemini-3-pro-preview`
-- `interactive-gemini` -> Gemini `gemini-3-pro-preview` on shell, with the tmux-backed normal-mode runtime injected by default
+- `visual-engineering` -> Gemini `gemini-3.1-pro-preview`
+- `interactive-gemini` -> Gemini `gemini-3.1-pro-preview` on shell, with the tmux-backed normal-mode runtime injected by default
 - `artistry` -> Gemini `gemini-3-flash-preview`
 - `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
 - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
@@ -202,9 +202,7 @@ Current category defaults from code:
 
 Important runtime naming split right now:
 
-- the repo's Gemini execution path currently uses Gemini CLI model ids such as `gemini-3-pro-preview` and `gemini-3-flash-preview`
-- the local Cursor-family inventory path (`agent models`) currently advertises names such as `gemini-3.1-pro`, `gemini-3-flash`, `composer-2-fast`, and `composer-2`
-- so `start_agent_task` route defaults documented here are the repo's current execution defaults, not a verbatim copy of the `agent models` output
+- the repo's Gemini execution path currently uses Gemini CLI model ids such as `gemini-3.1-pro-preview` and `gemini-3-flash-preview`
 
 ### `call_worker`
 
@@ -215,20 +213,20 @@ Important posture:
 - it accepts `worker: "gemini" | "cursor"` plus a `prompt`
 - it keeps the same async workflow polling contract as the other orchestration start surfaces
 - it is the closest repo-owned analogue to a direct subagent/worker invoke surface, but centered on worker lanes instead of named OMO agents
-- `model` is an optional override; if omitted, the repo uses the lane default (`gemini-3-pro-preview` for Gemini, `composer-2` for Cursor)
+- `model` is an optional override; if omitted, the repo uses the lane default (`gemini-3.1-pro-preview` for Gemini, `composer-2` for Cursor)
 - humans usually do not need to manage lane-specific internal args themselves; the agent should compose worker-compatible input automatically
 - if a caller still sends incompatible lane-only fields, `call_worker` strips them and returns a warning instead of failing the whole request
 - if a caller explicitly requested a runtime (`workerRuntime`), the agent should not silently retry on another runtime unless fallback was also explicitly requested
 
 Current direct worker defaults from code:
 
-- `call_worker(worker="gemini")` -> model `gemini-3-pro-preview`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_GEMINI_RUNTIME=mcp` changes it
+- `call_worker(worker="gemini")` -> model `gemini-3.1-pro-preview`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_GEMINI_RUNTIME=mcp` changes it
 - `call_worker(worker="cursor")` -> model `composer-2`, runtime `shell` unless an injected runtime, explicit `workerRuntime: "mcp"`, or `MAHIRO_CURSOR_RUNTIME=mcp` changes it
 
-Observed local runtime inventory at the time of writing:
+Observed local runtime probes at the time of writing:
 
-- `agent models` showed `composer-2-fast` as the runtime default and `composer-2` as the current Cursor-family model, plus `claude-opus-4-7-*`, `gemini-3.1-pro`, and `gemini-3-flash`
-- direct Gemini CLI probes succeeded with `gemini-3-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
+- `agent models` showed `composer-2-fast` as the runtime default and `composer-2` as the current Cursor-family model, plus `claude-opus-4-7-*`
+- direct Gemini CLI probes succeeded with `gemini-3.1-pro-preview`, `gemini-3-flash-preview`, and `gemini-2.5-pro`
 
 ### `orchestrate_workflow`
 

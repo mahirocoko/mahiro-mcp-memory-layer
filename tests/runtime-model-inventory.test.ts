@@ -17,7 +17,7 @@ auto - Auto
 composer-2-fast - Composer 2 Fast  (default)
 composer-2 - Composer 2  (current)
 claude-opus-4-7-high - Opus 4.7
-gemini-3-pro-preview - Gemini 3 Pro Preview
+gemini-3.1-pro-preview - Gemini 3.1 Pro Preview
 
 Tip: use --model <id> to switch.`),
     ).toEqual([
@@ -25,7 +25,7 @@ Tip: use --model <id> to switch.`),
       "composer-2-fast",
       "composer-2",
       "claude-opus-4-7-high",
-      "gemini-3-pro-preview",
+        "gemini-3.1-pro-preview",
     ]);
   });
 });
@@ -149,7 +149,7 @@ composer-2 - Composer 2`,
       "claude-4.6-sonnet-medium",
       "claude-4.6-opus-high",
       "gemini-3-flash-preview",
-      "gemini-3-pro-preview",
+      "gemini-3.1-pro-preview",
       "gemini-2.5-flash",
       "gemini-2.5-pro",
     ]);
