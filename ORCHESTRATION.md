@@ -271,6 +271,14 @@ For workflow command shapes, JSON payloads, async orchestration examples, and tr
 - Use the dedicated runtime docs in `MCP_USAGE.md` for exact payloads, polling/waiting tools, trace inspection, and direct async worker behavior.
 - Worker output is never the final truth; verification still belongs to the orchestrator.
 
+## Interactive Gemini Lane
+
+- `interactive-gemini` is the category-level escape hatch when you want Gemini through the repo's tmux-backed normal-mode shell runtime instead of the one-shot headless shell path.
+- Treat it as a runtime policy difference, not as a second orchestration API.
+- The public async surface stays the same: `start_agent_task` still returns the usual request/task IDs and polling guidance.
+- If a caller explicitly requests `workerRuntime: "mcp"`, do not force the tmux shell path.
+- Verification still belongs to the orchestrator: a successful interactive Gemini turn is not completion until the normal checks and judgment pass.
+
 ## Expected Turn Shape
 
 A good turn:

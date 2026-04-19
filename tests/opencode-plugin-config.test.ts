@@ -94,6 +94,9 @@ describe("loadOpenCodePluginConfig", () => {
           "categories": {
             "quick": {
               "model": "claude-opus-4-7-high"
+            },
+            "interactive-gemini": {
+              "model": "gemini-2.5-pro"
             }
           }
         },
@@ -108,6 +111,9 @@ describe("loadOpenCodePluginConfig", () => {
           categories: {
             quick: {
               workerRuntime: "mcp",
+            },
+            "interactive-gemini": {
+              workerRuntime: "shell",
             },
           },
         },
@@ -131,6 +137,10 @@ describe("loadOpenCodePluginConfig", () => {
           quick: {
             model: "claude-opus-4-7-high",
             workerRuntime: "mcp",
+          },
+          "interactive-gemini": {
+            model: "gemini-2.5-pro",
+            workerRuntime: "shell",
           },
         },
       },

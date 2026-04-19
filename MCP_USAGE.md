@@ -189,6 +189,8 @@ Example shape:
 }
 ```
 
+Current special case: this repo also recognizes an `interactive-gemini` category on the category façade. It still returns the same async polling contract as any other `start_agent_task` call, but on the shell lane it injects the repo's tmux-backed Gemini normal-mode runtime instead of the one-shot headless Gemini CLI path. If a caller explicitly sets `workerRuntime: "mcp"`, that explicit runtime wins and the tmux interactive shell path is skipped.
+
 ### `call_worker`
 
 Use this when you want a thin async direct-invoke surface on an explicit worker lane instead of category routing.
@@ -323,6 +325,7 @@ This repo supports shell-backed and MCP-backed worker execution depending on ent
 - default worker execution remains **shell** when nothing selects MCP
 - `MAHIRO_CURSOR_RUNTIME=mcp` and `MAHIRO_GEMINI_RUNTIME=mcp` opt into MCP-backed worker runtime selection where supported
 - workflow jobs can also set `workerRuntime: "mcp"` explicitly when you want the MCP-backed worker runtime for that job
+- `interactive-gemini` is the notable shell-lane exception: the public surface still reports `workerRuntime: "shell"`, but the shell runtime implementation itself is a tmux-hosted Gemini normal-mode turn rather than the plain JSON headless Gemini CLI path
 
 Do not assume every async or orchestration call is automatically using MCP-backed worker execution. Check the workflow metadata or trace/result store when it matters.
 

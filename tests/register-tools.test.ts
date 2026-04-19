@@ -422,6 +422,79 @@ describe("getRegisteredOrchestrationTools", () => {
     );
   });
 
+  it("starts the interactive-gemini category through the existing async envelope", async () => {
+    let resolveRun: ((value: Awaited<ReturnType<typeof runOrchestrationWorkflow>>) => void) | undefined;
+
+    vi.mocked(runOrchestrationWorkflow).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    const result = await tool?.execute({
+      category: "interactive-gemini",
+      prompt: "Reply once.",
+      taskKind: "general",
+      approvalMode: "plan",
+    });
+
+    const forwardedSpec = vi.mocked(runOrchestrationWorkflow).mock.calls[0]?.[0];
+
+    expect(forwardedSpec).toMatchObject({
+      mode: "parallel",
+      jobs: [
+        {
+          kind: "gemini",
+          workerRuntime: "shell",
+          input: {
+            prompt: "Reply once.",
+            model: "gemini-3-pro-preview",
+            taskKind: "general",
+            approvalMode: "plan",
+          },
+          routeReason: "default_interactive-gemini_lane",
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      requestId: expect.stringMatching(/^workflow_/),
+      status: "running",
+      surface: "agent-category",
+      category: "interactive-gemini",
+      route: {
+        workerKind: "gemini",
+        model: "gemini-3-pro-preview",
+        reason: "default_interactive-gemini_lane",
+        workerRuntime: "shell",
+      },
+      pollWith: "get_orchestration_result",
+    });
+
+    resolveRun?.({
+      requestId: "workflow_interactive_category",
+      mode: "parallel",
+      status: "completed",
+      results: [],
+      summary: {
+        totalJobs: 1,
+        finishedJobs: 1,
+        completedJobs: 1,
+        failedJobs: 0,
+        skippedJobs: 0,
+        startedAt: "2026-04-05T00:00:00.000Z",
+        finishedAt: "2026-04-05T00:00:00.000Z",
+        durationMs: 0,
+      },
+    });
+
+    await Promise.resolve();
+    expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
+  });
+
   it("executes the orchestration tool with normalized workflow input", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");

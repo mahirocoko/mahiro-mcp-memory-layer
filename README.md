@@ -74,11 +74,17 @@ Example plugin config:
       "quick": {
         "model": "claude-opus-4-7-high",
         "workerRuntime": "mcp"
+      },
+      "interactive-gemini": {
+        "model": "gemini-3-pro-preview",
+        "workerRuntime": "shell"
       }
     }
   }
 }
 ```
+
+`interactive-gemini` is the repo's Gemini normal-mode lane. On the current shell runtime path it keeps the same async orchestration envelope as any other `start_agent_task` category, but the execution step itself runs through a tmux-backed interactive Gemini turn instead of the one-shot JSON CLI path. Explicit `workerRuntime: "mcp"` remains the escape hatch when you do not want the tmux interactive shell path.
 
 Precedence is: environment override > project plugin config > user plugin config > built-in defaults.
 
@@ -134,6 +140,8 @@ When the MCP orchestration surface is available, `start_agent_task` is now the s
 - it does **not** create a second orchestration engine or a second persistence lifecycle
 
 Use it when you want OMOA-style category routing without constructing raw workflow specs yourself.
+
+The built-in `interactive-gemini` category is the main example of a category-level runtime distinction in this repo: it still starts through the same async `start_agent_task` surface, but the default shell lane is a tmux-hosted Gemini normal-mode turn rather than the plain headless shell invocation.
 
 **Host one-call:** `prepare_host_turn_memory` — same inputs as `build_context_for_task` except `includeMemorySuggestions` is implicit (always on): provide `task`, `mode`, `recentConversation`, and your scope ids (`userId`, `projectId`, `containerId`, `sessionId` as needed). Returns the built context bundle, `memorySuggestions`, and `conservativePolicy` (policy reuses that suggestion snapshot so heuristics run once). Optional `sourceOverride` / `extraTags` apply to auto-saved memories under `strong_candidate`, same as `apply_conservative_memory_policy`. **`prepare_turn_memory`** is an alias with the same inputs and behavior.
 

@@ -1,10 +1,12 @@
 import type { CursorWorkerInput } from "../cursor/types.js";
 import type { GeminiAllowedMcpServerNames, GeminiApprovalMode, GeminiTaskKind, GeminiWorkerInput } from "../gemini/types.js";
+import { interactiveShellGeminiRuntime } from "../gemini/runtime/shell/shell-gemini-runtime.js";
 import type { WorkerJob, WorkerRuntimeSelection } from "./types.js";
 import type { RuntimeModelInventorySnapshot } from "./runtime-model-inventory.js";
 
 export const agentTaskCategories = [
   "visual-engineering",
+  "interactive-gemini",
   "artistry",
   "ultrabrain",
   "deep",
@@ -38,6 +40,10 @@ interface AgentTaskRoutePreset {
 
 const defaultAgentTaskRoutePresets: Record<AgentTaskCategory, AgentTaskRoutePreset> = {
   "visual-engineering": {
+    workerKind: "gemini",
+    preferredModels: ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+  },
+  "interactive-gemini": {
     workerKind: "gemini",
     preferredModels: ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
   },
@@ -170,6 +176,10 @@ export type BuildAgentTaskWorkerJobInput =
 
 export function buildAgentTaskWorkerJob(input: BuildAgentTaskWorkerJobInput): WorkerJob {
   const route = resolveAgentTaskRoute(input);
+  const usesInteractiveGeminiShellRuntime =
+    input.category === "interactive-gemini"
+    && route.workerKind === "gemini"
+    && route.workerRuntime !== "mcp";
 
   if (route.workerKind === "gemini") {
     const geminiInput: GeminiWorkerInput = {
@@ -190,7 +200,16 @@ export function buildAgentTaskWorkerJob(input: BuildAgentTaskWorkerJobInput): Wo
       kind: "gemini",
       input: geminiInput,
       routeReason: route.reason,
-      ...(route.workerRuntime ? { workerRuntime: route.workerRuntime } : {}),
+      ...(route.workerRuntime || usesInteractiveGeminiShellRuntime
+        ? { workerRuntime: route.workerRuntime ?? "shell" }
+        : {}),
+      ...(usesInteractiveGeminiShellRuntime
+        ? {
+            dependencies: {
+              runtime: interactiveShellGeminiRuntime,
+            },
+          }
+        : {}),
       ...(input.retries !== undefined ? { retries: input.retries } : {}),
       ...(input.retryDelayMs !== undefined ? { retryDelayMs: input.retryDelayMs } : {}),
       ...(input.continueOnFailure !== undefined ? { continueOnFailure: input.continueOnFailure } : {}),

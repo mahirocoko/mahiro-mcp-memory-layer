@@ -5,6 +5,7 @@ import {
   resolveEscalatedAgentTaskRoute,
   resolveAgentTaskRoute,
 } from "../src/features/orchestration/agent-category-routing.js";
+import { interactiveShellGeminiRuntime } from "../src/features/gemini/runtime/shell/shell-gemini-runtime.js";
 import type { RuntimeModelInventorySnapshot } from "../src/features/orchestration/runtime-model-inventory.js";
 
 const sampleRuntimeModelInventory: RuntimeModelInventorySnapshot = {
@@ -38,6 +39,15 @@ describe("resolveAgentTaskRoute", () => {
       workerKind: "gemini",
       model: "gemini-3-pro-preview",
       reason: "default_visual-engineering_lane",
+    });
+  });
+
+  it("routes interactive-gemini to Gemini Pro on the shell lane by default", () => {
+    expect(resolveAgentTaskRoute({ category: "interactive-gemini" })).toEqual({
+      category: "interactive-gemini",
+      workerKind: "gemini",
+      model: "gemini-3-pro-preview",
+      reason: "default_interactive-gemini_lane",
     });
   });
 
@@ -196,6 +206,48 @@ describe("buildAgentTaskWorkerJob", () => {
       routeReason: "default_visual-engineering_lane",
       retries: 2,
       retryDelayMs: 750,
+    });
+  });
+
+  it("injects the interactive tmux Gemini runtime for the interactive-gemini category", () => {
+    expect(
+      buildAgentTaskWorkerJob({
+        category: "interactive-gemini",
+        taskId: "interactive-task",
+        prompt: "Reply once.",
+      }),
+    ).toEqual({
+      kind: "gemini",
+      input: {
+        taskId: "interactive-task",
+        prompt: "Reply once.",
+        model: "gemini-3-pro-preview",
+      },
+      routeReason: "default_interactive-gemini_lane",
+      workerRuntime: "shell",
+      dependencies: {
+        runtime: interactiveShellGeminiRuntime,
+      },
+    });
+  });
+
+  it("lets explicit mcp runtime override disable the interactive tmux Gemini runtime", () => {
+    expect(
+      buildAgentTaskWorkerJob({
+        category: "interactive-gemini",
+        taskId: "interactive-task",
+        prompt: "Reply once.",
+        workerRuntime: "mcp",
+      }),
+    ).toEqual({
+      kind: "gemini",
+      input: {
+        taskId: "interactive-task",
+        prompt: "Reply once.",
+        model: "gemini-3-pro-preview",
+      },
+      routeReason: "default_interactive-gemini_lane",
+      workerRuntime: "mcp",
     });
   });
 

@@ -13,3 +13,5 @@ data/lancedb/*
 !data/log/.gitkeep
 !data/traces/.gitkeep
 !data/lancedb/.gitkeep
+
+.DS_Store
