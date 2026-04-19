@@ -1,8 +1,5 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { getRegisteredCursorWorkerTools } from "../../cursor/mcp/register-cursor-worker-tools.js";
-import { getRegisteredGeminiWorkerTools } from "../../gemini/mcp/register-gemini-worker-tools.js";
-import { getRegisteredOrchestrationTools } from "../../orchestration/mcp/register-tools.js";
 import type { MemoryService } from "../memory-service.js";
 import { getRegisteredResources } from "./register-resources.js";
 import { getRegisteredMemoryTools } from "./register-tools.js";
@@ -15,9 +12,6 @@ export function createMemoryMcpServer(memoryService: MemoryService): McpServer {
 
   const tools = [
     ...getRegisteredMemoryTools(memoryService),
-    ...getRegisteredOrchestrationTools(),
-    ...getRegisteredCursorWorkerTools(),
-    ...getRegisteredGeminiWorkerTools(),
   ];
 
   for (const tool of tools) {

@@ -1,4 +1,25 @@
-import type { AgentTaskRouteOverrides } from "../orchestration/agent-category-routing.js";
+export const opencodePluginAgentTaskCategories = [
+  "visual-engineering",
+  "interactive-gemini",
+  "artistry",
+  "ultrabrain",
+  "deep",
+  "quick",
+  "unspecified-low",
+  "unspecified-high",
+  "writing",
+] as const;
+
+export type OpenCodePluginAgentTaskCategory = (typeof opencodePluginAgentTaskCategories)[number];
+
+export interface OpenCodePluginAgentTaskRouteOverride {
+  readonly model?: string;
+  readonly workerRuntime?: "shell" | "mcp";
+}
+
+export type AgentTaskRouteOverrides = Partial<
+  Record<OpenCodePluginAgentTaskCategory, OpenCodePluginAgentTaskRouteOverride>
+>;
 
 export const opencodePluginConfigEnv = {
   messageDebounceMs: "MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS",

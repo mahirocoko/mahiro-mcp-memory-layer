@@ -423,7 +423,7 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks["session.idle"]).toEqual(expect.any(Function));
     expect(harness.hooks["experimental.session.compacting"]).toEqual(expect.any(Function));
     expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual(
-      [...sharedMemoryToolNames, "mark_orchestration_task_verification", "memory_context", "runtime_capabilities"].sort(),
+      [...sharedMemoryToolNames, "memory_context", "runtime_capabilities"].sort(),
     );
     for (const sharedMemoryTool of getMemoryToolDefinitions()) {
       expect(harness.hooks.tool?.[sharedMemoryTool.name]?.description).toBe(sharedMemoryTool.description);
@@ -542,41 +542,6 @@ describe("product memory OpenCode plugin contract", () => {
     });
   });
 
-  it("returns compact plugin-facing call_worker output while preserving warnings", async () => {
-    const harness = await createPluginHarness({
-      standaloneMcpAvailable: true,
-    });
-
-    const result = parsePluginToolResult(
-      await harness.hooks.tool?.call_worker?.execute?.(
-        {
-          worker: "gemini",
-          prompt: "Summarize this repo.",
-          mode: "ask",
-          force: true,
-          trust: false,
-        },
-        { sessionID: "session-1" },
-      ),
-    ) as Record<string, unknown>;
-
-    expect(result).toMatchObject({
-      requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
-      worker: "gemini",
-      ignoredFields: ["mode", "force", "trust"],
-      warning: "Ignored incompatible gemini worker fields: mode, force, trust.",
-    });
-    expect(result).not.toHaveProperty("message");
-    expect(result).not.toHaveProperty("recommendedFollowUp");
-    expect(result).not.toHaveProperty("superviseWith");
-    expect(result).not.toHaveProperty("superviseResultWith");
-    expect(result).not.toHaveProperty("waitWith");
-
-    harness.childProcessSpawn.mockClear();
-    harness.bunSpawn?.mockClear();
-  });
-
   it("reports MCP-capable capabilities when standalone orchestration is available", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: true,
@@ -615,16 +580,16 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
-  it("exposes orchestration tools on the plugin path when MCP-backed orchestration is available", async () => {
+  it("does not expose orchestration tools on the plugin path even when MCP-backed orchestration is available", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: true,
     });
 
-    expect(harness.hooks.tool?.start_agent_task?.execute).toEqual(expect.any(Function));
-    expect(harness.hooks.tool?.call_worker?.execute).toEqual(expect.any(Function));
-    expect(harness.hooks.tool?.get_orchestration_result?.execute).toEqual(expect.any(Function));
-    expect(harness.hooks.tool?.supervise_orchestration_result?.execute).toEqual(expect.any(Function));
-    expect(harness.hooks.tool?.get_orchestration_supervision_result?.execute).toEqual(expect.any(Function));
+    expect(harness.hooks.tool?.start_agent_task).toBeUndefined();
+    expect(harness.hooks.tool?.call_worker).toBeUndefined();
+    expect(harness.hooks.tool?.get_orchestration_result).toBeUndefined();
+    expect(harness.hooks.tool?.supervise_orchestration_result).toBeUndefined();
+    expect(harness.hooks.tool?.get_orchestration_supervision_result).toBeUndefined();
     expect(harness.hooks.tool?.orchestrate_workflow).toBeUndefined();
     expect(harness.hooks.tool?.wait_for_orchestration_result).toBeUndefined();
     expect(harness.hooks.tool?.list_orchestration_traces).toBeUndefined();

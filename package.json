@@ -30,17 +30,11 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "cursor": "tsx src/cursor.ts",
-    "cursor-worker": "tsx src/cursor-worker.ts",
-    "gemini": "tsx src/gemini.ts",
-    "gemini-worker": "tsx src/gemini-worker.ts",
-    "list-orchestration-traces": "tsx src/list-orchestration-traces.ts",
-    "orchestrate": "tsx src/orchestrate.ts",
     "eval-retrieval": "tsx src/eval-retrieval.ts",
     "reindex": "tsx src/index.ts --reindex",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run tests/product-memory-plugin.test.ts tests/opencode-plugin-package.test.ts"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.22.3",

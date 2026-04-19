@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
 import type { OpenCodePluginFacadeConfigSnapshot } from "./config.js";
-import type { OpenCodePluginSessionReminderSupport } from "./session-reminder-support.js";
 
 const standaloneMcpServerEntryPath = fileURLToPath(new URL("../../index.ts", import.meta.url));
 const memoryMcpServerPath = fileURLToPath(new URL("../memory/mcp/server.ts", import.meta.url));
@@ -54,7 +53,9 @@ export interface OpenCodePluginRuntimeCapabilities {
 export interface OpenCodePluginRuntimeCapabilityOptions {
   readonly standaloneMcpAvailable?: boolean;
   readonly sessionVisibleRemindersAvailable?: boolean;
-  readonly sessionReminderSupport?: OpenCodePluginSessionReminderSupport;
+  readonly sessionReminderSupport?: {
+    readonly sessionPromptAsyncAvailable: boolean;
+  };
   readonly facadeConfig?: OpenCodePluginFacadeConfigSnapshot;
 }
 

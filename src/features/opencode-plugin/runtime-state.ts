@@ -4,7 +4,12 @@ import type {
   WakeUpMemoryResult,
 } from "../memory/types.js";
 import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
-import { resolveOpenCodeScope, type OpenCodePluginContext, type OpenCodePluginEvent, type OpenCodeScopeResolution } from "./resolve-scope.js";
+import {
+  resolveOpenCodeScope,
+  type OpenCodePluginContext,
+  type OpenCodePluginEvent,
+  type OpenCodeScopeResolution,
+} from "./resolve-scope.js";
 
 export interface OpenCodePluginCachedSession {
   readonly sessionId: string;
@@ -24,41 +29,6 @@ export interface OpenCodePluginCachedSession {
     readonly prepareTurn?: PrepareTurnMemoryResult;
     readonly prepareHostTurn?: PrepareHostTurnMemoryResult;
   };
-  readonly operator?: OpenCodePluginOperatorState;
-}
-
-export type OpenCodePluginOrchMode = "off" | "request-only" | "sticky-on";
-
-export type OpenCodePluginOperatorTaskStatus =
-  | "running"
-  | "awaiting_resume"
-  | "awaiting_verification"
-  | "completed"
-  | "needs_attention";
-
-export type OpenCodePluginVerificationPolicy = "default-repo";
-
-export interface OpenCodePluginOperatorTaskLedgerEntry {
-  readonly requestId: string;
-  readonly taskId?: string;
-  readonly resultTool: string;
-  readonly verificationPolicy: OpenCodePluginVerificationPolicy;
-  readonly verificationRequired: boolean;
-  readonly startedAt: string;
-  readonly updatedAt: string;
-  readonly workflowStatus?: string;
-  readonly operatorStatus: OpenCodePluginOperatorTaskStatus;
-  readonly reminderToken?: string;
-  readonly reminderStatus?: string;
-  readonly attentionReason?: string;
-  readonly verificationNote?: string;
-}
-
-export interface OpenCodePluginOperatorState {
-  readonly stickyModeEnabled: boolean;
-  readonly currentMode: OpenCodePluginOrchMode;
-  readonly lastOperatorUpdateAt?: string;
-  readonly tasks: Record<string, OpenCodePluginOperatorTaskLedgerEntry>;
 }
 
 export interface OpenCodePluginReadyMemoryContextResult {
@@ -90,14 +60,11 @@ export interface OpenCodePluginSessionState {
   pendingWakeUp?: Promise<void>;
   pendingPrepareHostTurnKey?: string;
   lastHandledPrepareHostTurnKey?: string;
-  lastAutoDispatchMessageId?: string;
-  lastPresentedTaskStartMessageId?: string;
   startupBrief?: string;
   capabilities?: OpenCodePluginRuntimeCapabilities;
   wakeUp?: WakeUpMemoryResult;
   prepareTurn?: PrepareTurnMemoryResult;
   prepareHostTurn?: PrepareHostTurnMemoryResult;
-  operator?: OpenCodePluginOperatorState;
 }
 
 export interface OpenCodePluginRuntimeState {
@@ -157,24 +124,18 @@ export function syncSessionStateFromEvent(
     lastUpdatedAt: new Date().toISOString(),
     lastMessageId: nextMessageId,
     recentConversation: resolveRecentConversationForEvent(event, existingState, nextMessageId),
-    messageVersion:
-      isTurnUpdateEvent
-        ? (existingState?.messageVersion ?? 0) + 1
-        : (existingState?.messageVersion ?? 0),
+    messageVersion: isTurnUpdateEvent ? (existingState?.messageVersion ?? 0) + 1 : (existingState?.messageVersion ?? 0),
     messageDebounceMs,
     hasStartedWakeUp: existingState?.hasStartedWakeUp ?? false,
     pendingMessageDebounce: existingState?.pendingMessageDebounce,
     pendingWakeUp: existingState?.pendingWakeUp,
     pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
-    lastAutoDispatchMessageId: existingState?.lastAutoDispatchMessageId,
-    lastPresentedTaskStartMessageId: existingState?.lastPresentedTaskStartMessageId,
     startupBrief: existingState?.startupBrief,
     capabilities: existingState?.capabilities,
     wakeUp: existingState?.wakeUp,
     prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
     prepareHostTurn: existingState?.prepareHostTurn,
-    operator: existingState?.operator,
   };
 
   runtimeState.sessions.set(sessionId, nextState);
@@ -224,7 +185,6 @@ export function buildMemoryContextResult(
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
         ...(sessionState.prepareHostTurn ? { prepareHostTurn: sessionState.prepareHostTurn } : {}),
       },
-      ...(sessionState.operator ? { operator: sessionState.operator } : {}),
     },
   };
 }

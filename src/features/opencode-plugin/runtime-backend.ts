@@ -9,6 +9,7 @@ export interface OpenCodePluginTestOptions {
   readonly messageDebounceMs?: number;
   readonly standaloneMcpAvailable?: boolean;
   readonly sessionVisibleRemindersAvailable?: boolean;
+  readonly sessionPromptAsyncAvailable?: boolean;
   readonly homeDirectory?: string;
   readonly opencodeConfigDirectory?: string;
 }

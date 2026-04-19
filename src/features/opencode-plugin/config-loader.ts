@@ -8,10 +8,10 @@ import { z } from "zod";
 import {
   defaultOpenCodePluginRemindersEnabled,
   defaultOpenCodePluginMessageDebounceMs,
+  opencodePluginAgentTaskCategories,
   opencodePluginConfigEnv,
   type OpenCodePluginConfig,
 } from "./config.js";
-import { agentTaskCategories } from "../orchestration/agent-category-routing.js";
 import { getAppEnv } from "../../config/env.js";
 
 const openCodePluginConfigFileSchema = z
@@ -29,7 +29,7 @@ const openCodePluginConfigFileSchema = z
         categories: z
           .object(
             Object.fromEntries(
-              agentTaskCategories.map((category) => [
+              opencodePluginAgentTaskCategories.map((category) => [
                 category,
                 z
                   .object({
@@ -149,7 +149,7 @@ function mergePluginConfigFiles(
   projectConfig: OpenCodePluginConfigFile,
 ): OpenCodePluginConfigFile {
   const mergedCategoryConfig = Object.fromEntries(
-    agentTaskCategories.flatMap((category) => {
+    opencodePluginAgentTaskCategories.flatMap((category) => {
       const userCategoryConfig = userConfig.routing?.categories?.[category];
       const projectCategoryConfig = projectConfig.routing?.categories?.[category];
       const mergedCategory = {
@@ -226,7 +226,7 @@ function mergeCategoryRoutes(configFile: OpenCodePluginConfigFile): OpenCodePlug
   }
 
   return Object.fromEntries(
-    agentTaskCategories.flatMap((category) => {
+    opencodePluginAgentTaskCategories.flatMap((category) => {
       const categoryOverride = categoryRoutes[category];
 
       if (!categoryOverride) {

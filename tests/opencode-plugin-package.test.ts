@@ -453,7 +453,6 @@ describe("OpenCode plugin package", () => {
 
       const expectedToolNames = [
         ...sharedToolDefinitions.map((tool) => tool.name),
-        "mark_orchestration_task_verification",
         "memory_context",
         "runtime_capabilities",
       ].sort();

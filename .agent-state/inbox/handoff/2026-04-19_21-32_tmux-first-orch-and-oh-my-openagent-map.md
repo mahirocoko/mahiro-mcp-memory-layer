@@ -13,19 +13,17 @@
 - Confirmed that `oh-my-openagent` cleanly separates composition root, runtime managers, tool surface, continuation hooks, and host adapter.
 
 ## Pending
-- [ ] Decide whether to commit the callback/reminder POC files in this repo:
-  - `src/features/opencode-plugin/callback-reminder-poc.ts`
-  - `tests/callback-reminder-poc.test.ts`
-  - `src/features/opencode-plugin/async-task-reminder-bridge.ts`
-- [ ] Decide whether to commit the new docs under `docs/oh-my-openagent/`.
-- [ ] Re-run a live reminder proof with a task shape that reaches a clean terminal success, then check whether a reminder comes back into the main session.
 - [ ] Keep the rule that learned summaries are hints only; source in `origin/` remains the only source of truth for architecture claims.
+
+## Direction Change
+- [x] Drop the callback/reminder proof follow-up from the active handoff path; orchestration will be cleaned and rebuilt from a fresh design instead of iterating on that proof.
+- [x] Drop commit-decision follow-ups for the callback/reminder POC files and the new `docs/oh-my-openagent/` docs from the active handoff path.
+- [x] Drop continuity-debugging follow-ups from the active handoff path for this reset.
+- [ ] Keep `ORCHESTRATION.md` only as guidance for model/agent usage and routing posture, not as a carry-forward orch-loop implementation plan.
 
 ## Next Session
 - [ ] Compare our current orchestration design against `oh-my-openagent` using the new docs: identify execution engine, runtime substrate owner, continuation policy, and host adapter in our repo.
 - [ ] Draft a tmux-first orchestration redesign spec that preserves the current public async contract but replaces headless execution.
-- [ ] If reminder callbacks are still a priority, build a stricter host-integrated proof around a successful background task instead of a failing one.
-- [ ] Decide whether to keep or delete the current callback/reminder POC code after the architectural comparison.
 
 ## Key Files
 - `docs/oh-my-openagent/README.md`
