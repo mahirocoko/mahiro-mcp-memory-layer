@@ -29,8 +29,11 @@ export function createOpenCodeAsyncTaskTracker(input: {
   readonly capabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
   readonly remindersEnabled: boolean;
   readonly onReminder?: (reminder: OpenCodeAsyncTaskReminderLike) => Promise<void> | void;
+  readonly resultStore?: OrchestrationResultStore;
+  readonly pollIntervalMs?: number;
+  readonly timeoutMs?: number;
 }): OpenCodeAsyncTaskTracker {
-  const resultStore = new OrchestrationResultStore(getAppEnv().dataPaths.orchestrationResultDirectory);
+  const resultStore = input.resultStore ?? new OrchestrationResultStore(getAppEnv().dataPaths.orchestrationResultDirectory);
   const reminderRegistry = createOpenCodeAsyncTaskReminderRegistry();
   const trackedRequestIds = new Set<string>();
 
@@ -57,8 +60,8 @@ export function createOpenCodeAsyncTaskTracker(input: {
       trackedRequestIds.add(requestId);
 
       void waitForOrchestrationResult(resultStore, requestId, {
-        pollIntervalMs: DEFAULT_ASYNC_TASK_REMINDER_POLL_INTERVAL_MS,
-        timeoutMs: DEFAULT_ASYNC_TASK_REMINDER_TIMEOUT_MS,
+        pollIntervalMs: input.pollIntervalMs ?? DEFAULT_ASYNC_TASK_REMINDER_POLL_INTERVAL_MS,
+        timeoutMs: input.timeoutMs ?? DEFAULT_ASYNC_TASK_REMINDER_TIMEOUT_MS,
       })
         .then(async (response) => {
           const reminder = buildOpenCodeAsyncTaskReminder(reminderRegistry, {
