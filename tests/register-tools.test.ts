@@ -171,7 +171,7 @@ describe("getRegisteredOrchestrationTools", () => {
       expect.arrayContaining(["spec", "cwd", "waitForCompletion"]),
     );
     expect(Object.keys(categoryTool?.inputSchema ?? {})).toEqual(
-      expect.arrayContaining(["category", "prompt"]),
+      expect.arrayContaining(["category", "prompt", "intent"]),
     );
     expect(Object.keys(workerTool?.inputSchema ?? {})).toEqual(
       expect.arrayContaining(["worker", "prompt"]),
@@ -354,6 +354,7 @@ describe("getRegisteredOrchestrationTools", () => {
     const result = await tool?.execute({
       category: "quick",
       prompt: "Review this diff.",
+      intent: "implementation",
       workerRuntime: "mcp",
       mode: "plan",
     });
@@ -367,6 +368,7 @@ describe("getRegisteredOrchestrationTools", () => {
       jobs: [
         {
           kind: "cursor",
+          intent: "implementation",
           workerRuntime: "mcp",
           input: {
             prompt: "Review this diff.",
@@ -381,6 +383,7 @@ describe("getRegisteredOrchestrationTools", () => {
       status: "running",
       surface: "agent-category",
       category: "quick",
+      intent: "implementation",
       route: {
         workerKind: "cursor",
         model: "composer-2",
@@ -414,6 +417,7 @@ describe("getRegisteredOrchestrationTools", () => {
         spec: expect.objectContaining({
           jobs: [
             expect.objectContaining({
+              intent: "implementation",
               routeReason: "default_quick_lane",
             }),
           ],
@@ -438,6 +442,7 @@ describe("getRegisteredOrchestrationTools", () => {
     const result = await tool?.execute({
       category: "interactive-gemini",
       prompt: "Reply once.",
+      intent: "proposal",
       taskKind: "general",
       approvalMode: "plan",
     });
@@ -449,6 +454,7 @@ describe("getRegisteredOrchestrationTools", () => {
       jobs: [
         {
           kind: "gemini",
+          intent: "proposal",
           workerRuntime: "shell",
           input: {
             prompt: "Reply once.",
@@ -465,6 +471,7 @@ describe("getRegisteredOrchestrationTools", () => {
       status: "running",
       surface: "agent-category",
       category: "interactive-gemini",
+      intent: "proposal",
       route: {
         workerKind: "gemini",
         model: "gemini-3.1-pro-preview",

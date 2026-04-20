@@ -3,6 +3,7 @@ import type {
   PrepareTurnMemoryResult,
   WakeUpMemoryResult,
 } from "../memory/types.js";
+import type { DelegatedTaskIntent } from "../orchestration/workflow-spec.js";
 import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
 import {
   resolveOpenCodeScope,
@@ -68,6 +69,7 @@ export interface OpenCodePluginSessionState {
       taskId: string;
       requestId: string;
       category: string;
+      intent: DelegatedTaskIntent;
       status: "running" | "awaiting_verification" | "completed" | "needs_attention";
       subagentIds?: string[];
       updatedAt: string;
@@ -226,6 +228,11 @@ export function buildPrepareHostTurnKey(sessionState: OpenCodePluginSessionState
   }
 
   return undefined;
+}
+
+export function hasActiveRunningImplementationTask(sessionState: OpenCodePluginSessionState): boolean {
+  return sessionState.operator?.orchModeEnabled === true
+    && sessionState.operator.tasks.some((task) => task.intent === "implementation" && task.status === "running");
 }
 
 function resolveMessageId(event: OpenCodePluginEvent): string | undefined {

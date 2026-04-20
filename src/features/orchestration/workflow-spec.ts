@@ -5,9 +5,11 @@ import type { GeminiWorkerInput, GeminiWorkerRuntime } from "../gemini/types.js"
 
 export type WorkerRuntimeKind = "shell" | "mcp";
 export type WorkflowSource = "cli" | "mcp";
+export type DelegatedTaskIntent = "proposal" | "implementation";
 
 export interface GeminiWorkflowJob {
   readonly kind: "gemini";
+  readonly intent?: DelegatedTaskIntent;
   readonly workerRuntime?: WorkerRuntimeKind;
   readonly routeReason?: string;
   readonly retries?: number;
@@ -22,6 +24,7 @@ export interface GeminiWorkflowJob {
 
 export interface CursorWorkflowJob {
   readonly kind: "cursor";
+  readonly intent?: DelegatedTaskIntent;
   readonly workerRuntime?: WorkerRuntimeKind;
   readonly routeReason?: string;
   readonly retries?: number;

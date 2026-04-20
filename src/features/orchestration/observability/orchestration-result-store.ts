@@ -14,6 +14,7 @@ export interface OrchestrationResultRecord {
     readonly workerRuntimes?: string[];
     readonly jobs?: Array<{
       readonly taskId: string;
+      readonly intent?: string;
       readonly workerRuntime?: string;
       readonly routeReason?: string;
       readonly subagentId?: string;
@@ -39,6 +40,7 @@ function buildMetadata(spec: OrchestrateWorkflowSpec, result?: OrchestrationRunR
     ...(workerRuntimes.length > 0 ? { workerRuntimes: [...new Set(workerRuntimes)] } : {}),
     jobs: jobs.map((job, index) => ({
       taskId: job.input.taskId,
+      ...(job.intent ? { intent: job.intent } : {}),
       ...(job.workerRuntime ? { workerRuntime: job.workerRuntime } : {}),
       ...(job.routeReason ? { routeReason: job.routeReason } : {}),
       ...(typeof job.input.subagentId === "string" ? { subagentId: job.input.subagentId } : {}),

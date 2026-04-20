@@ -38,6 +38,7 @@ export function createOpenCodePluginTools(
         category: z.string().min(1),
         prompt: z.string().min(1),
         model: z.string().optional(),
+        intent: z.enum(["proposal", "implementation"]),
         mode: z.enum(["plan", "ask"]).optional(),
         trust: z.boolean().optional(),
         force: z.boolean().optional(),
@@ -54,8 +55,8 @@ export function createOpenCodePluginTools(
       args: {
         requestId: z.string().min(1),
       },
-      execute: async (args) => {
-        return serializeOpenCodeToolResult(await runtime.getOrchestrationResult(args), "get_orchestration_result");
+      execute: async (args, toolContext) => {
+        return serializeOpenCodeToolResult(await runtime.getOrchestrationResult(args, toolContext), "get_orchestration_result");
       },
     },
     inspect_subagent_session: {

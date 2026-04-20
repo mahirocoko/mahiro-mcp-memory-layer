@@ -18,7 +18,7 @@ import { SubagentSessionStore } from "../subagents/subagent-session-store.js";
 import { TmuxSubagentManager } from "../subagents/tmux-subagent-manager.js";
 import { getOrchestrationSupervisionResult, startOrchestrationSupervision } from "../supervise-orchestration-result.js";
 import { waitForOrchestrationResult } from "../wait-for-orchestration-result.js";
-import { normalizeWorkflowSpec, type OrchestrateWorkflowSpec, type WorkerRuntimeKind, type WorkflowJob } from "../workflow-spec.js";
+import { normalizeWorkflowSpec, type DelegatedTaskIntent, type OrchestrateWorkflowSpec, type WorkerRuntimeKind, type WorkflowJob } from "../workflow-spec.js";
 
 function createStores() {
   const resultStore = new OrchestrationResultStore(paths.orchestrationResultDirectory);
@@ -155,6 +155,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
   const startAgentSchema = z.object({
     category: z.string().min(1),
     prompt: z.string().min(1),
+    intent: z.enum(["proposal", "implementation"]),
     model: z.string().optional(),
     workerRuntime: z.enum(["shell", "mcp"]).optional(),
     mode: z.enum(["plan", "ask"]).optional(),
@@ -257,6 +258,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
       inputSchema: {
         category: z.string().min(1),
         prompt: z.string().min(1),
+        intent: z.enum(["proposal", "implementation"]),
         model: z.string().optional(),
         workerRuntime: z.enum(["shell", "mcp"]).optional(),
         mode: z.enum(["plan", "ask"]).optional(),
@@ -273,6 +275,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
           category: parsedInput.category as AgentTaskCategory,
           taskId: newId(parsedInput.category === "interactive-gemini" ? "gemini" : "cursor"),
           prompt: parsedInput.prompt,
+          intent: parsedInput.intent as DelegatedTaskIntent,
           model: parsedInput.model,
           workerRuntime: parsedInput.workerRuntime as WorkerRuntimeKind | undefined,
           runtimeModelInventory,
@@ -290,6 +293,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
           status: "running",
           surface: "agent-category",
           category: parsedInput.category,
+          intent: parsedInput.intent,
           route: {
             ...resolveAgentTaskRoute({
             category: parsedInput.category as AgentTaskCategory,

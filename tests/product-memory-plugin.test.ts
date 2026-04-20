@@ -208,6 +208,53 @@ function parsePluginToolResult(result: unknown): unknown {
   return JSON.parse(result as string);
 }
 
+function mockPluginOrchestrationTools(options: {
+  readonly startAgentTaskResult?: Record<string, unknown>;
+  readonly getOrchestrationResult?: ReturnType<typeof vi.fn>;
+}) {
+  const startAgentTask = vi.fn().mockResolvedValue(options.startAgentTaskResult ?? {
+    requestId: "workflow_mocked",
+    status: "running",
+  });
+  const getOrchestrationResult = options.getOrchestrationResult ?? vi.fn().mockResolvedValue({
+    requestId: "workflow_mocked",
+    status: "running",
+    metadata: {
+      jobs: [],
+    },
+  });
+  const inspectSubagentSession = vi.fn().mockResolvedValue({ status: "idle" });
+
+  vi.doMock("../src/features/orchestration/mcp/register-tools.js", () => ({
+    getRegisteredOrchestrationTools: () => [
+      {
+        name: "start_agent_task",
+        description: "mocked start_agent_task",
+        inputSchema: {},
+        execute: startAgentTask,
+      },
+      {
+        name: "get_orchestration_result",
+        description: "mocked get_orchestration_result",
+        inputSchema: {},
+        execute: getOrchestrationResult,
+      },
+      {
+        name: "inspect_subagent_session",
+        description: "mocked inspect_subagent_session",
+        inputSchema: {},
+        execute: inspectSubagentSession,
+      },
+    ],
+  }));
+
+  return {
+    startAgentTask,
+    getOrchestrationResult,
+    inspectSubagentSession,
+  };
+}
+
 async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -408,6 +455,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.doUnmock("../src/features/opencode-plugin/config-loader.js");
+  vi.doUnmock("../src/features/orchestration/mcp/register-tools.js");
   const runtimeShell = await import("../src/features/opencode-plugin/runtime-shell.js");
   runtimeShell.resetOpenCodePluginMemoryBackendSingletonForTests();
 });
@@ -590,6 +638,280 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks.tool?.inspect_subagent_session).toBeDefined();
     expect(harness.hooks.tool?.call_worker).toBeUndefined();
     expect(harness.hooks.tool?.orchestrate_workflow).toBeUndefined();
+  });
+
+  it("stores delegated task intent in operator state and promotes completed runs to awaiting_verification", async () => {
+    vi.useFakeTimers();
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_intent",
+        status: "running",
+      },
+      getOrchestrationResult: vi.fn().mockResolvedValue({
+        requestId: "workflow_intent",
+        status: "completed",
+        metadata: {
+          jobs: [{ subagentId: "subagent_intent" }],
+        },
+      }),
+    });
+    const harness = await createPluginHarness({
+      sessionPromptAsyncAvailable: true,
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-intent") });
+    await flushMicrotasks();
+
+    const startResult = parsePluginToolResult(await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Implement the frontend revamp.",
+        intent: "implementation",
+      },
+      {
+        sessionID: "session-intent",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(startResult).toMatchObject({
+      requestId: "workflow_intent",
+      taskId: "task_intent",
+      status: "running",
+    });
+
+    const whileRunning = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-intent",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(whileRunning).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          orchModeEnabled: true,
+          tasks: [
+            {
+              taskId: "task_intent",
+              requestId: "workflow_intent",
+              category: "visual-engineering",
+              intent: "implementation",
+              status: "running",
+            },
+          ],
+        },
+      },
+    });
+
+    await advanceFakeTimeBy(1500);
+
+    const afterCompletion = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-intent",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(afterCompletion).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          tasks: [
+            {
+              taskId: "task_intent",
+              requestId: "workflow_intent",
+              intent: "implementation",
+              status: "awaiting_verification",
+              subagentIds: ["subagent_intent"],
+            },
+          ],
+        },
+      },
+    });
+    expect(harness.promptAsync).toHaveBeenCalledTimes(2);
+    expectNoSelfSpawn(harness);
+  });
+
+  it("maps failed orchestration terminal states to needs_attention on explicit result reads", async () => {
+    const getOrchestrationResult = vi.fn().mockResolvedValue({
+      requestId: "workflow_failed",
+      status: "runner_failed",
+      metadata: {
+        jobs: [{ subagentId: "subagent_failed" }],
+      },
+    });
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_failed",
+        status: "running",
+      },
+      getOrchestrationResult,
+    });
+    const harness = await createPluginHarness();
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-failed") });
+    await flushMicrotasks();
+
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Implement the frontend revamp.",
+        intent: "implementation",
+      },
+      {
+        sessionID: "session-failed",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    const orchestrationResult = parsePluginToolResult(await harness.hooks.tool?.get_orchestration_result?.execute?.(
+      {
+        requestId: "workflow_failed",
+      },
+      {
+        sessionID: "session-failed",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(orchestrationResult).toMatchObject({
+      requestId: "workflow_failed",
+      status: "runner_failed",
+    });
+
+    const memoryContext = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-failed",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(memoryContext).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          tasks: [
+            {
+              requestId: "workflow_failed",
+              intent: "implementation",
+              status: "needs_attention",
+              subagentIds: ["subagent_failed"],
+            },
+          ],
+        },
+      },
+    });
+    expect(getOrchestrationResult).toHaveBeenCalledTimes(1);
+    expectNoSelfSpawn(harness);
+  });
+
+  it("blocks continuity preflight while a delegated implementation task is still running", async () => {
+    vi.useFakeTimers();
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_blocked",
+        status: "running",
+      },
+      getOrchestrationResult: vi.fn().mockResolvedValue({
+        requestId: "workflow_blocked",
+        status: "running",
+        metadata: {
+          jobs: [],
+        },
+      }),
+    });
+    const harness = await createPluginHarness({
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-blocked") });
+    await flushMicrotasks();
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Implement the frontend revamp.",
+        intent: "implementation",
+      },
+      {
+        sessionID: "session-blocked",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    await harness.hooks["message.updated"]?.({
+      event: createMessageUpdatedEvent(
+        "session-blocked",
+        "Continue from the previous orchestration debugging session and recall what we decided earlier.",
+      ),
+    });
+    await advanceFakeTimeBy(25);
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-blocked") });
+    await flushMicrotasks();
+
+    expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
+    expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
+    expectNoSelfSpawn(harness);
+  });
+
+  it("does not block continuity preflight for running proposal tasks", async () => {
+    vi.useFakeTimers();
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_proposal",
+        status: "running",
+      },
+      getOrchestrationResult: vi.fn().mockResolvedValue({
+        requestId: "workflow_proposal",
+        status: "running",
+        metadata: {
+          jobs: [],
+        },
+      }),
+    });
+    const harness = await createPluginHarness({
+      messageDebounceMs: 25,
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-proposal") });
+    await flushMicrotasks();
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Propose a frontend revamp direction.",
+        intent: "proposal",
+      },
+      {
+        sessionID: "session-proposal",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    await harness.hooks["message.updated"]?.({
+      event: createMessageUpdatedEvent(
+        "session-proposal",
+        "Continue from the previous orchestration debugging session and recall what we decided earlier.",
+      ),
+    });
+    await advanceFakeTimeBy(25);
+    await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-proposal") });
+    await flushMicrotasks();
+
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledTimes(1);
+    expect(harness.memory.prepareHostTurnMemory).toHaveBeenCalledTimes(1);
+    expectNoSelfSpawn(harness);
   });
 
   it("serves the native memory_context tool from cached singleton runtime state", async () => {

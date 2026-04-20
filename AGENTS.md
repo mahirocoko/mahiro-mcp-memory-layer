@@ -1,35 +1,36 @@
 # Agent
 
-Start here, then load the narrower doc that matches your task:
+Start here, then load the narrower doc that matches your task.
 
-- Use `README.md` for package overview, install, and command/reference material.
-- Use `MCP_USAGE.md` for the practical MCP/runtime tool surface, plugin-vs-MCP mode split, async waiting, and trace/result flows.
-- Use `ORCHESTRATION.md` for orchestrator posture, worker routing, delegation rules, and verification policy.
+- Use `README.md` for package overview, install, and human-facing command/reference material.
+- Use `MCP_USAGE.md` for the practical runtime/tool surface and the plugin-vs-MCP mode split.
+- Use `ORCHESTRATION.md` for orchestrator posture, worker routing, and the current operator-loop rules.
+- Use `CONTINUITY_DEBUGGING.md` when the task is about memory continuity, recall, or why continuity did or did not trigger.
 
 ## Repo identity
 
 - Package / MCP server: `mahiro-mcp-memory-layer`
-- Standard plugin path: plugin-native memory surface first
-- Source checkout path: may additionally expose the standalone MCP/orchestration surface
+- Stable default surface today: plugin-native memory tools plus a thin plugin-native orchestration façade
+- Source checkout path: may additionally expose the standalone MCP orchestration surface
 
-## Orchestration reset posture
+## Current posture
 
-- Treat the current repo as having one stable product surface today: the memory MCP / plugin-native memory layer.
-- Treat orchestration as a greenfield rebuild, not as something to recover from older local code paths by default.
-- Use `oh-my-openagent` as the primary architectural reference for the new orchestration design, especially its layered split between composition root, execution engine, runtime substrate owner, continuation/verification policy, reminder bridge, and host adapter.
-- Copy the topology and responsibility boundaries first, not the old repo's deleted orchestration behavior or accidental transitional shims.
-- Keep memory as an independent foundation that orchestration can call into; do not collapse memory and orchestration into one inseparable subsystem.
+- Treat memory as the stable foundation.
+- Treat orchestration as a thin control-plane layer over worker execution, not as a second copy of the memory system.
+- Keep memory and orchestration decoupled.
+- Prefer the plugin-native façade first when you are on the plugin path.
 
-## Documentation boundary rules
+## Documentation boundaries
 
-- When editing `MCP_USAGE.md` or `ORCHESTRATION.md`, write for AI agents consuming this MCP from other repositories, not primarily for maintainers working inside this repo.
-- Keep `README.md` human-facing. Keep `MCP_USAGE.md` and `ORCHESTRATION.md` consumer-AI-facing.
-- Do not turn `MCP_USAGE.md` or `ORCHESTRATION.md` into local dev notes for this repo unless that guidance is also genuinely useful to external AI consumers.
+- `README.md` is human-facing.
+- `MCP_USAGE.md` and `ORCHESTRATION.md` are AI-consumer-facing.
+- Do not promise tools or states that the current runtime does not actually expose.
 
 ## Minimal guardrails
 
 - Verify before declaring done.
 - Default verification order: `bun run typecheck`, `bun run test`, `bun run build`.
 - Preserve history and never force-push.
-- Do not present orchestration tools as guaranteed unless the current runtime mode actually exposes them; check `MCP_USAGE.md` for the mode split.
-- When a user explicitly asks for interactive OpenCode testing, or explicitly asks for `tmux` + `opencode` + `send-keys`, use that live interactive path for the test step. Do not silently substitute headless `opencode run`, MCP worker calls, or other non-interactive shortcuts for the requested validation mode.
+- Check `runtime_capabilities` before claiming orchestration is available.
+- On the plugin path, `start_agent_task` now requires an explicit task `intent` (`proposal` or `implementation`).
+- A running delegated `implementation` task on the plugin path blocks continuity-style local fallback until the task leaves `running`.

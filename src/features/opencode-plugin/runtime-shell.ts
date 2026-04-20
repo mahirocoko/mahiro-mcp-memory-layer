@@ -27,6 +27,7 @@ import {
   buildPrepareHostTurnKey,
   extractRecentConversation,
   getOrCreateSingletonRuntimeState,
+  hasActiveRunningImplementationTask,
   resetOpenCodePluginRuntimeStateForTests,
   resolveSessionIdFromUnknown,
   syncSessionStateFromEvent,
@@ -34,6 +35,7 @@ import {
   type OpenCodePluginSessionState,
 } from "./runtime-state.js";
 import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
+import type { DelegatedTaskIntent } from "../orchestration/workflow-spec.js";
 
 export interface OpenCodePluginToolExecutionContext {
   readonly sessionID?: ToolContext["sessionID"];
@@ -98,7 +100,10 @@ export interface OpenCodePluginRuntime {
     args: Record<string, unknown>,
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<unknown>;
-  readonly getOrchestrationResult: (args: Record<string, unknown>) => Promise<unknown>;
+  readonly getOrchestrationResult: (
+    args: Record<string, unknown>,
+    context: OpenCodePluginToolExecutionContext,
+  ) => Promise<unknown>;
   readonly inspectSubagentSession: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -141,6 +146,86 @@ export function createOpenCodePluginRuntime(
     });
   };
 
+  const resolveDelegatedTaskIntent = (value: unknown): DelegatedTaskIntent =>
+    value === "implementation" ? "implementation" : "proposal";
+
+  const resolveTrackedTaskStatus = (
+    status: unknown,
+  ): "running" | "awaiting_verification" | "needs_attention" | undefined => {
+    if (status === "running") {
+      return "running";
+    }
+
+    if (status === "completed") {
+      return "awaiting_verification";
+    }
+
+    if (
+      status === "failed"
+      || status === "timed_out"
+      || status === "step_failed"
+      || status === "runner_failed"
+    ) {
+      return "needs_attention";
+    }
+
+    return undefined;
+  };
+
+  const syncTrackedTaskFromResult = (
+    sessionId: string,
+    requestId: string,
+    result: unknown,
+  ): {
+    taskStatus?: "running" | "awaiting_verification" | "needs_attention";
+    subagentIds: string[];
+    changed: boolean;
+    rawStatus?: string;
+  } => {
+    const sessionState = runtimeState.sessions.get(sessionId);
+    const taskEntry = sessionState?.operator?.tasks.find((task) => task.requestId === requestId);
+
+    if (!sessionState || !taskEntry || typeof result !== "object" || result === null) {
+      return { subagentIds: [], changed: false };
+    }
+
+    const resultRecord = result as Record<string, unknown>;
+    const nextStatus = resolveTrackedTaskStatus(resultRecord.status);
+    const metadata = typeof resultRecord.metadata === "object" && resultRecord.metadata !== null
+      ? resultRecord.metadata as Record<string, unknown>
+      : undefined;
+    const jobs = Array.isArray(metadata?.jobs)
+      ? metadata.jobs as Array<Record<string, unknown>>
+      : [];
+    const subagentIds = jobs
+      .map((job) => job.subagentId)
+      .filter((value): value is string => typeof value === "string");
+
+    if (!nextStatus) {
+      return {
+        subagentIds,
+        changed: false,
+        rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
+      };
+    }
+
+    const previousSubagentIds = taskEntry.subagentIds ?? [];
+    const changed = taskEntry.status !== nextStatus
+      || previousSubagentIds.length !== subagentIds.length
+      || previousSubagentIds.some((value, index) => value !== subagentIds[index]);
+
+    taskEntry.status = nextStatus;
+    taskEntry.subagentIds = subagentIds;
+    taskEntry.updatedAt = new Date().toISOString();
+
+    return {
+      taskStatus: nextStatus,
+      subagentIds,
+      changed,
+      rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
+    };
+  };
+
   const watchTaskForSession = (
     sessionId: string,
     taskId: string,
@@ -167,20 +252,22 @@ export function createOpenCodePluginRuntime(
         return;
       }
 
-      const metadata = typeof result.metadata === "object" && result.metadata !== null
-        ? result.metadata as Record<string, unknown>
-        : undefined;
-      const jobs = Array.isArray(metadata?.jobs)
-        ? metadata.jobs as Array<Record<string, unknown>>
-        : [];
-      const subagentIds = jobs.map((job) => job.subagentId).filter((value): value is string => typeof value === "string");
-      taskEntry.status = "awaiting_verification";
-      taskEntry.subagentIds = subagentIds;
-      taskEntry.updatedAt = new Date().toISOString();
+      const synced = syncTrackedTaskFromResult(sessionId, requestId, result);
+      if (!synced.changed || !synced.taskStatus) {
+        return;
+      }
+
+      if (synced.taskStatus === "awaiting_verification") {
+        await notifySession(
+          sessionId,
+          `Task — ${category} finished background work and is awaiting verification. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
+        );
+        return;
+      }
 
       await notifySession(
         sessionId,
-        `Task — ${category} finished background work and is awaiting verification. requestId=${requestId}${subagentIds.length > 0 ? ` subagentId=${subagentIds[0]}` : ""}`,
+        `Task — ${category} ended with status ${synced.rawStatus ?? "unknown"} and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
       );
     };
 
@@ -362,6 +449,10 @@ export function createOpenCodePluginRuntime(
 
     currentSessionState.pendingMessageDebounce = undefined;
 
+    if (hasActiveRunningImplementationTask(currentSessionState)) {
+      return;
+    }
+
     const scope = currentSessionState.scopeResolution.scope;
     const routing = resolveMemoryPreflightRouting(recentConversation);
 
@@ -475,6 +566,10 @@ export function createOpenCodePluginRuntime(
     const recentConversation = sessionState.recentConversation;
 
     if (!recentConversation) {
+      return;
+    }
+
+    if (hasActiveRunningImplementationTask(sessionState)) {
       return;
     }
 
@@ -648,6 +743,7 @@ export function createOpenCodePluginRuntime(
 
       const taskId = `task_${requestId.replace(/^workflow_/, "")}`;
       const category = typeof args.category === "string" ? args.category : "task";
+      const intent = resolveDelegatedTaskIntent(args.intent);
       const latestSessionState = runtimeState.sessions.get(sessionId);
       if (latestSessionState?.operator) {
         latestSessionState.operator.tasks = [
@@ -656,6 +752,7 @@ export function createOpenCodePluginRuntime(
             taskId,
             requestId,
             category,
+            intent,
             status: "running",
             updatedAt: new Date().toISOString(),
           },
@@ -670,12 +767,20 @@ export function createOpenCodePluginRuntime(
         taskId,
       };
     },
-    getOrchestrationResult: async (args) => {
+    getOrchestrationResult: async (args, toolContext) => {
       const tool = orchestrationTools.get_orchestration_result;
       if (!tool) {
         throw new Error("Missing get_orchestration_result orchestration tool.");
       }
-      return await tool.execute(args);
+      const result = await tool.execute(args);
+      const requestId = typeof args.requestId === "string" ? args.requestId : undefined;
+      const sessionId = resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties);
+
+      if (requestId && sessionId) {
+        syncTrackedTaskFromResult(sessionId, requestId, result);
+      }
+
+      return result;
     },
     inspectSubagentSession: async (args) => {
       const tool = orchestrationTools.inspect_subagent_session;

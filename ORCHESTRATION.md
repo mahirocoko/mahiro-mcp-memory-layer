@@ -1,343 +1,108 @@
 # Orchestration
 
-This file extends `AGENTS.md` with the repo's orchestration-specific posture.
+This file extends `AGENTS.md` with the repo’s orchestration posture.
 
-Use `MCP_USAGE.md` for concrete MCP tool contracts, async waiting, polling payloads, and runtime-mode differences.
+Use `MCP_USAGE.md` for the concrete runtime/tool contract. This file is about how to behave as the orchestrator.
 
-## Cursor Trust Defaults
+## Core posture
 
-- Current workspace paths are trusted by default for Cursor-family runs in this repo.
-- Nested paths under the current workspace are also trusted by default.
-- Unrelated workspaces stay untrusted unless trust is opted in explicitly.
-- Use per-job `trust: true|false`, workflow-level `defaultTrust`, or `CURSOR_TRUSTED_WORKSPACES` when the default workspace rule is not enough.
-- Use `--no-trust` or `trust: false` when a run must stay untrusted even inside the current workspace.
+- You are the control plane first.
+- Delegate execution before broad local implementation work.
+- Keep verification and final judgment local.
+- Do not let the orchestrator and delegated worker own the same implementation task at the same time.
 
-## Shortcut Protocol
+## Strict `orch:` posture
 
-- If the user prefixes a request with `orch:`, switch into strict orchestrator mode for that request.
-- In `orch:` mode, classify first, choose the worker and model explicitly, and delegate before doing any real code work.
-- In `orch:` mode, local implementation is allowed only through the narrow escape hatch below.
-- In `orch:` mode, you may still do verification, routing, synthesis, and final judgment locally.
-- Treat `orch:` as a behavioral override, not as a literal shell command.
+`orch:` means:
 
-Draft sticky-mode extension:
+- classify the request first
+- choose the worker/model deliberately
+- delegate before non-trivial implementation
+- avoid silent local fallback while delegated work is still healthy
 
-- `orch: on` -> turn on sticky strict orchestrator mode for the current session.
-- `orch: off` -> turn off sticky strict orchestrator mode for the current session.
-- `orch: status` -> report whether sticky strict orchestrator mode is currently on.
-- `orch: <task>` -> use strict orchestrator mode for that request only.
+`orch:` does **not** mean:
 
-When `orch: on` is active, treat every subsequent actionable request as if it had been prefixed with `orch:`.
-
-`orch: on` means:
-
-- classify the task before broad local reading
-- choose the worker family and explicit model before implementation work
-- delegate before doing implementation, refactor, review, planning, or multi-file analysis locally
-- use local execution only for the narrow escape hatch, verification, orchestration wiring, and final synthesis
-- prefer parallel delegation when subtasks are independent
-- do not silently fall back to local implementation just because it feels faster
-- do not silently downgrade a user-requested model
-
-`orch: on` does not mean:
-
-- always use Opus
-- always use Gemini
+- always use the biggest model
+- skip tests, typecheck, or build
 - forbid local verification
-- skip typecheck, tests, build, or targeted spot-checks
 
-Sticky-mode notes:
+## Plugin operator loop: current shipped rules
 
-- On the plugin path, `orch: on/off/status` is now implemented as session-scoped operator state rather than docs-only draft language.
-- Sticky `orch` mode changes posture, not model routing defaults by itself.
-- Sticky `orch` state is session-scoped rather than global.
-- Continue to gate orchestration claims on `runtime_capabilities`; sticky posture does not imply MCP orchestration is available in every runtime.
+On the plugin path, the thin operator loop currently provides:
 
-## Core Role
+- tracked session tasks via `start_agent_task`
+- explicit task `intent` (`proposal` or `implementation`)
+- task state visible through `memory_context`
+- task-state sync via `get_orchestration_result`
+- session-visible `Task — ...` messages when `session.promptAsync` is available
 
-- You are the orchestrator first.
-- Your job is to classify work, choose the right worker and model, verify outputs, and make the final judgment.
-- You are not the default implementation worker. For most real code work, another worker should do the execution first.
-- Workers do execution, extraction, review, planning, and synthesis support.
-- Final architectural judgment and completion claims stay with the orchestrator.
+Current plugin-path task status mapping:
 
-## Control Plane vs Execution Plane
+- `running` = delegated work still owns the task
+- `awaiting_verification` = the worker reached terminal success-like completion and the orchestrator must verify
+- `needs_attention` = the worker reached terminal failure-like completion or otherwise needs intervention
 
-- Treat the main agent as the **control plane**: intent understanding, planning, worker selection, verification, and final synthesis.
-- Treat delegated agents as the **execution plane**: implementation, refactoring, search, extraction, focused review, planning, and specialized reasoning.
-- Keep judgment centralized and execution distributed. The orchestrator decides; workers do.
-- Do not let multiple agents behave like competing orchestrators on the same unit of work.
-- A single workflow may still contain multiple worker jobs; the thing to avoid is multiple orchestrators competing on one decision surface, not multiple execution workers in one workflow.
+## Hard control-plane rule
 
-## Plugin Operator Loop
+When a tracked delegated task has:
 
-On the plugin path, the orchestrator posture now has a thin session-local operator loop layered on top of the existing orchestration primitives.
+- `intent = implementation`
+- `status = running`
 
-- `start_agent_task` can create a tracked session task when orch mode is active
-- `orch:` can now inject a visible `Task — ...` start into the same session on the plugin path before the underlying workflow finishes
-- terminal async reminders can bring `requestId`, `taskId`, and reminder-token context back into the main session
-- `get_orchestration_result` is the normal resume step after a reminder, not just a passive polling read
-- completed workflow output is not treated as operator-complete until it passes the verification step
-- `mark_orchestration_task_verification` is the plugin-local finalize step for closing tracked tasks as `completed` or `needs_attention`
+the plugin path must preserve delegated ownership.
 
-Current delivery posture:
+Practical consequence:
 
-- on the plugin path, that session-visible reminder path can be provided by plugin-local continuation injection through `client.session.promptAsync`
-- `client.tui.showToast` is optional UX acknowledgement only and does not define availability by itself
+- continuity-style local fallback is blocked
+- continuity/memory preflight that would push the main agent back into “continue the work locally” is suppressed
+- the orchestrator should wait, inspect, resume, or verify — not overlap the same implementation locally
 
-Important posture:
+This guard does **not** apply to `proposal` tasks.
 
-- this is a **thin control-plane loop**, not a second orchestration engine
-- workflow execution truth still lives in the workflow result and supervision stores
-- the plugin operator ledger is a session view over that truth so the main agent can resume, verify, and close the loop cleanly
+## Task-shape contract
 
-## Token-Saving Posture
+Category is routing metadata. It is not enough by itself to describe deliverable shape.
 
-- The main agent should stay smart, not bloated. Offload execution and broad discovery before the orchestrator absorbs large amounts of context.
-- Prefer cheap search/retrieval layers first: `explore`, `librarian`, and lighter worker models should narrow the problem before expensive reasoning runs.
-- Do not broad-read locally if a worker can summarize, search, or extract first.
-- After delegation, the orchestrator should re-read only what is necessary to verify the result: executable checks, targeted diffs, and a small number of spot-checks.
-- Avoid duplicate context burn: do not manually repeat the same search or full-file reading that a delegated worker already performed unless verification proves it necessary.
+Use:
 
-## Narrow Escape Hatch
+- `intent: "proposal"` for direction, ideas, planning, or recommendations
+- `intent: "implementation"` for delegated code ownership
 
-Direct inline edits are allowed only for:
+Do not treat a proposal task as partial completion of an implementation request.
 
-- trivial fixes: <=5 lines in 1 file
-- docs and rule updates
-- worker/config wiring
-- synthesis artifacts after workers already did extraction or analysis
-- emergency hotfixes that are obvious and <=10 lines
-
-Everything else must delegate first before you edit locally.
-
-## Inline-work Tripwires
-
-Stop and delegate if any of these are true:
-
-- you read more than ~100 lines of source without spawning a worker
-- you are about to make your 3rd file edit without delegating
-- you are writing implementation code rather than docs/config/orchestration glue
-- you are mentally summarizing a file instead of asking a worker to summarize it
-- you are planning a multi-step refactor in your head instead of sending it to a planning worker
-
-If a tripwire is hit, stop and delegate unless the work already fits the narrow escape hatch above.
-
-## Orchestrator Operating Protocol
-
-Before implementation work:
-
-1. Classify the task shape.
-2. If the task is outside the narrow escape hatch, delegate first.
-3. If the task needs >3 files or >100 lines of reading, delegate first.
-4. Read <=50 lines for orientation before delegation.
-5. Spawn workers before broad local reading.
-
-After a worker returns:
-
-1. Run executable checks first.
-2. Spot-check <=3 locations and <=80 lines total.
-3. If verification still needs broad rereading, escalate to another worker instead of absorbing the context locally.
-
-## Parallel-first Rule
-
-If the task decomposes into 2+ independent subtasks, run workers in parallel.
-
-Do not serialize independent work just because it is easier to think about locally.
-
-For workflow composition:
-
-- use one parallel workflow when multiple worker jobs are independent and belong to the same delegated batch
-- use one sequential workflow when later steps depend on earlier worker output
-- use separate workflows only when the batches are materially distinct or should be observed independently
-- multiple worker jobs in one workflow are normal; multiple orchestrators for the same unit of work are not
-
-## Local Worker Policy
-
-- Primary posture: remain the orchestrator; workers are support, not the final decision-maker.
-- Strict delegate-first posture: implementation, review, refactor, planning, and multi-file analysis should go to a worker first.
-- Local execution is reserved for the narrow escape hatch plus verification, orchestration wiring, and final synthesis.
-- Gemini and Cursor-family workers can both run in parallel when their subtasks are independent.
-- Gemini is the default family for visual-engineering, frontend/artistry work, and alternative reasoning with `gemini-3-flash-preview` or `gemini-3.1-pro-preview`, with `gemini-2.5-flash` / `gemini-2.5-pro` as stable fallback lanes.
-- Cursor-family `agent` is the default family for most codebase execution work, with `composer-2` as the primary default in this repo.
-- Avoid `claude-4.6-sonnet-medium` as a primary lane in this repo; keep it as fallback-only for explicit requests or compatibility constraints.
-
-## Worker Routing
-
-| Task shape | Primary worker | Default model | Verification | Notes |
-| --- | --- | --- | --- | --- |
-| Visual/frontend execution, visual-engineering, artistry | Gemini | `gemini-3.1-pro-preview` | run checks plus visual/behavior spot-checks | default family for design-led work |
-| Lightweight visual passes, extraction, or alternate reasoning | Gemini | `gemini-3-flash-preview` | spot-check key claims | lighter Gemini path |
-| Standard implementation, review, refactor, and execution | Cursor-family `agent` | `composer-2` | run typecheck/tests and inspect touched files | default coding worker |
-| Harder implementation, review, or refactor | Cursor-family `agent` | `composer-2` | targeted diff review plus typecheck/tests | stay on `composer-2` first; escalate only with a concrete reason |
-| Complex planning, Opus validation, or very hard execution | Cursor-family `agent` | `claude-opus-4-7-high` | verify against repo constraints | planner with the orchestrator, and escalate to thinking-high when deep reasoning quality is the real bottleneck |
+## Worker routing defaults
 
 Current category defaults from code:
 
 - `visual-engineering` -> Gemini `gemini-3.1-pro-preview`
-- `interactive-gemini` -> Gemini `gemini-3.1-pro-preview` on shell, with the tmux-backed normal-mode runtime injected by default
-- `artistry` -> Gemini `gemini-3-flash-preview`
+- `interactive-gemini` -> Gemini `gemini-3.1-pro-preview` on shell
+- `artistry` -> Gemini `gemini-3.1-pro-preview`
 - `ultrabrain` -> Cursor `claude-opus-4-7-thinking-high`
 - `deep` / `unspecified-high` -> Cursor `claude-opus-4-7-high`
 - `quick` / `unspecified-low` / `writing` -> Cursor `composer-2`
 
-Current direct worker defaults from code:
+## Verification posture
 
-- `call_worker(worker="gemini")` -> `gemini-3.1-pro-preview`
-- `call_worker(worker="cursor")` -> `composer-2`
+Worker completion is not the end state.
 
-Observed local runtime probes:
+- terminal success-like worker completion -> verify locally
+- terminal failure-like worker completion -> `needs_attention`, then diagnose or re-route
+- do not call delegated work “done” until executable verification passes
 
-- `agent models` currently advertises Cursor-family inventory names such as `composer-2-fast` and `composer-2`
-- the Gemini CLI itself currently accepts execution ids such as `gemini-3.1-pro-preview` and `gemini-3-flash-preview`
+Default verification order in this repo:
 
-## Frontend Task Routing
+1. `bun run typecheck`
+2. `bun run test`
+3. `bun run build`
 
-Frontend tasks split into two shapes:
+## OMOA alignment
 
-**Design-led**: visual layout, styling, component scaffolding, and small static UI work.
+Use `oh-my-openagent` as the architecture reference for separation of concerns:
 
-- Do directly when the scope is small and the pattern is clear.
-- Delegate to Gemini when you intentionally want `gemini-3-flash-preview` or `gemini-3.1-pro-preview` for visual/frontend execution.
-- Treat Gemini as an execution worker here, not just a summarizer or critic.
-- Do not over-orchestrate trivial frontend scaffolding.
+- execution engine
+- runtime substrate owner
+- continuation/control policy
+- reminder bridge
+- host adapter
 
-**Engineering-led**: state management, data fetching, complex logic, or risky UI refactors.
-
-- Route like any other implementation task through the Worker Routing table.
-- Default to `composer-2`; escalate only after a concrete failure, an explicit stronger-model request, or a clearly architecture-level problem.
-
-**Hard boundaries**:
-
-- Gemini must not own backend changes, API handlers, database logic, auth flows, or shared non-UI infrastructure.
-- If a design-led task grows into significant state management, data wiring, or non-local application logic, escalate to Cursor.
-- If a task mixes design-led and engineering-led work, split it when practical; otherwise default to Cursor and note why.
-
-## Routing Procedure
-
-1. Classify the task shape first.
-2. Choose the worker from the routing table.
-3. Pick the lightest model that is still reliable, unless the user explicitly requests a model.
-4. Pass the model explicitly.
-5. Verify with executable checks first, then targeted spot-checks.
-6. Escalate only when there is a concrete reason.
-
-For Cursor-family work in this repo, start with `composer-2` by default. Do not jump to fallback-only lanes just because the task looks harder on first glance.
-
-If the user explicitly names a model, use that exact model for the delegated step unless it is unavailable or incompatible.
-
-If the user explicitly asks for Opus, planning, or an Opus-level validation pass, use `claude-opus-4-7-high` and do not silently downgrade to `composer-2` or fallback-only lanes.
-
-## Worker Usage Patterns
-
-Use Gemini when intentionally selecting `gemini-3-flash-preview` or `gemini-3.1-pro-preview`.
-
-Common reasons to choose Gemini:
-
-- visual/frontend execution
-- visual-engineering and artistry
-- summarize files or docs
-- extract facts or timelines
-- compare options before implementation
-- narrow a large search space before coding
-- get a different reasoning style from the Cursor family
-
-Recommended model ladder:
-
-- `gemini-3-flash-preview` -> lighter visual/exploration/extraction work
-- `gemini-3.1-pro-preview` -> stronger visual/frontend/artistry work or harder Gemini reasoning
-- `gemini-2.5-flash` / `gemini-2.5-pro` -> stable fallback lanes when preview lanes are unavailable
-
-Use the Cursor-family `agent` headless path for applied coding work:
-
-- implementation and refactoring
-- code review
-- patch planning inside the codebase
-- edits that benefit from an agent/tool loop
-
-Recommended model ladder:
-
-- `composer-2` -> default doer for standard implementation and review
-- `claude-opus-4-7-high` -> primary hard escalation for planning, architecture, and high-risk validation
-- `claude-opus-4-7-thinking-high` -> deep-reasoning escalation when deliberate thinking quality matters more than speed
-- fallback-only: `claude-4.6-sonnet-medium`, `claude-4.6-opus-*`
-
-`--mode plan` is not the default posture. Use it only when the task is complex enough that you need an explicit planning pass.
-
-Headless is the default posture for local workers. Prefer `agent -p --output-format json ...` or repo-local worker wrappers over interactive usage.
-
-Parallelize only when worker inputs are fully independent, regardless of whether the workers are Gemini, Cursor, or mixed.
-
-Independent:
-
-- Gemini designs one frontend surface while Cursor reviews an unrelated backend diff
-- Gemini extracts facts from docs while Cursor plans an unrelated refactor
-- Two Gemini workers analyze separate visual/frontend areas in parallel
-- Five Cursor workers review five unrelated modules in parallel, then you compare the results
-
-Dependent and must sequence:
-
-- Gemini extracts facts -> you use those facts to write the Cursor prompt
-- Cursor produces a plan -> you send that plan to Gemini for critique
-
-For workflow command shapes, JSON payloads, async orchestration examples, and trace inspection, use `MCP_USAGE.md`. Treat `README.md` as human-facing reference rather than guaranteed injected AI context.
-
-## MCP Workflow Posture
-
-- Prefer the right async entrypoint when the runtime actually exposes MCP tools. Use direct async worker tools for a single worker job and `orchestrate_workflow` only for genuinely workflow-shaped tasks.
-- Prefer async orchestration for long-running work.
-- Poll-first is the default production posture: hand the request ID to `supervise_orchestration_result` and then poll `get_orchestration_supervision_result`, or use a host-side background poller before considering any blocking wait helper.
-- Use the dedicated runtime docs in `MCP_USAGE.md` for exact payloads, polling/waiting tools, trace inspection, and direct async worker behavior.
-- Worker output is never the final truth; verification still belongs to the orchestrator.
-
-## Interactive Gemini Lane
-
-- `interactive-gemini` is the category-level escape hatch when you want Gemini through the repo's tmux-backed normal-mode shell runtime instead of the one-shot headless shell path.
-- Treat it as a runtime policy difference, not as a second orchestration API.
-- The public async surface stays the same: `start_agent_task` still returns the usual request/task IDs and polling guidance.
-- If a caller explicitly requests `workerRuntime: "mcp"`, do not force the tmux shell path.
-- Verification still belongs to the orchestrator: a successful interactive Gemini turn is not completion until the normal checks and judgment pass.
-
-## Expected Turn Shape
-
-A good turn:
-
-1. Read <=50 lines for orientation.
-2. Classify the task.
-3. Choose the right async entrypoint.
-4. Delegate and keep the `requestId`.
-5. Hand the `requestId` to `supervise_orchestration_result` and then poll `get_orchestration_supervision_result`, or use a host-side background poller, and treat blocking waits as a secondary short-helper path only.
-6. Run typecheck/test/build.
-7. Spot-check <=3 locations.
-8. Synthesize the result.
-
-A bad turn:
-
-1. Read several files "to understand context."
-2. Read more files "to be thorough."
-3. Start async work, see `running`, and treat that as a blocker or failure.
-4. Fall back to sync before the async run reaches terminal state.
-5. Edit multiple files directly.
-6. Run tests.
-7. Never delegate.
-
-## Escalation Triggers
-
-- required facts or artifacts are still missing after one verification pass
-- worker output is weak or incomplete
-- facts conflict after targeted checks
-- the task has turned into architecture-level judgment
-- tests, typecheck, or build failures require deeper reasoning than the current worker/model is providing
-
-## Model Rule
-
-Never rely on implicit model defaults.
-
-Do not silently substitute a different model when the user explicitly requested one.
-
-If a requested model cannot be used, say so and choose the nearest justified fallback explicitly.
-
-Planning passes that are explicitly requested as Opus-level planning or validation must use `claude-opus-4-7-high`.
-
-- Gemini examples: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, with `gemini-2.5-flash` / `gemini-2.5-pro` as stable fallbacks
-- Cursor examples: `composer-2`, `claude-opus-4-7-high`, `claude-opus-4-7-thinking-high` with Sonnet/older Opus as fallback-only
+The key local rule copied from that posture is simple: a healthy delegated implementation task should keep ownership until it reaches a real terminal state.

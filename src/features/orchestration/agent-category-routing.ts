@@ -3,7 +3,7 @@ import { newId } from "../../lib/ids.js";
 import { interactiveTmuxGeminiRuntime } from "../gemini/runtime/tmux/interactive-gemini-tmux-runtime.js";
 import type { GeminiWorkerInput } from "../gemini/types.js";
 import type { RuntimeModelInventorySnapshot } from "./runtime-model-inventory.js";
-import type { WorkerRuntimeKind, WorkflowJob } from "./workflow-spec.js";
+import type { DelegatedTaskIntent, WorkerRuntimeKind, WorkflowJob } from "./workflow-spec.js";
 
 export type AgentTaskCategory =
   | "visual-engineering"
@@ -27,7 +27,7 @@ interface RouteDefaults {
 const routeDefaults: Record<AgentTaskCategory, RouteDefaults> = {
   "visual-engineering": { workerKind: "gemini", primaryModel: "gemini-3.1-pro-preview", fallbacks: ["gemini-2.5-pro", "gemini-2.5-flash"] },
   "interactive-gemini": { workerKind: "gemini", primaryModel: "gemini-3.1-pro-preview", fallbacks: ["gemini-2.5-pro", "gemini-2.5-flash"] },
-  artistry: { workerKind: "gemini", primaryModel: "gemini-3-flash-preview", fallbacks: ["gemini-2.5-flash", "gemini-2.5-pro"] },
+  artistry: { workerKind: "gemini", primaryModel: "gemini-3.1-pro-preview", fallbacks: ["gemini-2.5-pro", "gemini-2.5-flash"] },
   ultrabrain: { workerKind: "cursor", primaryModel: "claude-opus-4-7-thinking-high", fallbacks: ["claude-4.6-opus-high", "composer-2"] },
   deep: { workerKind: "cursor", primaryModel: "claude-opus-4-7-high", fallbacks: ["claude-4.6-opus-high", "composer-2"] },
   "unspecified-high": { workerKind: "cursor", primaryModel: "claude-opus-4-7-high", fallbacks: ["claude-4.6-opus-high", "composer-2"] },
@@ -121,6 +121,7 @@ export function buildAgentTaskWorkerJob(input: {
   readonly trust?: boolean;
   readonly force?: boolean;
   readonly continueOnFailure?: boolean;
+  readonly intent?: DelegatedTaskIntent;
   readonly taskKind?: string;
   readonly approvalMode?: "default" | "auto_edit" | "yolo" | "plan";
   readonly allowedMcpServerNames?: string[] | "none";
@@ -143,6 +144,7 @@ export function buildAgentTaskWorkerJob(input: {
     const interactive = route.workerRuntime !== "mcp";
     return {
       kind: "gemini",
+      ...(input.intent ? { intent: input.intent } : {}),
       input: geminiInput,
       routeReason: route.reason,
       ...(route.workerRuntime || interactive ? { workerRuntime: route.workerRuntime ?? "shell" } : {}),
@@ -166,6 +168,7 @@ export function buildAgentTaskWorkerJob(input: {
   };
   return {
     kind: "cursor",
+    ...(input.intent ? { intent: input.intent } : {}),
     input: cursorInput,
     routeReason: route.reason,
     ...(route.workerRuntime ? { workerRuntime: route.workerRuntime } : {}),
