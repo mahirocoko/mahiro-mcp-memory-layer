@@ -14,7 +14,6 @@ export type OpenCodePluginAgentTaskCategory = (typeof opencodePluginAgentTaskCat
 
 export interface OpenCodePluginAgentTaskRouteOverride {
   readonly model?: string;
-  readonly workerRuntime?: "shell" | "mcp";
 }
 
 export type AgentTaskRouteOverrides = Partial<

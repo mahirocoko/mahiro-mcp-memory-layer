@@ -413,7 +413,7 @@ afterEach(async () => {
 });
 
 describe("product memory OpenCode plugin contract", () => {
-  it("initializes as an OpenCode plugin module with the shared native memory tool surface, memory_context, runtime_capabilities, and no stdio self-spawn", async () => {
+  it("initializes as an OpenCode plugin module with memory, orchestration, memory_context, runtime_capabilities, and no stdio self-spawn", async () => {
     const harness = await createPluginHarness();
     const sharedMemoryToolNames = getMemoryToolDefinitions().map((tool) => tool.name).sort();
 
@@ -423,7 +423,7 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.hooks["session.idle"]).toEqual(expect.any(Function));
     expect(harness.hooks["experimental.session.compacting"]).toEqual(expect.any(Function));
     expect(Object.keys(harness.hooks.tool ?? {}).sort()).toEqual(
-      [...sharedMemoryToolNames, "memory_context", "runtime_capabilities"].sort(),
+      [...sharedMemoryToolNames, "memory_context", "runtime_capabilities", "start_agent_task", "get_orchestration_result", "inspect_subagent_session"].sort(),
     );
     for (const sharedMemoryTool of getMemoryToolDefinitions()) {
       expect(harness.hooks.tool?.[sharedMemoryTool.name]?.description).toBe(sharedMemoryTool.description);
@@ -458,9 +458,9 @@ describe("product memory OpenCode plugin contract", () => {
         memoryContextToolAvailable: true,
       },
       orchestration: {
-        available: false,
-        toolNames: [],
-        activation: "unavailable",
+        available: true,
+        toolNames: ["start_agent_task", "get_orchestration_result", "inspect_subagent_session"],
+        activation: "plugin-native",
       },
       facade: {
         categoryRoutingAvailable: true,
@@ -522,7 +522,7 @@ describe("product memory OpenCode plugin contract", () => {
     });
   });
 
-  it("does not advertise session task flow when prompt injection exists without MCP orchestration", async () => {
+  it("advertises plugin-native session task flow when prompt injection is available", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: false,
       sessionPromptAsyncAvailable: true,
@@ -533,16 +533,17 @@ describe("product memory OpenCode plugin contract", () => {
     expect(result).toMatchObject({
       mode: "plugin-native",
       orchestration: {
-        available: false,
+        available: true,
+        activation: "plugin-native",
       },
       facade: {
         sessionVisibleRemindersAvailable: true,
-        sessionTaskFlowAvailable: false,
+        sessionTaskFlowAvailable: true,
       },
     });
   });
 
-  it("reports MCP-capable capabilities when standalone orchestration is available", async () => {
+  it("reports plugin-native orchestration capabilities", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: true,
     });
@@ -554,11 +555,10 @@ describe("product memory OpenCode plugin contract", () => {
     const result = parsePluginToolResult(await harness.hooks.tool?.runtime_capabilities?.execute?.({}, {}));
 
     expect(result).toMatchObject({
-      mode: "plugin-native+mcp",
+      mode: "plugin-native",
       orchestration: {
         available: true,
-        serverName: "mahiro-mcp-memory-layer",
-        activation: "source-checkout-mcp-injection",
+        activation: "plugin-native",
       },
       facade: {
         categoryRoutingAvailable: true,
@@ -569,30 +569,27 @@ describe("product memory OpenCode plugin contract", () => {
       },
     });
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
-      "orchestrate_workflow",
-    );
-    expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
       "start_agent_task",
     );
     expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
-      "call_worker",
+      "get_orchestration_result",
+    );
+    expect((result as { orchestration: { toolNames: string[] } }).orchestration.toolNames).toContain(
+      "inspect_subagent_session",
     );
     expectNoSelfSpawn(harness);
   });
 
-  it("does not expose orchestration tools on the plugin path even when MCP-backed orchestration is available", async () => {
+  it("exposes plugin-native orchestration tools on the plugin path", async () => {
     const harness = await createPluginHarness({
       standaloneMcpAvailable: true,
     });
 
-    expect(harness.hooks.tool?.start_agent_task).toBeUndefined();
+    expect(harness.hooks.tool?.start_agent_task).toBeDefined();
+    expect(harness.hooks.tool?.get_orchestration_result).toBeDefined();
+    expect(harness.hooks.tool?.inspect_subagent_session).toBeDefined();
     expect(harness.hooks.tool?.call_worker).toBeUndefined();
-    expect(harness.hooks.tool?.get_orchestration_result).toBeUndefined();
-    expect(harness.hooks.tool?.supervise_orchestration_result).toBeUndefined();
-    expect(harness.hooks.tool?.get_orchestration_supervision_result).toBeUndefined();
     expect(harness.hooks.tool?.orchestrate_workflow).toBeUndefined();
-    expect(harness.hooks.tool?.wait_for_orchestration_result).toBeUndefined();
-    expect(harness.hooks.tool?.list_orchestration_traces).toBeUndefined();
   });
 
   it("serves the native memory_context tool from cached singleton runtime state", async () => {

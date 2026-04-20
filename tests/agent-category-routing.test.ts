@@ -5,7 +5,7 @@ import {
   resolveEscalatedAgentTaskRoute,
   resolveAgentTaskRoute,
 } from "../src/features/orchestration/agent-category-routing.js";
-import { interactiveShellGeminiRuntime } from "../src/features/gemini/runtime/shell/shell-gemini-runtime.js";
+import { interactiveTmuxGeminiRuntime } from "../src/features/gemini/runtime/tmux/interactive-gemini-tmux-runtime.js";
 import type { RuntimeModelInventorySnapshot } from "../src/features/orchestration/runtime-model-inventory.js";
 
 const sampleRuntimeModelInventory: RuntimeModelInventorySnapshot = {
@@ -194,6 +194,7 @@ describe("buildAgentTaskWorkerJob", () => {
     ).toEqual({
       kind: "gemini",
       input: {
+        subagentId: expect.stringMatching(/^subagent_/),
         taskId: "ui-task",
         prompt: "Design the sidebar.",
         model: "gemini-3.1-pro-preview",
@@ -204,6 +205,10 @@ describe("buildAgentTaskWorkerJob", () => {
         allowedMcpServerNames: ["context7"],
       },
       routeReason: "default_visual-engineering_lane",
+      workerRuntime: "shell",
+      dependencies: {
+        runtime: expect.any(Object),
+      },
       retries: 2,
       retryDelayMs: 750,
     });
@@ -219,6 +224,7 @@ describe("buildAgentTaskWorkerJob", () => {
     ).toEqual({
       kind: "gemini",
       input: {
+        subagentId: expect.stringMatching(/^subagent_/),
         taskId: "interactive-task",
         prompt: "Reply once.",
         model: "gemini-3.1-pro-preview",
@@ -226,7 +232,7 @@ describe("buildAgentTaskWorkerJob", () => {
       routeReason: "default_interactive-gemini_lane",
       workerRuntime: "shell",
       dependencies: {
-        runtime: interactiveShellGeminiRuntime,
+        runtime: interactiveTmuxGeminiRuntime,
       },
     });
   });
@@ -266,6 +272,7 @@ describe("buildAgentTaskWorkerJob", () => {
     ).toEqual({
       kind: "cursor",
       input: {
+        subagentId: expect.stringMatching(/^subagent_/),
         taskId: "code-task",
         prompt: "Review this diff.",
         model: "composer-2",
@@ -342,6 +349,7 @@ describe("buildAgentTaskWorkerJob", () => {
       kind: "cursor",
       routeReason: "runtime_fallback_missing_primary_model",
       input: {
+        subagentId: expect.stringMatching(/^subagent_/),
         taskId: "debug-task",
         prompt: "Explain the root cause.",
         model: "claude-4.6-opus-high",

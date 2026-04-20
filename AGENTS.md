@@ -12,6 +12,14 @@ Start here, then load the narrower doc that matches your task:
 - Standard plugin path: plugin-native memory surface first
 - Source checkout path: may additionally expose the standalone MCP/orchestration surface
 
+## Orchestration reset posture
+
+- Treat the current repo as having one stable product surface today: the memory MCP / plugin-native memory layer.
+- Treat orchestration as a greenfield rebuild, not as something to recover from older local code paths by default.
+- Use `oh-my-openagent` as the primary architectural reference for the new orchestration design, especially its layered split between composition root, execution engine, runtime substrate owner, continuation/verification policy, reminder bridge, and host adapter.
+- Copy the topology and responsibility boundaries first, not the old repo's deleted orchestration behavior or accidental transitional shims.
+- Keep memory as an independent foundation that orchestration can call into; do not collapse memory and orchestration into one inseparable subsystem.
+
 ## Documentation boundary rules
 
 - When editing `MCP_USAGE.md` or `ORCHESTRATION.md`, write for AI agents consuming this MCP from other repositories, not primarily for maintainers working inside this repo.

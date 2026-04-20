@@ -422,7 +422,7 @@ describe("OpenCode plugin package", () => {
               sessionStartWakeUpAvailable: true,
             },
             orchestration: {
-              available: false,
+              available: true,
             },
             facade: {
         categoryRoutingAvailable: true,
@@ -455,6 +455,9 @@ describe("OpenCode plugin package", () => {
         ...sharedToolDefinitions.map((tool) => tool.name),
         "memory_context",
         "runtime_capabilities",
+        "start_agent_task",
+        "get_orchestration_result",
+        "inspect_subagent_session",
       ].sort();
 
       expect(Object.keys(pluginHooks.tool).sort()).toEqual(expectedToolNames);

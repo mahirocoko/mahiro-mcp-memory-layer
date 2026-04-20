@@ -10,6 +10,7 @@ vi.mock("node:child_process", () => ({
 
 import {
   buildGeminiInteractiveShellArgs,
+  buildGeminiInteractiveTmuxSessionArgs,
   buildGeminiShellArgs,
   shellGeminiRuntime,
 } from "../src/features/gemini/runtime/shell/shell-gemini-runtime.js";
@@ -104,9 +105,25 @@ describe("shellGeminiRuntime", () => {
       "plan",
       "--allowed-mcp-server-names",
       "docs,repo-tools",
-      "--screen-reader",
       "-i",
       "Reply with OK",
+    ]);
+  });
+
+  it("builds tmux session startup args without embedding the prompt", () => {
+    expect(buildGeminiInteractiveTmuxSessionArgs({
+      taskId: "task-2c",
+      prompt: "Reply with OK",
+      model: "gemini-3.1-pro-preview",
+      approvalMode: "plan",
+      allowedMcpServerNames: ["docs", "repo-tools"],
+    })).toEqual([
+      "-m",
+      "gemini-3.1-pro-preview",
+      "--approval-mode",
+      "plan",
+      "--allowed-mcp-server-names",
+      "docs,repo-tools",
     ]);
   });
 

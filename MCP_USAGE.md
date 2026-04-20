@@ -4,6 +4,14 @@ Use this file when you need to understand the practical MCP/runtime surface for 
 
 `README.md` remains the human-facing package reference. `ORCHESTRATION.md` remains the orchestrator posture and routing policy. This file is the AI-facing guide for what runtime surfaces exist, when they exist, and how to use them safely.
 
+## Current product posture
+
+Treat the current repo as having one stable product surface today: the memory MCP / plugin-native memory layer.
+
+Treat orchestration as a greenfield rebuild layered on top of that memory foundation. When this file describes orchestration-capable MCP tools, read them as the active runtime surface when available, not as a reason to recover older deleted local orchestration paths by default.
+
+Use `oh-my-openagent` as the primary architectural reference for the new orchestration design, especially its split between composition root, execution engine, runtime substrate owner, continuation/verification policy, reminder bridge, and host adapter.
+
 ## Runtime modes
 
 There are two important runtime shapes in this repo.
@@ -38,7 +46,7 @@ If the host is using the standalone server directly (`bun run start`, `bun run d
 
 ## Mode split: plugin-native vs MCP-backed
 
-Use the plugin-native memory surface first for memory work. Do not assume orchestration tools exist just because the repo supports them.
+Use the plugin-native memory surface first for memory work. Do not assume orchestration tools exist just because the repo can expose them on MCP-capable runtimes.
 
 - **Plugin-native memory work**: use the memory tools above
 - **MCP orchestration / worker work**: use only when the host/runtime actually exposes those tools
@@ -59,7 +67,7 @@ Important posture:
 
 - this is a **plugin-local control-plane layer**, not a second orchestration engine
 - these settings do **not** imply orchestration is available on the standard plugin path; continue to gate on `runtime_capabilities`
-- categories compile down to the repo’s existing worker/runtime/model choices rather than replacing the current workflow/result/supervision primitives
+- categories compile down to the runtime's worker/runtime/model choices rather than replacing the workflow/result/supervision primitives underneath
 
 ### Plugin-local operator loop
 
@@ -156,6 +164,12 @@ Recommended conservative write flow:
 ## MCP orchestration entrypoints
 
 When the MCP orchestration surface is available, these are the primary tools:
+
+Important posture before reading this section:
+
+- the stable default product surface is still memory-first
+- orchestration should be treated as a fresh layered design, not as a compatibility commitment to older deleted repo-local orchestration code
+- when you design or extend this surface, prefer `oh-my-openagent`-style topology and responsibility boundaries over reviving transitional shims
 
 - `start_agent_task`
 - `call_worker`

@@ -62,6 +62,17 @@ export interface OpenCodePluginSessionState {
   lastHandledPrepareHostTurnKey?: string;
   startupBrief?: string;
   capabilities?: OpenCodePluginRuntimeCapabilities;
+  operator?: {
+    orchModeEnabled: boolean;
+    tasks: Array<{
+      taskId: string;
+      requestId: string;
+      category: string;
+      status: "running" | "awaiting_verification" | "completed" | "needs_attention";
+      subagentIds?: string[];
+      updatedAt: string;
+    }>;
+  };
   wakeUp?: WakeUpMemoryResult;
   prepareTurn?: PrepareTurnMemoryResult;
   prepareHostTurn?: PrepareHostTurnMemoryResult;
@@ -133,6 +144,10 @@ export function syncSessionStateFromEvent(
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
     startupBrief: existingState?.startupBrief,
     capabilities: existingState?.capabilities,
+    operator: existingState?.operator ?? {
+      orchModeEnabled: false,
+      tasks: [],
+    },
     wakeUp: existingState?.wakeUp,
     prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
     prepareHostTurn: existingState?.prepareHostTurn,
@@ -180,6 +195,7 @@ export function buildMemoryContextResult(
       },
       ...(sessionState.startupBrief ? { startupBrief: sessionState.startupBrief } : {}),
       ...(sessionState.capabilities ? { capabilities: sessionState.capabilities } : {}),
+      ...(sessionState.operator ? { operator: sessionState.operator } : {}),
       cached: {
         ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),

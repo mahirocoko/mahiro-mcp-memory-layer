@@ -20,7 +20,6 @@ import { logPluginLifecycle, toErrorMessage } from "./runtime-logging.js";
 import {
   buildOpenCodePluginStartupBrief,
   resolveOpenCodePluginRuntimeCapabilities,
-  resolveOpenCodePluginRuntimeCapabilitiesSync,
   type OpenCodePluginRuntimeCapabilities,
 } from "./runtime-capabilities.js";
 import {
@@ -34,6 +33,7 @@ import {
   type OpenCodePluginMemoryContextResult,
   type OpenCodePluginSessionState,
 } from "./runtime-state.js";
+import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
 
 export interface OpenCodePluginToolExecutionContext {
   readonly sessionID?: ToolContext["sessionID"];
@@ -94,6 +94,12 @@ export interface OpenCodePluginRuntime {
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<unknown>;
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
+  readonly startAgentTask: (
+    args: Record<string, unknown>,
+    context: OpenCodePluginToolExecutionContext,
+  ) => Promise<unknown>;
+  readonly getOrchestrationResult: (args: Record<string, unknown>) => Promise<unknown>;
+  readonly inspectSubagentSession: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
 export function createOpenCodePluginRuntime(
@@ -106,22 +112,80 @@ export function createOpenCodePluginRuntime(
     options.__test?.sessionVisibleRemindersAvailable ??
     options.__test?.sessionPromptAsyncAvailable ??
     typeof context.client.session?.promptAsync === "function";
-  const syncCapabilities = resolveOpenCodePluginRuntimeCapabilitiesSync({
-    standaloneMcpAvailable: options.__test?.standaloneMcpAvailable,
-    sessionVisibleRemindersAvailable,
-    facadeConfig: {
-      remindersEnabled: config.runtime.remindersEnabled,
-      categoryRoutes: config.routing.categoryRoutes,
-    },
-  });
   const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
-    standaloneMcpAvailable: syncCapabilities.orchestration.available,
     sessionVisibleRemindersAvailable,
     facadeConfig: {
       remindersEnabled: config.runtime.remindersEnabled,
       categoryRoutes: config.routing.categoryRoutes,
     },
   });
+  const orchestrationTools = Object.fromEntries(
+    getRegisteredOrchestrationTools().map((tool) => [tool.name, tool]),
+  );
+
+  const notifySession = async (sessionId: string, message: string): Promise<void> => {
+    if (typeof context.client.session?.promptAsync !== "function") {
+      return;
+    }
+
+    await context.client.session.promptAsync({
+      path: { id: sessionId },
+      body: {
+        parts: [
+          {
+            type: "text",
+            text: message,
+          },
+        ],
+      },
+    });
+  };
+
+  const watchTaskForSession = (
+    sessionId: string,
+    taskId: string,
+    requestId: string,
+    category: string,
+  ): void => {
+    const pollIntervalMs = 1500;
+
+    const tick = async (): Promise<void> => {
+      const sessionState = runtimeState.sessions.get(sessionId);
+      const taskEntry = sessionState?.operator?.tasks.find((task) => task.taskId === taskId);
+      if (!sessionState || !taskEntry || taskEntry.status !== "running") {
+        return;
+      }
+
+      const result = await orchestrationTools.get_orchestration_result?.execute({ requestId }) as Record<string, unknown> | null;
+      if (!result || typeof result.status !== "string") {
+        setTimeout(() => void tick(), pollIntervalMs);
+        return;
+      }
+
+      if (result.status === "running") {
+        setTimeout(() => void tick(), pollIntervalMs);
+        return;
+      }
+
+      const metadata = typeof result.metadata === "object" && result.metadata !== null
+        ? result.metadata as Record<string, unknown>
+        : undefined;
+      const jobs = Array.isArray(metadata?.jobs)
+        ? metadata.jobs as Array<Record<string, unknown>>
+        : [];
+      const subagentIds = jobs.map((job) => job.subagentId).filter((value): value is string => typeof value === "string");
+      taskEntry.status = "awaiting_verification";
+      taskEntry.subagentIds = subagentIds;
+      taskEntry.updatedAt = new Date().toISOString();
+
+      await notifySession(
+        sessionId,
+        `Task — ${category} finished background work and is awaiting verification. requestId=${requestId}${subagentIds.length > 0 ? ` subagentId=${subagentIds[0]}` : ""}`,
+      );
+    };
+
+    setTimeout(() => void tick(), pollIntervalMs);
+  };
 
   const routeEvent = async (
     event: OpenCodePluginEvent,
@@ -557,6 +621,69 @@ export function createOpenCodePluginRuntime(
       });
     },
     readRuntimeCapabilities: () => runtimeCapabilitiesPromise,
+    startAgentTask: async (args, toolContext) => {
+      const sessionId = resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties);
+      if (!sessionId) {
+        throw new Error("start_agent_task requires a live plugin session context.");
+      }
+
+      const sessionState = runtimeState.sessions.get(sessionId);
+      if (sessionState?.operator) {
+        sessionState.operator.orchModeEnabled = true;
+      }
+
+      const startAgentTaskTool = orchestrationTools.start_agent_task;
+      if (!startAgentTaskTool) {
+        throw new Error("Missing start_agent_task orchestration tool.");
+      }
+      const result = await startAgentTaskTool.execute({
+        ...args,
+        workerRuntime: "shell",
+      }) as Record<string, unknown>;
+
+      const requestId = typeof result.requestId === "string" ? result.requestId : undefined;
+      if (!requestId) {
+        return result;
+      }
+
+      const taskId = `task_${requestId.replace(/^workflow_/, "")}`;
+      const category = typeof args.category === "string" ? args.category : "task";
+      const latestSessionState = runtimeState.sessions.get(sessionId);
+      if (latestSessionState?.operator) {
+        latestSessionState.operator.tasks = [
+          ...latestSessionState.operator.tasks,
+          {
+            taskId,
+            requestId,
+            category,
+            status: "running",
+            updatedAt: new Date().toISOString(),
+          },
+        ];
+      }
+
+      await notifySession(sessionId, `Task — ${category} started in background. requestId=${requestId} taskId=${taskId}`);
+      watchTaskForSession(sessionId, taskId, requestId, category);
+
+      return {
+        ...result,
+        taskId,
+      };
+    },
+    getOrchestrationResult: async (args) => {
+      const tool = orchestrationTools.get_orchestration_result;
+      if (!tool) {
+        throw new Error("Missing get_orchestration_result orchestration tool.");
+      }
+      return await tool.execute(args);
+    },
+    inspectSubagentSession: async (args) => {
+      const tool = orchestrationTools.inspect_subagent_session;
+      if (!tool) {
+        throw new Error("Missing inspect_subagent_session orchestration tool.");
+      }
+      return await tool.execute(args);
+    },
   };
 }
 

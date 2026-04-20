@@ -6,6 +6,7 @@ data/cache/*.json
 data/traces/*.jsonl
 data/traces/orchestration-results/*.json
 data/traces/orchestration-supervisions/*.json
+data/traces/orchestration-subagents/*.json
 data/lancedb/*
 .pulselane-refactor/
 .agent-state/learn/**/origin

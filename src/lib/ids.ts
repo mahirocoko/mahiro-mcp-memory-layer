@@ -2,6 +2,8 @@
 export const WORKFLOW_REQUEST_ID_PATTERN = /^workflow_[0-9a-f]{32}$/;
 /** Matches IDs from {@link newId} with prefix `"supervisor"` (hyphenless lowercase UUID). */
 export const SUPERVISOR_REQUEST_ID_PATTERN = /^supervisor_[0-9a-f]{32}$/;
+/** Matches IDs from {@link newId} with prefix `"subagent"` (hyphenless lowercase UUID). */
+export const SUBAGENT_ID_PATTERN = /^subagent_[0-9a-f]{32}$/;
 
 export function isWorkflowRequestId(value: string): boolean {
   return WORKFLOW_REQUEST_ID_PATTERN.test(value);
@@ -9,6 +11,10 @@ export function isWorkflowRequestId(value: string): boolean {
 
 export function isSupervisorRequestId(value: string): boolean {
   return SUPERVISOR_REQUEST_ID_PATTERN.test(value);
+}
+
+export function isSubagentId(value: string): boolean {
+  return SUBAGENT_ID_PATTERN.test(value);
 }
 
 export function newId(prefix: string): string {

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
 
 import type {
@@ -31,6 +32,41 @@ export function createOpenCodePluginTools(
 
   return {
     ...memoryTools,
+    start_agent_task: {
+      description: "Start a background shell/tmux subagent task from the current plugin session.",
+      args: {
+        category: z.string().min(1),
+        prompt: z.string().min(1),
+        model: z.string().optional(),
+        mode: z.enum(["plan", "ask"]).optional(),
+        trust: z.boolean().optional(),
+        force: z.boolean().optional(),
+        taskKind: z.string().optional(),
+        approvalMode: z.enum(["default", "auto_edit", "yolo", "plan"]).optional(),
+        allowedMcpServerNames: z.union([z.array(z.string()), z.literal("none")]).optional(),
+      },
+      execute: async (args, toolContext) => {
+        return serializeOpenCodeToolResult(await runtime.startAgentTask(args, toolContext), "start_agent_task");
+      },
+    },
+    get_orchestration_result: {
+      description: "Read the latest stored orchestration result for a tracked task.",
+      args: {
+        requestId: z.string().min(1),
+      },
+      execute: async (args) => {
+        return serializeOpenCodeToolResult(await runtime.getOrchestrationResult(args), "get_orchestration_result");
+      },
+    },
+    inspect_subagent_session: {
+      description: "Observe the latest tracked tmux subagent session state by subagent id.",
+      args: {
+        subagentId: z.string().min(1),
+      },
+      execute: async (args) => {
+        return serializeOpenCodeToolResult(await runtime.inspectSubagentSession(args), "inspect_subagent_session");
+      },
+    },
     runtime_capabilities: {
       description: "Read the active OpenCode runtime capability contract for memory and optional orchestration surfaces.",
       args: {},
@@ -63,8 +99,6 @@ function compactOpenCodeToolResult(result: unknown, toolName: string): unknown {
 
   if (
     toolName === "start_agent_task" ||
-    toolName === "call_worker" ||
-    toolName === "orchestrate_workflow" ||
     toolName === "get_orchestration_result"
   ) {
     const {
