@@ -39,6 +39,7 @@ export function createOpenCodePluginTools(
         prompt: z.string().min(1),
         model: z.string().optional(),
         intent: z.enum(["proposal", "implementation"]),
+        executor: z.enum(["gemini", "cursor"]).optional(),
         mode: z.enum(["plan", "ask"]).optional(),
         trust: z.boolean().optional(),
         force: z.boolean().optional(),

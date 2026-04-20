@@ -3,7 +3,7 @@ import { newId } from "../../lib/ids.js";
 import { interactiveTmuxGeminiRuntime } from "../gemini/runtime/tmux/interactive-gemini-tmux-runtime.js";
 import type { GeminiWorkerInput } from "../gemini/types.js";
 import type { RuntimeModelInventorySnapshot } from "./runtime-model-inventory.js";
-import type { DelegatedTaskIntent, WorkerRuntimeKind, WorkflowJob } from "./workflow-spec.js";
+import type { DelegatedTaskExecutor, DelegatedTaskIntent, WorkerRuntimeKind, WorkflowJob } from "./workflow-spec.js";
 
 export type AgentTaskCategory =
   | "visual-engineering"
@@ -16,7 +16,7 @@ export type AgentTaskCategory =
   | "unspecified-low"
   | "writing";
 
-type WorkerKind = "gemini" | "cursor";
+type WorkerKind = DelegatedTaskExecutor;
 
 interface RouteDefaults {
   readonly workerKind: WorkerKind;
@@ -36,8 +36,14 @@ const routeDefaults: Record<AgentTaskCategory, RouteDefaults> = {
   writing: { workerKind: "cursor", primaryModel: "composer-2", fallbacks: ["claude-4.6-sonnet-medium", "claude-4.6-opus-high"] },
 };
 
+const workerDefaults: Record<WorkerKind, RouteDefaults> = {
+  gemini: routeDefaults["visual-engineering"],
+  cursor: routeDefaults.quick,
+};
+
 export interface AgentTaskRoute {
   readonly category: AgentTaskCategory;
+  readonly requestedExecutor?: WorkerKind;
   readonly workerKind: WorkerKind;
   readonly model: string;
   readonly reason: string;
@@ -67,29 +73,54 @@ function pickAvailableModel(primary: string, fallbacks: readonly string[], inven
   return { model: primary, fallback: false };
 }
 
+function classifyModelExecutor(model: string): WorkerKind | undefined {
+  if (/^gemini-/i.test(model)) {
+    return "gemini";
+  }
+
+  if (/^(composer-|claude-)/i.test(model)) {
+    return "cursor";
+  }
+
+  return undefined;
+}
+
 export function resolveAgentTaskRoute(input: {
   readonly category: AgentTaskCategory;
+  readonly executor?: WorkerKind;
   readonly model?: string;
   readonly workerRuntime?: WorkerRuntimeKind;
   readonly routeOverrides?: AgentTaskRouteOverrides;
   readonly runtimeModelInventory?: RuntimeModelInventorySnapshot;
 }): AgentTaskRoute {
   const defaults = routeDefaults[input.category];
+  const effectiveWorkerKind = input.executor ?? defaults.workerKind;
+  const effectiveDefaults = input.executor ? workerDefaults[input.executor] : defaults;
   const override = input.routeOverrides?.[input.category];
+
+  if (input.executor && input.model) {
+    const explicitModelExecutor = classifyModelExecutor(input.model);
+
+    if (explicitModelExecutor && explicitModelExecutor !== input.executor) {
+      throw new Error(`Explicit executor '${input.executor}' is incompatible with model '${input.model}'.`);
+    }
+  }
 
   if (input.model) {
     return {
       category: input.category,
-      workerKind: defaults.workerKind,
+      ...(input.executor ? { requestedExecutor: input.executor } : {}),
+      workerKind: effectiveWorkerKind,
       model: input.model,
-      reason: "explicit_model_override",
+      reason: input.executor ? "explicit_executor_model_override" : "explicit_model_override",
       ...(input.workerRuntime ? { workerRuntime: input.workerRuntime } : {}),
     };
   }
 
-  if (override?.model) {
+  if (!input.executor && override?.model) {
     return {
       category: input.category,
+      ...(input.executor ? { requestedExecutor: input.executor } : {}),
       workerKind: defaults.workerKind,
       model: override.model,
       reason: "config_route_override",
@@ -97,12 +128,15 @@ export function resolveAgentTaskRoute(input: {
     };
   }
 
-  const selected = pickAvailableModel(defaults.primaryModel, defaults.fallbacks, input.runtimeModelInventory);
+  const selected = pickAvailableModel(effectiveDefaults.primaryModel, effectiveDefaults.fallbacks, input.runtimeModelInventory);
   return {
     category: input.category,
-    workerKind: defaults.workerKind,
+    ...(input.executor ? { requestedExecutor: input.executor } : {}),
+    workerKind: effectiveWorkerKind,
     model: selected.model,
-    reason: selected.fallback ? "runtime_fallback_missing_primary_model" : `default_${input.category}_lane`,
+    reason: input.executor
+      ? (selected.fallback ? "explicit_executor_runtime_fallback" : "explicit_executor_override")
+      : (selected.fallback ? "runtime_fallback_missing_primary_model" : `default_${input.category}_lane`),
     ...(input.workerRuntime ? { workerRuntime: input.workerRuntime } : {}),
   };
 }
@@ -111,6 +145,7 @@ export function buildAgentTaskWorkerJob(input: {
   readonly category: AgentTaskCategory;
   readonly taskId: string;
   readonly prompt: string;
+  readonly executor?: WorkerKind;
   readonly model?: string;
   readonly workerRuntime?: WorkerRuntimeKind;
   readonly routeOverrides?: AgentTaskRouteOverrides;
@@ -145,6 +180,7 @@ export function buildAgentTaskWorkerJob(input: {
     return {
       kind: "gemini",
       ...(input.intent ? { intent: input.intent } : {}),
+      ...(input.executor ? { requestedExecutor: input.executor } : {}),
       input: geminiInput,
       routeReason: route.reason,
       ...(route.workerRuntime || interactive ? { workerRuntime: route.workerRuntime ?? "shell" } : {}),
@@ -169,6 +205,7 @@ export function buildAgentTaskWorkerJob(input: {
   return {
     kind: "cursor",
     ...(input.intent ? { intent: input.intent } : {}),
+    ...(input.executor ? { requestedExecutor: input.executor } : {}),
     input: cursorInput,
     routeReason: route.reason,
     ...(route.workerRuntime ? { workerRuntime: route.workerRuntime } : {}),

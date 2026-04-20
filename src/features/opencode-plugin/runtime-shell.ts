@@ -758,6 +758,16 @@ export function createOpenCodePluginRuntime(
       const taskId = `task_${requestId.replace(/^workflow_/, "")}`;
       const category = typeof args.category === "string" ? args.category : "task";
       const intent = resolveDelegatedTaskIntent(args.intent);
+      const requestedExecutor = args.executor === "gemini" || args.executor === "cursor"
+        ? args.executor
+        : undefined;
+      const route = typeof result.route === "object" && result.route !== null
+        ? result.route as Record<string, unknown>
+        : undefined;
+      const resolvedExecutor = route?.workerKind === "gemini" || route?.workerKind === "cursor"
+        ? route.workerKind
+        : undefined;
+      const resolvedModel = typeof route?.model === "string" ? route.model : undefined;
       const latestSessionState = runtimeState.sessions.get(sessionId);
       if (latestSessionState?.operator) {
         latestSessionState.operator.tasks = [
@@ -767,6 +777,9 @@ export function createOpenCodePluginRuntime(
             requestId,
             category,
             intent,
+            ...(requestedExecutor ? { requestedExecutor } : {}),
+            ...(resolvedExecutor ? { resolvedExecutor } : {}),
+            ...(resolvedModel ? { resolvedModel } : {}),
             status: "running",
             updatedAt: new Date().toISOString(),
           },

@@ -502,6 +502,89 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
   });
 
+  it("lets explicit gemini executor override a cursor-default category", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    const result = await tool?.execute({
+      category: "quick",
+      prompt: "Use Gemini for this task.",
+      intent: "implementation",
+      executor: "gemini",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls.at(-1)?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "gemini",
+          requestedExecutor: "gemini",
+          input: {
+            model: "gemini-3.1-pro-preview",
+          },
+          routeReason: "explicit_executor_override",
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      executor: "gemini",
+      route: {
+        workerKind: "gemini",
+        model: "gemini-3.1-pro-preview",
+        reason: "explicit_executor_override",
+        requestedExecutor: "gemini",
+      },
+    });
+  });
+
+  it("lets explicit cursor executor override a gemini-default category", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    const result = await tool?.execute({
+      category: "visual-engineering",
+      prompt: "Use Cursor for this task.",
+      intent: "implementation",
+      executor: "cursor",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls.at(-1)?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "cursor",
+          requestedExecutor: "cursor",
+          input: {
+            model: "composer-2",
+          },
+          routeReason: "explicit_executor_override",
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      executor: "cursor",
+      route: {
+        workerKind: "cursor",
+        model: "composer-2",
+        reason: "explicit_executor_override",
+        requestedExecutor: "cursor",
+      },
+    });
+  });
+
+  it("fails closed on incompatible explicit executor and model", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    await expect(
+      tool?.execute({
+        category: "quick",
+        prompt: "Use Gemini but with a cursor model.",
+        intent: "implementation",
+        executor: "gemini",
+        model: "composer-2",
+      }),
+    ).rejects.toThrow(/incompatible/i);
+  });
+
   it("executes the orchestration tool with normalized workflow input", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "orchestrate_workflow");

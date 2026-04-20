@@ -739,6 +739,66 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("stores requested and resolved executor in plugin operator state", async () => {
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_executor",
+        status: "running",
+        route: {
+          workerKind: "gemini",
+          model: "gemini-3.1-pro-preview",
+          reason: "explicit_executor_override",
+          requestedExecutor: "gemini",
+        },
+      },
+    });
+    const harness = await createPluginHarness();
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-executor") });
+    await flushMicrotasks();
+
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "quick",
+        prompt: "Use Gemini for this task.",
+        intent: "implementation",
+        executor: "gemini",
+      },
+      {
+        sessionID: "session-executor",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    const memoryContext = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-executor",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(memoryContext).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          tasks: [
+            {
+              requestId: "workflow_executor",
+              requestedExecutor: "gemini",
+              resolvedExecutor: "gemini",
+              resolvedModel: "gemini-3.1-pro-preview",
+              status: "running",
+            },
+          ],
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("maps failed orchestration terminal states to needs_attention on explicit result reads", async () => {
     const getOrchestrationResult = vi.fn().mockResolvedValue({
       requestId: "workflow_failed",

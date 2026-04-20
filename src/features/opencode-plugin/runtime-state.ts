@@ -70,6 +70,9 @@ export interface OpenCodePluginSessionState {
       requestId: string;
       category: string;
       intent: DelegatedTaskIntent;
+      requestedExecutor?: "gemini" | "cursor";
+      resolvedExecutor?: "gemini" | "cursor";
+      resolvedModel?: string;
       status: "running" | "awaiting_verification" | "completed" | "needs_attention";
       attentionReason?: "approval_required";
       approvalPrompt?: string;
