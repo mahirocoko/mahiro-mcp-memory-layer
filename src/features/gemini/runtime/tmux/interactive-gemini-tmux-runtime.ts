@@ -14,10 +14,31 @@ function hasGeminiCompleted(output: string): boolean {
   return output.includes("✦ ") && output.includes("Type your message or @path/to/file");
 }
 
-function toGeminiResult(output: string, input: GeminiWorkerInput, timedOut: boolean): GeminiCommandRunResult {
+const approvalPromptMatchers = [
+  "Approve this action?",
+  "Do you want to proceed?",
+  "Press enter to confirm",
+  "Allow this action?",
+] as const;
+
+function toGeminiResult(
+  output: string,
+  input: GeminiWorkerInput,
+  timedOut: boolean,
+  extra?: {
+    approvalRequired?: boolean;
+    approvalPrompt?: string;
+  },
+): GeminiCommandRunResult {
   const response = extractInteractiveGeminiResponse(output);
   return {
-    stdout: JSON.stringify({ response, stats: { model: input.model }, rawOutput: output }),
+    stdout: JSON.stringify({
+      response,
+      stats: { model: input.model },
+      rawOutput: output,
+      ...(extra?.approvalRequired ? { approvalRequired: true } : {}),
+      ...(extra?.approvalPrompt ? { approvalPrompt: extra.approvalPrompt } : {}),
+    }),
     stderr: "",
     exitCode: timedOut ? null : 0,
     signal: timedOut ? "SIGTERM" : null,
@@ -81,6 +102,7 @@ export class InteractiveGeminiTmuxRuntime implements GeminiWorkerRuntime {
           input: "1",
         },
       ],
+      interruptOnMatches: [...approvalPromptMatchers],
     });
     let finalResult = result;
     if (result.timedOut && hasGeminiCompleted(result.output)) {
@@ -127,7 +149,10 @@ export class InteractiveGeminiTmuxRuntime implements GeminiWorkerRuntime {
       }
     }
 
-    const commandResult = toGeminiResult(finalResult.output, input, finalResult.timedOut);
+    const commandResult = toGeminiResult(finalResult.output, input, finalResult.timedOut, {
+      ...(finalResult.interruptedReason === "approval_required" ? { approvalRequired: true } : {}),
+      ...(finalResult.matchedText ? { approvalPrompt: finalResult.matchedText } : {}),
+    });
     return {
       ...commandResult,
       stdout: JSON.stringify({

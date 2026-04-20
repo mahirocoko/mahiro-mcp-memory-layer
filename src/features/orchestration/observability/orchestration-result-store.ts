@@ -15,6 +15,8 @@ export interface OrchestrationResultRecord {
     readonly jobs?: Array<{
       readonly taskId: string;
       readonly intent?: string;
+      readonly approvalRequired?: boolean;
+      readonly approvalPrompt?: string;
       readonly workerRuntime?: string;
       readonly routeReason?: string;
       readonly subagentId?: string;
@@ -34,6 +36,27 @@ export interface OrchestrationResultRecord {
 function buildMetadata(spec: OrchestrateWorkflowSpec, result?: OrchestrationRunResult): OrchestrationResultRecord["metadata"] {
   const jobs = spec.mode === "parallel" ? spec.jobs : spec.steps;
   const workerRuntimes = jobs.map((job) => job.workerRuntime).filter((value): value is NonNullable<typeof value> => typeof value === "string");
+
+  const resolveJobResult = (index: number) => {
+    const item = result?.results[index];
+
+    if (!item || !("result" in item)) {
+      return undefined;
+    }
+
+    return item.result;
+  };
+
+  const resolveApprovalPrompt = (index: number) => {
+    const jobResult = resolveJobResult(index);
+
+    if (jobResult?.status !== "approval_required") {
+      return undefined;
+    }
+
+    return jobResult.approvalPrompt;
+  };
+
   return {
     mode: spec.mode,
     taskIds: jobs.map((job) => job.input.taskId),
@@ -44,8 +67,10 @@ function buildMetadata(spec: OrchestrateWorkflowSpec, result?: OrchestrationRunR
       ...(job.workerRuntime ? { workerRuntime: job.workerRuntime } : {}),
       ...(job.routeReason ? { routeReason: job.routeReason } : {}),
       ...(typeof job.input.subagentId === "string" ? { subagentId: job.input.subagentId } : {}),
-      ...(result && result.results[index] && "result" in result.results[index] && result.results[index].result.sessionName ? { sessionName: result.results[index].result.sessionName } : {}),
-      ...(result && result.results[index] && "result" in result.results[index] && result.results[index].result.paneId ? { paneId: result.results[index].result.paneId } : {}),
+      ...(resolveJobResult(index)?.status === "approval_required" ? { approvalRequired: true } : {}),
+      ...(typeof resolveApprovalPrompt(index) === "string" ? { approvalPrompt: resolveApprovalPrompt(index) } : {}),
+      ...(resolveJobResult(index)?.sessionName ? { sessionName: resolveJobResult(index)?.sessionName } : {}),
+      ...(resolveJobResult(index)?.paneId ? { paneId: resolveJobResult(index)?.paneId } : {}),
       ...(job.retries !== undefined ? { configuredRetries: job.retries } : {}),
       ...(job.retryDelayMs !== undefined ? { configuredRetryDelayMs: job.retryDelayMs } : {}),
     })),

@@ -22,6 +22,7 @@ export interface TmuxRuntimeTaskInput {
     readonly match: string;
     readonly input: string;
   }>;
+  readonly interruptOnMatches?: string[];
 }
 
 export interface TmuxRuntimeTaskResult {
@@ -30,6 +31,8 @@ export interface TmuxRuntimeTaskResult {
   readonly completionDetected: boolean;
   readonly sessionName: string;
   readonly paneId: string;
+  readonly interruptedReason?: "approval_required";
+  readonly matchedText?: string;
 }
 
 function quoteShellArg(value: string): string {
@@ -174,6 +177,20 @@ export class TmuxRuntimeOwner {
           sessionName: spawned.sessionName,
           paneId: spawned.paneId,
         };
+      }
+
+      for (const interruptMatch of input.interruptOnMatches ?? []) {
+        if (output.includes(interruptMatch)) {
+          return {
+            output,
+            timedOut: false,
+            completionDetected: false,
+            sessionName: spawned.sessionName,
+            paneId: spawned.paneId,
+            interruptedReason: "approval_required",
+            matchedText: interruptMatch,
+          };
+        }
       }
 
       for (const autoResponse of input.autoResponses ?? []) {

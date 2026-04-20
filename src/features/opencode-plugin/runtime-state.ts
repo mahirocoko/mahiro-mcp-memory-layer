@@ -71,6 +71,8 @@ export interface OpenCodePluginSessionState {
       category: string;
       intent: DelegatedTaskIntent;
       status: "running" | "awaiting_verification" | "completed" | "needs_attention";
+      attentionReason?: "approval_required";
+      approvalPrompt?: string;
       subagentIds?: string[];
       updatedAt: string;
     }>;

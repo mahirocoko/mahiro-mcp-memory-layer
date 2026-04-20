@@ -181,6 +181,8 @@ export function createOpenCodePluginRuntime(
     subagentIds: string[];
     changed: boolean;
     rawStatus?: string;
+    attentionReason?: "approval_required";
+    approvalPrompt?: string;
   } => {
     const sessionState = runtimeState.sessions.get(sessionId);
     const taskEntry = sessionState?.operator?.tasks.find((task) => task.requestId === requestId);
@@ -200,12 +202,18 @@ export function createOpenCodePluginRuntime(
     const subagentIds = jobs
       .map((job) => job.subagentId)
       .filter((value): value is string => typeof value === "string");
+    const approvalPrompt = jobs
+      .map((job) => job.approvalPrompt)
+      .find((value): value is string => typeof value === "string");
+    const approvalRequired = jobs.some((job) => job.approvalRequired === true);
 
     if (!nextStatus) {
       return {
         subagentIds,
         changed: false,
         rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
+        ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
+        ...(approvalPrompt ? { approvalPrompt } : {}),
       };
     }
 
@@ -216,6 +224,8 @@ export function createOpenCodePluginRuntime(
 
     taskEntry.status = nextStatus;
     taskEntry.subagentIds = subagentIds;
+    taskEntry.attentionReason = approvalRequired ? "approval_required" : undefined;
+    taskEntry.approvalPrompt = approvalPrompt;
     taskEntry.updatedAt = new Date().toISOString();
 
     return {
@@ -223,6 +233,8 @@ export function createOpenCodePluginRuntime(
       subagentIds,
       changed,
       rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
+      ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
+      ...(approvalPrompt ? { approvalPrompt } : {}),
     };
   };
 
@@ -247,12 +259,12 @@ export function createOpenCodePluginRuntime(
         return;
       }
 
+      const synced = syncTrackedTaskFromResult(sessionId, requestId, result);
+
       if (result.status === "running") {
         setTimeout(() => void tick(), pollIntervalMs);
         return;
       }
-
-      const synced = syncTrackedTaskFromResult(sessionId, requestId, result);
       if (!synced.changed || !synced.taskStatus) {
         return;
       }
@@ -267,7 +279,9 @@ export function createOpenCodePluginRuntime(
 
       await notifySession(
         sessionId,
-        `Task — ${category} ended with status ${synced.rawStatus ?? "unknown"} and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
+        synced.attentionReason === "approval_required"
+          ? `Task — ${category} is waiting on Gemini approval and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}${synced.approvalPrompt ? ` approvalPrompt=${JSON.stringify(synced.approvalPrompt)}` : ""}`
+          : `Task — ${category} ended with status ${synced.rawStatus ?? "unknown"} and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
       );
     };
 

@@ -816,6 +816,90 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
+  it("surfaces approval-gated delegated tasks as needs_attention with approval metadata", async () => {
+    const getOrchestrationResult = vi.fn().mockResolvedValue({
+      requestId: "workflow_approval",
+      status: "failed",
+      metadata: {
+        jobs: [{
+          subagentId: "subagent_approval",
+          approvalRequired: true,
+          approvalPrompt: "Approve this action?",
+        }],
+      },
+    });
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_approval",
+        status: "running",
+      },
+      getOrchestrationResult,
+    });
+    const harness = await createPluginHarness({
+      sessionPromptAsyncAvailable: true,
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-approval") });
+    await flushMicrotasks();
+
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Implement the frontend revamp.",
+        intent: "implementation",
+      },
+      {
+        sessionID: "session-approval",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    const orchestrationResult = parsePluginToolResult(await harness.hooks.tool?.get_orchestration_result?.execute?.(
+      {
+        requestId: "workflow_approval",
+      },
+      {
+        sessionID: "session-approval",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(orchestrationResult).toMatchObject({
+      requestId: "workflow_approval",
+      status: "failed",
+    });
+
+    const memoryContext = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-approval",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(memoryContext).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          tasks: [
+            {
+              requestId: "workflow_approval",
+              intent: "implementation",
+              status: "needs_attention",
+              attentionReason: "approval_required",
+              approvalPrompt: "Approve this action?",
+              subagentIds: ["subagent_approval"],
+            },
+          ],
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
   it("blocks continuity preflight while a delegated implementation task is still running", async () => {
     vi.useFakeTimers();
     mockPluginOrchestrationTools({

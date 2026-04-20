@@ -65,6 +65,22 @@ function parseGeminiResult(input: GeminiWorkerInput, output: GeminiCommandRunRes
     : undefined;
   const response = typeof parsed?.response === "string" ? parsed.response : output.stdout.trim();
 
+  if (parsed?.approvalRequired === true) {
+    return {
+      status: "approval_required",
+      requestedModel: input.model,
+      reportedModel,
+      response,
+      ...(typeof parsed?.approvalPrompt === "string" ? { approvalPrompt: parsed.approvalPrompt } : {}),
+      ...(typeof parsed?.subagentId === "string" ? { subagentId: parsed.subagentId } : {}),
+      ...(typeof parsed?.sessionName === "string" ? { sessionName: parsed.sessionName } : {}),
+      ...(typeof parsed?.paneId === "string" ? { paneId: parsed.paneId } : {}),
+      durationMs: output.durationMs,
+      startedAt: output.startedAt,
+      finishedAt: output.finishedAt,
+    };
+  }
+
   return {
     status: "completed",
     requestedModel: input.model,
@@ -157,7 +173,7 @@ export async function runWorkerJob(job: WorkflowJob, options: RunWorkerJobOption
           throw new Error("Missing Gemini runtime dependency.");
         }
         const result = parseGeminiResult(job.input, await runtime.run(job.input));
-        if (result.status === "completed" || retryCount >= maxRetries) {
+        if (result.status === "completed" || result.status === "approval_required" || retryCount >= maxRetries) {
           return { kind: job.kind, input: job.input, retryCount, result };
         }
       } else {

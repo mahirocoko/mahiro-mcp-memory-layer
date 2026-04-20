@@ -22,11 +22,12 @@ export interface GeminiWorkerInput {
 }
 
 export interface GeminiWorkerRunResult {
-  readonly status: "completed" | "failed" | "timeout" | "invalid_input";
+  readonly status: "completed" | "failed" | "timeout" | "invalid_input" | "approval_required";
   readonly requestedModel: string;
   readonly reportedModel?: string;
   readonly response?: string;
   readonly error?: string;
+  readonly approvalPrompt?: string;
   readonly durationMs: number;
   readonly startedAt: string;
   readonly finishedAt: string;
