@@ -33,9 +33,9 @@ export function createOpenCodePluginTools(
   return {
     ...memoryTools,
     start_agent_task: {
-      description: "Start a background shell/tmux subagent task from the current plugin session.",
+      description: "Start a background executor task from the current plugin session.",
       args: {
-        category: z.string().min(1),
+        category: z.string().min(1).optional(),
         prompt: z.string().min(1),
         model: z.string().optional(),
         intent: z.enum(["proposal", "implementation"]),

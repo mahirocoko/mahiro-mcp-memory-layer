@@ -79,9 +79,30 @@ describe("resolveAgentTaskRoute", () => {
     expect(resolveAgentTaskRoute({ category: "artistry" })).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       reason: "default_artistry_lane",
     });
+  });
+
+  it("supports executor-first routing without a category", () => {
+    expect(resolveAgentTaskRoute({ executor: "gemini" })).toEqual({
+      requestedExecutor: "gemini",
+      workerKind: "gemini",
+      model: "gemini-3.1-pro-preview",
+      reason: "explicit_executor_override",
+    });
+  });
+
+  it("infers the executor from an explicit model without a category", () => {
+    expect(resolveAgentTaskRoute({ model: "composer-2" })).toEqual({
+      workerKind: "cursor",
+      model: "composer-2",
+      reason: "explicit_model_override",
+    });
+  });
+
+  it("requires at least one route hint", () => {
+    expect(() => resolveAgentTaskRoute({})).toThrow(/at least one of category, executor, or model/i);
   });
 
   it("routes general-purpose categories to composer-2 by default", () => {
@@ -170,7 +191,7 @@ describe("resolveAgentTaskRoute", () => {
     ).toEqual({
       category: "artistry",
       workerKind: "gemini",
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-pro",
       reason: "runtime_fallback_missing_primary_model",
     });
   });
@@ -283,6 +304,30 @@ describe("buildAgentTaskWorkerJob", () => {
       },
       routeReason: "default_quick_lane",
       continueOnFailure: true,
+    });
+  });
+
+  it("builds executor-first Gemini jobs without a category", () => {
+    expect(
+      buildAgentTaskWorkerJob({
+        taskId: "executor-task",
+        prompt: "Use Gemini for this task.",
+        executor: "gemini",
+      }),
+    ).toEqual({
+      kind: "gemini",
+      input: {
+        subagentId: expect.stringMatching(/^subagent_/),
+        taskId: "executor-task",
+        prompt: "Use Gemini for this task.",
+        model: "gemini-3.1-pro-preview",
+      },
+      requestedExecutor: "gemini",
+      routeReason: "explicit_executor_override",
+      workerRuntime: "shell",
+      dependencies: {
+        runtime: expect.any(Object),
+      },
     });
   });
 

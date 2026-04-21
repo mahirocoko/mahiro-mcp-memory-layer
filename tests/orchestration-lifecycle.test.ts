@@ -8,7 +8,7 @@ describe("OrchestrationLifecycle", () => {
       append: vi.fn(async () => undefined),
     } as const;
     const resultStore = {
-      writeRunning: vi.fn(async () => undefined),
+      writeRequested: vi.fn(async () => undefined),
       writeCompleted: vi.fn(async () => undefined),
       writeRunnerFailed: vi.fn(async () => undefined),
     } as const;
@@ -81,7 +81,7 @@ describe("OrchestrationLifecycle", () => {
       append: vi.fn(async () => undefined),
     } as const;
     const resultStore = {
-      writeRunning: vi.fn(async () => undefined),
+      writeRequested: vi.fn(async () => undefined),
       writeCompleted: vi.fn(async () => undefined),
       writeRunnerFailed: vi.fn(async () => undefined),
     } as const;

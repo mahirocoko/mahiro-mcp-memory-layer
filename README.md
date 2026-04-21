@@ -27,9 +27,9 @@ On this path, OpenCode gets the memory tools natively from the in-process backen
 
 Important plugin-path notes:
 
-- `start_agent_task` requires `category`, `prompt`, and explicit `intent` (`proposal` or `implementation`)
+- `start_agent_task` requires `prompt` and explicit `intent` (`proposal` or `implementation`); `category` is now optional routing metadata
 - the plugin operator ledger tracks task intent and status in `memory_context.session.operator`
-- a running delegated `implementation` task suppresses continuity-style preflight on the plugin path so the main agent does not drift into local fallback while delegated work is still live
+- a `requested` implementation task does not suppress continuity-style preflight; only a truly `running` implementation task can do that
 - successful terminal workflow results map to `awaiting_verification`
 - failed terminal workflow results map to `needs_attention`
 
@@ -76,7 +76,7 @@ Plugin-native extras:
 
 ## Thin plugin orchestration façade
 
-Use `start_agent_task` when you want category-routed delegated work from the plugin path.
+Use `start_agent_task` when you want the plugin path to drive Gemini or Cursor as explicit executors while the main conversation owner stays local. `category` is an optional preset, not the task-shape truth.
 
 Current routing defaults:
 

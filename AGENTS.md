@@ -33,4 +33,4 @@ Start here, then load the narrower doc that matches your task.
 - Preserve history and never force-push.
 - Check `runtime_capabilities` before claiming orchestration is available.
 - On the plugin path, `start_agent_task` now requires an explicit task `intent` (`proposal` or `implementation`).
-- A running delegated `implementation` task on the plugin path blocks continuity-style local fallback until the task leaves `running`.
+- A `requested` implementation task on the plugin path does not block continuity-style local fallback; only a truly `running` implementation task does.

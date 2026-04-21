@@ -37,7 +37,7 @@ describe("OrchestrationResultStore", () => {
     workDir = await mkdtemp(path.join(tmpdir(), "orch-result-"));
     const store = new OrchestrationResultStore(workDir);
 
-    await store.writeRunning({
+    await store.writeRequested({
       requestId: VALID_WORKFLOW_REQUEST_ID,
       source: "mcp",
       spec: minimalParallelSpec,
@@ -49,6 +49,7 @@ describe("OrchestrationResultStore", () => {
     expect(readBack?.metadata.jobs).toEqual([
       {
         taskId: "g1",
+        resolvedExecutor: "gemini",
         workerRuntime: "shell",
         configuredRetries: 2,
         configuredRetryDelayMs: 500,
@@ -73,7 +74,7 @@ describe("OrchestrationResultStore", () => {
     const store = new OrchestrationResultStore(workDir);
 
     await expect(
-      store.writeRunning({
+      store.writeRequested({
         requestId: "evil/../x",
         source: "mcp",
         spec: minimalParallelSpec,

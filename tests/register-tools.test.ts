@@ -56,14 +56,14 @@ vi.mock("../src/features/orchestration/observability/orchestration-trace.js", as
 });
 
 const orchestrationResultStoreMock = {
-  writeRunning: vi.fn(async ({ requestId, source, spec }) => ({
+  writeRequested: vi.fn(async ({ requestId, source, spec }) => ({
     requestId,
     source,
     metadata: {
       mode: spec.mode,
       taskIds: [],
     },
-    status: "running",
+    status: "requested",
     createdAt: "2026-04-05T00:00:00.000Z",
     updatedAt: "2026-04-05T00:00:00.000Z",
   })),
@@ -224,7 +224,7 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       surface: "worker-lane",
       worker: "gemini",
       route: {
@@ -380,7 +380,7 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       surface: "agent-category",
       category: "quick",
       intent: "implementation",
@@ -412,7 +412,7 @@ describe("getRegisteredOrchestrationTools", () => {
 
     await Promise.resolve();
     expect(orchestrationResultStoreMock.writeCompleted).toHaveBeenCalledTimes(1);
-    expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledWith(
+    expect(orchestrationResultStoreMock.writeRequested).toHaveBeenCalledWith(
       expect.objectContaining({
         spec: expect.objectContaining({
           jobs: [
@@ -468,7 +468,7 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       surface: "agent-category",
       category: "interactive-gemini",
       intent: "proposal",
@@ -570,6 +570,77 @@ describe("getRegisteredOrchestrationTools", () => {
     });
   });
 
+  it("accepts executor-first start_agent_task calls without a category", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    const result = await tool?.execute({
+      prompt: "Use Gemini for this task.",
+      intent: "implementation",
+      executor: "gemini",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls.at(-1)?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "gemini",
+          requestedExecutor: "gemini",
+          routeReason: "explicit_executor_override",
+          input: {
+            model: "gemini-3.1-pro-preview",
+          },
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      status: "requested",
+      executor: "gemini",
+      route: {
+        workerKind: "gemini",
+        model: "gemini-3.1-pro-preview",
+        reason: "explicit_executor_override",
+        requestedExecutor: "gemini",
+      },
+    });
+    expect(result).not.toHaveProperty("category");
+  });
+
+  it("uses the inferred model executor to derive the task id family", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    await tool?.execute({
+      prompt: "Use a Gemini model for this task.",
+      intent: "implementation",
+      model: "gemini-3.1-pro-preview",
+    });
+
+    expect(vi.mocked(runOrchestrationWorkflow).mock.calls.at(-1)?.[0]).toMatchObject({
+      jobs: [
+        {
+          kind: "gemini",
+          input: {
+            taskId: expect.stringMatching(/^gemini_/),
+            model: "gemini-3.1-pro-preview",
+          },
+          routeReason: "explicit_model_override",
+        },
+      ],
+    });
+  });
+
+  it("rejects start_agent_task when category, executor, and model are all missing", async () => {
+    const tools = getRegisteredOrchestrationTools();
+    const tool = tools.find((item) => item.name === "start_agent_task");
+
+    await expect(
+      tool?.execute({
+        prompt: "Do the task.",
+        intent: "implementation",
+      }),
+    ).rejects.toThrow(/at least one of category, executor, or model/i);
+  });
+
   it("fails closed on incompatible explicit executor and model", async () => {
     const tools = getRegisteredOrchestrationTools();
     const tool = tools.find((item) => item.name === "start_agent_task");
@@ -635,10 +706,10 @@ describe("getRegisteredOrchestrationTools", () => {
       traceRequestId: expect.stringMatching(/^workflow_/),
       traceStore: orchestrationTraceStoreMock,
     });
-    expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
+    expect(orchestrationResultStoreMock.writeRequested).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       executionMode: "async",
       waitMode: "explicit_async",
       pollWith: "get_orchestration_result",
@@ -737,7 +808,7 @@ describe("getRegisteredOrchestrationTools", () => {
 
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       executionMode: "async",
       waitMode: "explicit_async",
       pollWith: "get_orchestration_result",
@@ -751,14 +822,14 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.",
+      "Prefer background polling in production hosts. Treat status=requested as accepted async work, not as proof that executor work has already started. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still pending or a bounded wait timed out.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow request was accepted because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat requested as pending async work, not proof of executor start. Use wait_for_orchestration_result only for short blocking checks.",
     );
     expect(result).not.toHaveProperty("autoAsync");
-    expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
+    expect(orchestrationResultStoreMock.writeRequested).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
 
     resolveRun?.({
@@ -813,7 +884,7 @@ describe("getRegisteredOrchestrationTools", () => {
 
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       executionMode: "async",
       waitMode: "auto_async",
       pollWith: "get_orchestration_result",
@@ -828,13 +899,13 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.",
+      "Prefer background polling in production hosts. Treat status=requested as accepted async work, not as proof that executor work has already started. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still pending or a bounded wait timed out.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.",
+      "Workflow request was accepted because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat requested as pending async work, not proof of executor start. Use wait_for_orchestration_result only for short blocking checks.",
     );
-    expect(orchestrationResultStoreMock.writeRunning).toHaveBeenCalledTimes(1);
+    expect(orchestrationResultStoreMock.writeRequested).toHaveBeenCalledTimes(1);
     expect(orchestrationResultStoreMock.writeCompleted).not.toHaveBeenCalled();
 
     resolveRun?.({
@@ -952,7 +1023,7 @@ describe("getRegisteredOrchestrationTools", () => {
 
     expect(result).toMatchObject({
       requestId: expect.stringMatching(/^workflow_/),
-      status: "running",
+      status: "requested",
       autoAsync: true,
     });
 
@@ -993,7 +1064,7 @@ describe("getRegisteredOrchestrationTools", () => {
         taskIds: ["cursor_123"],
         jobs: [{ taskId: "cursor_123", routeReason: "default_quick_lane" }],
       },
-      status: "running",
+      status: "requested",
       createdAt: "2026-04-05T00:00:00.000Z",
       updatedAt: "2026-04-05T00:00:00.000Z",
     });
@@ -1008,7 +1079,7 @@ describe("getRegisteredOrchestrationTools", () => {
     expect(orchestrationResultStoreMock.read).toHaveBeenCalledWith(requestId);
     expect(result).toMatchObject({
       requestId,
-      status: "running",
+      status: "requested",
       executionMode: "async",
       pollWith: "get_orchestration_result",
       superviseWith: "supervise_orchestration_result",
@@ -1026,11 +1097,11 @@ describe("getRegisteredOrchestrationTools", () => {
     });
     expect(result).toHaveProperty(
       "warning",
-      "status=running means the workflow is still in progress in background, not stale or failed. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution while this requestId is still running.",
+      "status=requested means the workflow request was accepted and is still pending in background. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution just because the workflow has not reached terminal yet.",
     );
     expect(result).toHaveProperty(
       "message",
-      "Workflow result is still running in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat running as healthy in-progress state and do not switch to sync/local execution just because the workflow has not finished yet or a bounded wait timed out.",
+      "Workflow request is still pending in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat requested as accepted async work, not proof that executor work has already started.",
     );
   });
 

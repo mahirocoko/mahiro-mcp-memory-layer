@@ -36,12 +36,13 @@ Important plugin-path rules:
 
 - `start_agent_task` requires explicit `intent`: `proposal` or `implementation`
 - `memory_context.session.operator.tasks[]` now tracks `intent` as well as task status
-- a running delegated `implementation` task blocks continuity-style preflight on the plugin path
+- a `requested` implementation task does not block continuity-style preflight on the plugin path
 - `get_orchestration_result` updates tracked task state when it sees a terminal workflow result
 
 Current tracked task outcomes on the plugin path:
 
-- `running` -> still delegated and in progress
+- `requested` -> async work was accepted but executor-start evidence is not yet claimed
+- `running` -> executor-running evidence exists and the task is in progress
 - `completed` workflow result -> plugin task becomes `awaiting_verification`
 - `failed | timed_out | step_failed | runner_failed` workflow result -> plugin task becomes `needs_attention`
 
@@ -70,23 +71,24 @@ What the plugin path does **not** currently guarantee:
 
 ## `start_agent_task`
 
-Use this on the plugin path when you want category-routed delegated work.
+Use this on the plugin path when you want Sisyphus to keep conversation ownership while the facade drives Gemini or Cursor as the executor.
 
 Current required shape:
 
 ```json
 {
-  "category": "visual-engineering",
   "prompt": "Implement the requested frontend change.",
-  "intent": "implementation"
+  "intent": "implementation",
+  "executor": "gemini"
 }
 ```
 
 Notes:
 
 - `intent` is now part of the control-plane contract, not just prompt wording
-- choose `proposal` when the delegated task is only for direction, planning, or recommendations
-- choose `implementation` when the delegated task is expected to own the code change
+- choose `proposal` when the task is only for direction, planning, or recommendations
+- choose `implementation` when the task is expected to produce code or other concrete changes
+- `category` is optional routing metadata; prefer `executor` when the caller already knows which runtime to use
 
 ## `get_orchestration_result`
 
@@ -94,6 +96,7 @@ Use this to read the latest stored workflow record.
 
 On the plugin path it also keeps the tracked task ledger in sync:
 
+- healthy `requested` stays `requested` until the facade has stronger execution evidence or a terminal result
 - healthy `running` stays `running`
 - terminal success-like completion becomes `awaiting_verification`
 - terminal failure-like completion becomes `needs_attention`
@@ -109,7 +112,7 @@ For orchestration debugging, inspect:
 - each task’s `intent`
 - each task’s `status`
 
-If a delegated `implementation` task is still `running`, continuity-style preflight suppression on the plugin path is expected.
+If an `implementation` task is still truly `running`, continuity-style preflight suppression on the plugin path is expected. A merely `requested` task should not suppress preflight.
 
 ## Wider MCP orchestration surface
 
@@ -126,7 +129,7 @@ Those belong to the standalone/MCP-capable runtime story, not to the guaranteed 
 
 ## Practical safety reminders
 
-- Treat `running` as healthy in-progress state.
+- Treat `requested` as accepted async work, not proof that executor work has already started.
 - Do not fall back to local execution just because async work is still running.
 - On the plugin path, treat `intent` as mandatory truth for task shape.
 - Use `memory_context` before guessing what the plugin operator loop thinks is happening.

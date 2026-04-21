@@ -645,7 +645,7 @@ describe("product memory OpenCode plugin contract", () => {
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_intent",
-        status: "running",
+        status: "requested",
       },
       getOrchestrationResult: vi.fn().mockResolvedValue({
         requestId: "workflow_intent",
@@ -678,10 +678,10 @@ describe("product memory OpenCode plugin contract", () => {
     expect(startResult).toMatchObject({
       requestId: "workflow_intent",
       taskId: "task_intent",
-      status: "running",
+      status: "requested",
     });
 
-    const whileRunning = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+    const whileRequested = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
         sessionID: "session-intent",
@@ -690,7 +690,7 @@ describe("product memory OpenCode plugin contract", () => {
       },
     ));
 
-    expect(whileRunning).toMatchObject({
+    expect(whileRequested).toMatchObject({
       status: "ready",
       session: {
         operator: {
@@ -701,7 +701,7 @@ describe("product memory OpenCode plugin contract", () => {
               requestId: "workflow_intent",
               category: "visual-engineering",
               intent: "implementation",
-              status: "running",
+              status: "requested",
             },
           ],
         },
@@ -743,7 +743,7 @@ describe("product memory OpenCode plugin contract", () => {
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_executor",
-        status: "running",
+        status: "requested",
         route: {
           workerKind: "gemini",
           model: "gemini-3.1-pro-preview",
@@ -790,7 +790,7 @@ describe("product memory OpenCode plugin contract", () => {
               requestedExecutor: "gemini",
               resolvedExecutor: "gemini",
               resolvedModel: "gemini-3.1-pro-preview",
-              status: "running",
+              status: "requested",
             },
           ],
         },
@@ -810,7 +810,7 @@ describe("product memory OpenCode plugin contract", () => {
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_failed",
-        status: "running",
+        status: "requested",
       },
       getOrchestrationResult,
     });
@@ -891,7 +891,7 @@ describe("product memory OpenCode plugin contract", () => {
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_approval",
-        status: "running",
+        status: "requested",
       },
       getOrchestrationResult,
     });
@@ -960,16 +960,16 @@ describe("product memory OpenCode plugin contract", () => {
     expectNoSelfSpawn(harness);
   });
 
-  it("blocks continuity preflight while a delegated implementation task is still running", async () => {
+  it("does not block continuity preflight for requested implementation tasks", async () => {
     vi.useFakeTimers();
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_blocked",
-        status: "running",
+        status: "requested",
       },
       getOrchestrationResult: vi.fn().mockResolvedValue({
         requestId: "workflow_blocked",
-        status: "running",
+        status: "requested",
         metadata: {
           jobs: [],
         },
@@ -1004,21 +1004,21 @@ describe("product memory OpenCode plugin contract", () => {
     await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent("session-blocked") });
     await flushMicrotasks();
 
-    expect(harness.memory.prepareTurnMemory).not.toHaveBeenCalled();
-    expect(harness.memory.prepareHostTurnMemory).not.toHaveBeenCalled();
+    expect(harness.memory.prepareTurnMemory).toHaveBeenCalledTimes(1);
+    expect(harness.memory.prepareHostTurnMemory).toHaveBeenCalledTimes(1);
     expectNoSelfSpawn(harness);
   });
 
-  it("does not block continuity preflight for running proposal tasks", async () => {
+  it("does not block continuity preflight for requested proposal tasks", async () => {
     vi.useFakeTimers();
     mockPluginOrchestrationTools({
       startAgentTaskResult: {
         requestId: "workflow_proposal",
-        status: "running",
+        status: "requested",
       },
       getOrchestrationResult: vi.fn().mockResolvedValue({
         requestId: "workflow_proposal",
-        status: "running",
+        status: "requested",
         metadata: {
           jobs: [],
         },

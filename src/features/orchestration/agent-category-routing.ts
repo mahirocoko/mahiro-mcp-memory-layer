@@ -42,7 +42,7 @@ const workerDefaults: Record<WorkerKind, RouteDefaults> = {
 };
 
 export interface AgentTaskRoute {
-  readonly category: AgentTaskCategory;
+  readonly category?: AgentTaskCategory;
   readonly requestedExecutor?: WorkerKind;
   readonly workerKind: WorkerKind;
   readonly model: string;
@@ -86,17 +86,27 @@ function classifyModelExecutor(model: string): WorkerKind | undefined {
 }
 
 export function resolveAgentTaskRoute(input: {
-  readonly category: AgentTaskCategory;
+  readonly category?: AgentTaskCategory;
   readonly executor?: WorkerKind;
   readonly model?: string;
   readonly workerRuntime?: WorkerRuntimeKind;
   readonly routeOverrides?: AgentTaskRouteOverrides;
   readonly runtimeModelInventory?: RuntimeModelInventorySnapshot;
 }): AgentTaskRoute {
-  const defaults = routeDefaults[input.category];
-  const effectiveWorkerKind = input.executor ?? defaults.workerKind;
+  if (!input.category && !input.executor && !input.model) {
+    throw new Error("resolveAgentTaskRoute requires at least one of category, executor, or model.");
+  }
+
+  const inferredExecutor = input.model ? classifyModelExecutor(input.model) : undefined;
+  const effectiveWorkerKind = input.executor ?? inferredExecutor ?? (input.category ? routeDefaults[input.category].workerKind : undefined);
+
+  if (!effectiveWorkerKind) {
+    throw new Error("Unable to resolve worker executor from start_agent_task input.");
+  }
+
+  const defaults = input.category ? routeDefaults[input.category] : workerDefaults[effectiveWorkerKind];
   const effectiveDefaults = input.executor ? workerDefaults[input.executor] : defaults;
-  const override = input.routeOverrides?.[input.category];
+  const override = input.category ? input.routeOverrides?.[input.category] : undefined;
 
   if (input.executor && input.model) {
     const explicitModelExecutor = classifyModelExecutor(input.model);
@@ -108,7 +118,7 @@ export function resolveAgentTaskRoute(input: {
 
   if (input.model) {
     return {
-      category: input.category,
+      ...(input.category ? { category: input.category } : {}),
       ...(input.executor ? { requestedExecutor: input.executor } : {}),
       workerKind: effectiveWorkerKind,
       model: input.model,
@@ -119,7 +129,7 @@ export function resolveAgentTaskRoute(input: {
 
   if (!input.executor && override?.model) {
     return {
-      category: input.category,
+      ...(input.category ? { category: input.category } : {}),
       ...(input.executor ? { requestedExecutor: input.executor } : {}),
       workerKind: defaults.workerKind,
       model: override.model,
@@ -130,19 +140,19 @@ export function resolveAgentTaskRoute(input: {
 
   const selected = pickAvailableModel(effectiveDefaults.primaryModel, effectiveDefaults.fallbacks, input.runtimeModelInventory);
   return {
-    category: input.category,
+    ...(input.category ? { category: input.category } : {}),
     ...(input.executor ? { requestedExecutor: input.executor } : {}),
     workerKind: effectiveWorkerKind,
     model: selected.model,
     reason: input.executor
       ? (selected.fallback ? "explicit_executor_runtime_fallback" : "explicit_executor_override")
-      : (selected.fallback ? "runtime_fallback_missing_primary_model" : `default_${input.category}_lane`),
+      : (selected.fallback ? "runtime_fallback_missing_primary_model" : (input.category ? `default_${input.category}_lane` : "default_executor_lane")),
     ...(input.workerRuntime ? { workerRuntime: input.workerRuntime } : {}),
   };
 }
 
 export function buildAgentTaskWorkerJob(input: {
-  readonly category: AgentTaskCategory;
+  readonly category?: AgentTaskCategory;
   readonly taskId: string;
   readonly prompt: string;
   readonly executor?: WorkerKind;

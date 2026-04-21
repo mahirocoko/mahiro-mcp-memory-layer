@@ -151,7 +151,11 @@ export function createOpenCodePluginRuntime(
 
   const resolveTrackedTaskStatus = (
     status: unknown,
-  ): "running" | "awaiting_verification" | "needs_attention" | undefined => {
+  ): "requested" | "running" | "awaiting_verification" | "needs_attention" | undefined => {
+    if (status === "requested") {
+      return "requested";
+    }
+
     if (status === "running") {
       return "running";
     }
@@ -177,7 +181,7 @@ export function createOpenCodePluginRuntime(
     requestId: string,
     result: unknown,
   ): {
-    taskStatus?: "running" | "awaiting_verification" | "needs_attention";
+    taskStatus?: "requested" | "running" | "awaiting_verification" | "needs_attention";
     subagentIds: string[];
     changed: boolean;
     rawStatus?: string;
@@ -249,7 +253,7 @@ export function createOpenCodePluginRuntime(
     const tick = async (): Promise<void> => {
       const sessionState = runtimeState.sessions.get(sessionId);
       const taskEntry = sessionState?.operator?.tasks.find((task) => task.taskId === taskId);
-      if (!sessionState || !taskEntry || taskEntry.status !== "running") {
+      if (!sessionState || !taskEntry || (taskEntry.status !== "requested" && taskEntry.status !== "running")) {
         return;
       }
 
@@ -261,7 +265,7 @@ export function createOpenCodePluginRuntime(
 
       const synced = syncTrackedTaskFromResult(sessionId, requestId, result);
 
-      if (result.status === "running") {
+      if (result.status === "requested" || result.status === "running") {
         setTimeout(() => void tick(), pollIntervalMs);
         return;
       }
@@ -756,7 +760,9 @@ export function createOpenCodePluginRuntime(
       }
 
       const taskId = `task_${requestId.replace(/^workflow_/, "")}`;
-      const category = typeof args.category === "string" ? args.category : "task";
+      const category = typeof args.category === "string"
+        ? args.category
+        : (typeof args.executor === "string" ? `${args.executor}-task` : "task");
       const intent = resolveDelegatedTaskIntent(args.intent);
       const requestedExecutor = args.executor === "gemini" || args.executor === "cursor"
         ? args.executor
@@ -780,13 +786,13 @@ export function createOpenCodePluginRuntime(
             ...(requestedExecutor ? { requestedExecutor } : {}),
             ...(resolvedExecutor ? { resolvedExecutor } : {}),
             ...(resolvedModel ? { resolvedModel } : {}),
-            status: "running",
+            status: "requested",
             updatedAt: new Date().toISOString(),
           },
         ];
       }
 
-      await notifySession(sessionId, `Task — ${category} started in background. requestId=${requestId} taskId=${taskId}`);
+      await notifySession(sessionId, `Task — ${category} request accepted in background. requestId=${requestId} taskId=${taskId}`);
       watchTaskForSession(sessionId, taskId, requestId, category);
 
       return {

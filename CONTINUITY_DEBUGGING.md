@@ -26,7 +26,7 @@ For orchestration continuity bugs, pay special attention to each tracked task’
 - `intent`
 - `status`
 
-If a delegated `implementation` task is still `running`, suppressed continuity-style preflight on the plugin path is expected.
+If an `implementation` task is still truly `running`, suppressed continuity-style preflight on the plugin path is expected. A merely `requested` task should not suppress preflight.
 
 ## What to inspect in `inspect_memory_retrieval`
 
@@ -39,4 +39,4 @@ Use it to answer:
 
 ## Routing rule
 
-When the issue is “why didn’t the session continue the way I expected?”, do not jump straight to recap or broad search. First determine whether the plugin operator loop was deliberately preserving delegated ownership because a running implementation task was still active.
+When the issue is “why didn’t the session continue the way I expected?”, do not jump straight to recap or broad search. First determine whether the plugin operator loop was deliberately preserving the executor lane because a truly running implementation task was still active.

@@ -7,11 +7,11 @@ import type { OrchestrationRunResult } from "../run-orchestration-workflow.js";
 export class OrchestrationLifecycle {
   public constructor(
     private readonly traceStore: Pick<OrchestrationTraceStore, "append">,
-    private readonly resultStore: Pick<OrchestrationResultStore, "writeRunning" | "writeCompleted" | "writeRunnerFailed">,
+    private readonly resultStore: Pick<OrchestrationResultStore, "writeRequested" | "writeCompleted" | "writeRunnerFailed">,
   ) {}
 
-  public async markRunning(input: { requestId: string; source: "cli" | "mcp"; spec: OrchestrateWorkflowSpec }): Promise<void> {
-    await this.resultStore.writeRunning(input);
+  public async markRequested(input: { requestId: string; source: "cli" | "mcp"; spec: OrchestrateWorkflowSpec }): Promise<void> {
+    await this.resultStore.writeRequested(input);
   }
 
   public async markCompleted(input: { requestId: string; source: "cli" | "mcp"; spec: OrchestrateWorkflowSpec; result: OrchestrationRunResult }): Promise<void> {

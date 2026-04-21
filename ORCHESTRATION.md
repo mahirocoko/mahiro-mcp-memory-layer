@@ -9,7 +9,7 @@ Use `MCP_USAGE.md` for the concrete runtime/tool contract. This file is about ho
 - You are the control plane first.
 - Delegate execution before broad local implementation work.
 - Keep verification and final judgment local.
-- Do not let the orchestrator and delegated worker own the same implementation task at the same time.
+- Keep conversation ownership local even when a worker executor is selected.
 
 ## Strict `orch:` posture
 
@@ -38,18 +38,19 @@ On the plugin path, the thin operator loop currently provides:
 
 Current plugin-path task status mapping:
 
-- `running` = delegated work still owns the task
+- `requested` = async work was accepted but executor-running evidence is not yet claimed
+- `running` = executor-running evidence exists and the task is in progress
 - `awaiting_verification` = the worker reached terminal success-like completion and the orchestrator must verify
 - `needs_attention` = the worker reached terminal failure-like completion or otherwise needs intervention
 
 ## Hard control-plane rule
 
-When a tracked delegated task has:
+When a tracked implementation task has:
 
 - `intent = implementation`
 - `status = running`
 
-the plugin path must preserve delegated ownership.
+the plugin path must preserve executor ownership for that running implementation lane.
 
 Practical consequence:
 
@@ -61,12 +62,12 @@ This guard does **not** apply to `proposal` tasks.
 
 ## Task-shape contract
 
-Category is routing metadata. It is not enough by itself to describe deliverable shape.
+Category is optional routing metadata. It is not enough by itself to describe deliverable shape.
 
 Use:
 
 - `intent: "proposal"` for direction, ideas, planning, or recommendations
-- `intent: "implementation"` for delegated code ownership
+- `intent: "implementation"` for concrete code or artifact production while the conversation owner remains local
 
 Do not treat a proposal task as partial completion of an implementation request.
 
@@ -105,4 +106,4 @@ Use `oh-my-openagent` as the architecture reference for separation of concerns:
 - reminder bridge
 - host adapter
 
-The key local rule copied from that posture is simple: a healthy delegated implementation task should keep ownership until it reaches a real terminal state.
+The key local rule copied from that posture is simple: a truly running implementation executor should keep its lane until it reaches a real terminal state.

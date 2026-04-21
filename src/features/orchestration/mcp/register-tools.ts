@@ -35,18 +35,18 @@ function createSubagentManager() {
   );
 }
 
-const asyncWarning = "Prefer background polling in production hosts. Treat status=running as healthy in-progress state, not as failure or staleness. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still running or a bounded wait timed out.";
+const asyncWarning = "Prefer background polling in production hosts. Treat status=requested as accepted async work, not as proof that executor work has already started. Use supervise_orchestration_result to start repo-owned supervision, or a host-side poller built on get_orchestration_result. wait_for_orchestration_result is only for short blocking checks because MCP or host request timeouts may fire before the workflow finishes; do not fall back to sync/local execution just because a workflow is still pending or a bounded wait timed out.";
 
 function startMessage(reason: "false" | "omitted"): string {
   return reason === "false"
-    ? "Workflow started in background because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks."
-    : "Workflow started in background because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat running as in-progress state and keep polling; do not switch to sync/local execution just because the workflow has not reached terminal yet. Use wait_for_orchestration_result only for short blocking checks.";
+    ? "Workflow request was accepted because waitForCompletion was false. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat requested as pending async work, not proof of executor start. Use wait_for_orchestration_result only for short blocking checks."
+    : "Workflow request was accepted because waitForCompletion was omitted. Hand this requestId to supervise_orchestration_result to start repo-owned supervision, or to a host-side poller that calls get_orchestration_result until terminal. Treat requested as pending async work, not proof of executor start. Use wait_for_orchestration_result only for short blocking checks.";
 }
 
 function startAsyncRun(spec: OrchestrateWorkflowSpec, source: "mcp" | "cli") {
   const { lifecycle, traceStore } = createStores();
   const requestId = newId("workflow");
-  void lifecycle.markRunning({ requestId, source, spec });
+  void lifecycle.markRequested({ requestId, source, spec });
   const promise = runOrchestrationWorkflow(hydrateWorkflowRuntimes(spec), {
     traceRequestId: requestId,
     traceSource: source,
@@ -108,10 +108,10 @@ function routeForWorker(worker: "gemini" | "cursor", workerRuntime?: WorkerRunti
   };
 }
 
-function createRunningEnvelope(requestId: string, waitMode: "explicit_async" | "auto_async", extra: Record<string, unknown>) {
+function createRequestedEnvelope(requestId: string, waitMode: "explicit_async" | "auto_async", extra: Record<string, unknown>) {
   return {
     requestId,
-    status: "running",
+    status: "requested",
     executionMode: "async",
     waitMode,
     pollWith: "get_orchestration_result",
@@ -153,7 +153,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
     allowedMcpServerNames: z.union([z.array(z.string()), z.literal("none")]).optional(),
   });
   const startAgentSchema = z.object({
-    category: z.string().min(1),
+    category: z.string().min(1).optional(),
     prompt: z.string().min(1),
     intent: z.enum(["proposal", "implementation"]),
     executor: z.enum(["gemini", "cursor"]).optional(),
@@ -165,6 +165,14 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
     taskKind: z.string().optional(),
     approvalMode: z.enum(["default", "auto_edit", "yolo", "plan"]).optional(),
     allowedMcpServerNames: z.union([z.array(z.string()), z.literal("none")]).optional(),
+  }).superRefine((value, ctx) => {
+    if (!value.category && !value.executor && !value.model) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "start_agent_task requires at least one of category, executor, or model.",
+        path: ["category"],
+      });
+    }
   });
   return [
     {
@@ -185,7 +193,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
           throw new Error("Workflow spec must include at least one job.");
         }
         const requestId = startAsyncRun(spec, "mcp");
-        return createRunningEnvelope(requestId, parsedInput.waitForCompletion === false ? "explicit_async" : "auto_async", {});
+        return createRequestedEnvelope(requestId, parsedInput.waitForCompletion === false ? "explicit_async" : "auto_async", {});
       },
     },
     {
@@ -241,7 +249,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
         const requestId = startAsyncRun(spec, "mcp");
         return {
           requestId,
-          status: "running",
+          status: "requested",
           surface: "worker-lane",
           worker,
           route,
@@ -255,9 +263,9 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
     },
     {
       name: "start_agent_task",
-      description: "Start one async category-routed orchestration task through the thin public facade.",
+      description: "Start one async executor-routed orchestration task through the thin public facade.",
       inputSchema: {
-        category: z.string().min(1),
+        category: z.string().min(1).optional(),
         prompt: z.string().min(1),
         intent: z.enum(["proposal", "implementation"]),
         executor: z.enum(["gemini", "cursor"]).optional(),
@@ -273,9 +281,16 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
       execute: async (input) => {
         const parsedInput = startAgentSchema.parse(input);
         const runtimeModelInventory = await loadRuntimeModelInventory();
+        const route = resolveAgentTaskRoute({
+          category: parsedInput.category as AgentTaskCategory | undefined,
+          executor: parsedInput.executor,
+          model: parsedInput.model,
+          workerRuntime: parsedInput.workerRuntime as WorkerRuntimeKind | undefined,
+          runtimeModelInventory,
+        });
         const job = buildAgentTaskWorkerJob({
-          category: parsedInput.category as AgentTaskCategory,
-          taskId: newId(parsedInput.category === "interactive-gemini" ? "gemini" : "cursor"),
+          category: parsedInput.category as AgentTaskCategory | undefined,
+          taskId: newId(route.workerKind === "gemini" ? "gemini" : "cursor"),
           prompt: parsedInput.prompt,
           intent: parsedInput.intent as DelegatedTaskIntent,
           executor: parsedInput.executor,
@@ -293,19 +308,13 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
         const requestId = startAsyncRun(spec, "mcp");
         return {
           requestId,
-          status: "running",
+          status: "requested",
           surface: "agent-category",
-          category: parsedInput.category,
+          ...(parsedInput.category ? { category: parsedInput.category } : {}),
           intent: parsedInput.intent,
           ...(parsedInput.executor ? { executor: parsedInput.executor } : {}),
           route: {
-            ...resolveAgentTaskRoute({
-            category: parsedInput.category as AgentTaskCategory,
-            executor: parsedInput.executor,
-            model: parsedInput.model,
-            workerRuntime: parsedInput.workerRuntime as WorkerRuntimeKind | undefined,
-            runtimeModelInventory,
-            }),
+            ...route,
             ...(parsedInput.category === "interactive-gemini" && parsedInput.workerRuntime === undefined ? { workerRuntime: "shell" } : {}),
           },
           pollWith: "get_orchestration_result",
@@ -336,7 +345,7 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
               jobsWithReasons: routeReasons.length,
             }
           : undefined;
-        if (record.status === "running") {
+        if (record.status === "requested") {
           return {
             ...record,
             executionMode: "async",
@@ -347,8 +356,8 @@ export function getRegisteredOrchestrationTools(): RegisteredTool[] {
             recommendedFollowUp: "supervise_orchestration_result",
             nextArgs: { requestId },
             ...(routeSummary ? { routeSummary } : {}),
-            warning: "status=running means the workflow is still in progress in background, not stale or failed. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution while this requestId is still running.",
-            message: "Workflow result is still running in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat running as healthy in-progress state and do not switch to sync/local execution just because the workflow has not finished yet or a bounded wait timed out.",
+            warning: "status=requested means the workflow request was accepted and is still pending in background. Keep polling get_orchestration_result with this requestId or start repo-owned supervision with supervise_orchestration_result. wait_for_orchestration_result is only a short blocking helper. Do not fall back to waitForCompletion: true, sync worker tools, or local CLI execution just because the workflow has not reached terminal yet.",
+            message: "Workflow request is still pending in background. Prefer supervise_orchestration_result for repo-owned polling, or keep polling get_orchestration_result with this requestId until terminal. Treat requested as accepted async work, not proof that executor work has already started.",
           };
         }
         return {

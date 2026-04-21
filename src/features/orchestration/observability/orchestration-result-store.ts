@@ -28,7 +28,7 @@ export interface OrchestrationResultRecord {
       readonly configuredRetryDelayMs?: number;
     }>;
   };
-  readonly status: "running" | "completed" | "failed" | "timed_out" | "step_failed" | "runner_failed";
+  readonly status: "requested" | "completed" | "failed" | "timed_out" | "step_failed" | "runner_failed";
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly result?: OrchestrationRunResult;
@@ -96,7 +96,7 @@ export class OrchestrationResultStore {
     return record;
   }
 
-  public async writeRunning(input: {
+  public async writeRequested(input: {
     readonly requestId: string;
     readonly source: "cli" | "mcp";
     readonly spec: OrchestrateWorkflowSpec;
@@ -107,7 +107,7 @@ export class OrchestrationResultStore {
       requestId: input.requestId,
       source: input.source,
       metadata: buildMetadata(input.spec),
-      status: "running",
+      status: "requested",
       createdAt: now,
       updatedAt: now,
     });
