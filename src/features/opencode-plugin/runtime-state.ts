@@ -74,7 +74,7 @@ export interface OpenCodePluginSessionState {
       resolvedExecutor?: "gemini" | "cursor";
       resolvedModel?: string;
       status: "requested" | "running" | "awaiting_verification" | "needs_attention";
-      attentionReason?: "approval_required";
+      attentionReason?: "approval_required" | "unhealthy_session";
       approvalPrompt?: string;
       subagentIds?: string[];
       updatedAt: string;

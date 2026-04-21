@@ -30,28 +30,6 @@ function isValidModel(model: string): boolean {
 }
 
 function parseGeminiResult(input: GeminiWorkerInput, output: GeminiCommandRunResult): GeminiWorkerRunResult {
-  if (output.timedOut) {
-    return {
-      status: "timeout",
-      requestedModel: input.model,
-      durationMs: output.durationMs,
-      startedAt: output.startedAt,
-      finishedAt: output.finishedAt,
-      error: output.stderr || "Gemini command timed out.",
-    };
-  }
-
-  if ((output.exitCode ?? 1) !== 0) {
-    return {
-      status: "failed",
-      requestedModel: input.model,
-      durationMs: output.durationMs,
-      startedAt: output.startedAt,
-      finishedAt: output.finishedAt,
-      error: output.stderr || output.stdout || `Gemini command exited with code ${output.exitCode ?? "unknown"}.`,
-    };
-  }
-
   let parsed: Record<string, unknown> | undefined;
   try {
     parsed = JSON.parse(output.stdout) as Record<string, unknown>;
@@ -64,17 +42,50 @@ function parseGeminiResult(input: GeminiWorkerInput, output: GeminiCommandRunRes
     ? String((stats as Record<string, unknown>).model)
     : undefined;
   const response = typeof parsed?.response === "string" ? parsed.response : output.stdout.trim();
+  const sharedMetadata = {
+    ...(reportedModel ? { reportedModel } : {}),
+    ...(typeof parsed?.subagentId === "string" ? { subagentId: parsed.subagentId } : {}),
+    ...(typeof parsed?.sessionName === "string" ? { sessionName: parsed.sessionName } : {}),
+    ...(typeof parsed?.paneId === "string" ? { paneId: parsed.paneId } : {}),
+    ...(typeof parsed?.paneState === "string" ? { paneState: parsed.paneState as GeminiWorkerRunResult["paneState"] } : {}),
+    ...(typeof parsed?.paneStateReason === "string" ? { paneStateReason: parsed.paneStateReason } : {}),
+    ...(typeof parsed?.lastVisiblePaneExcerpt === "string" ? { lastVisiblePaneExcerpt: parsed.lastVisiblePaneExcerpt } : {}),
+    ...(typeof parsed?.promptSubmissionAttempted === "boolean" ? { promptSubmissionAttempted: parsed.promptSubmissionAttempted } : {}),
+  };
+
+  if (output.timedOut) {
+    return {
+      status: "timeout",
+      requestedModel: input.model,
+      ...sharedMetadata,
+      durationMs: output.durationMs,
+      startedAt: output.startedAt,
+      finishedAt: output.finishedAt,
+      error: typeof parsed?.paneStateReason === "string"
+        ? `Gemini command timed out after pane state '${parsed.paneStateReason}'.`
+        : (output.stderr || "Gemini command timed out."),
+    };
+  }
+
+  if ((output.exitCode ?? 1) !== 0) {
+    return {
+      status: "failed",
+      requestedModel: input.model,
+      ...sharedMetadata,
+      durationMs: output.durationMs,
+      startedAt: output.startedAt,
+      finishedAt: output.finishedAt,
+      error: output.stderr || output.stdout || `Gemini command exited with code ${output.exitCode ?? "unknown"}.`,
+    };
+  }
 
   if (parsed?.approvalRequired === true) {
     return {
       status: "approval_required",
       requestedModel: input.model,
-      reportedModel,
+      ...sharedMetadata,
       response,
       ...(typeof parsed?.approvalPrompt === "string" ? { approvalPrompt: parsed.approvalPrompt } : {}),
-      ...(typeof parsed?.subagentId === "string" ? { subagentId: parsed.subagentId } : {}),
-      ...(typeof parsed?.sessionName === "string" ? { sessionName: parsed.sessionName } : {}),
-      ...(typeof parsed?.paneId === "string" ? { paneId: parsed.paneId } : {}),
       durationMs: output.durationMs,
       startedAt: output.startedAt,
       finishedAt: output.finishedAt,
@@ -84,11 +95,8 @@ function parseGeminiResult(input: GeminiWorkerInput, output: GeminiCommandRunRes
   return {
     status: "completed",
     requestedModel: input.model,
-    reportedModel,
+    ...sharedMetadata,
     response,
-    ...(typeof parsed?.subagentId === "string" ? { subagentId: parsed.subagentId } : {}),
-    ...(typeof parsed?.sessionName === "string" ? { sessionName: parsed.sessionName } : {}),
-    ...(typeof parsed?.paneId === "string" ? { paneId: parsed.paneId } : {}),
     durationMs: output.durationMs,
     startedAt: output.startedAt,
     finishedAt: output.finishedAt,

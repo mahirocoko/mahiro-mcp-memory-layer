@@ -771,6 +771,18 @@ describe("product memory OpenCode plugin contract", () => {
       },
     );
 
+    await harness.hooks.tool?.get_orchestration_result?.execute?.(
+      {
+        requestId: "workflow_unhealthy",
+      },
+      {
+        sessionID: "session-unhealthy",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+    await flushMicrotasks();
+
     const memoryContext = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
       {},
       {
@@ -952,6 +964,76 @@ describe("product memory OpenCode plugin contract", () => {
               attentionReason: "approval_required",
               approvalPrompt: "Approve this action?",
               subagentIds: ["subagent_approval"],
+            },
+          ],
+        },
+      },
+    });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("surfaces unhealthy Gemini sessions as needs_attention with an unhealthy reason", async () => {
+    vi.useFakeTimers();
+    const getOrchestrationResult = vi.fn().mockResolvedValue({
+      requestId: "workflow_unhealthy",
+      status: "timed_out",
+      metadata: {
+        jobs: [{
+          subagentId: "subagent_unhealthy",
+          paneState: "unhealthy",
+          paneStateReason: "api_error_400_function_call_mismatch",
+        }],
+      },
+    });
+    mockPluginOrchestrationTools({
+      startAgentTaskResult: {
+        requestId: "workflow_unhealthy",
+        status: "requested",
+      },
+      getOrchestrationResult,
+    });
+    const harness = await createPluginHarness({
+      sessionPromptAsyncAvailable: true,
+    });
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-unhealthy") });
+    await flushMicrotasks();
+
+    await harness.hooks.tool?.start_agent_task?.execute?.(
+      {
+        category: "visual-engineering",
+        prompt: "Implement the frontend revamp.",
+        intent: "implementation",
+      },
+      {
+        sessionID: "session-unhealthy",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    );
+
+    await advanceFakeTimeBy(1500);
+
+    const memoryContext = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-unhealthy",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(memoryContext).toMatchObject({
+      status: "ready",
+      session: {
+        operator: {
+          tasks: [
+            {
+              requestId: "workflow_unhealthy",
+              intent: "implementation",
+              status: "needs_attention",
+              attentionReason: "unhealthy_session",
+              subagentIds: ["subagent_unhealthy"],
             },
           ],
         },

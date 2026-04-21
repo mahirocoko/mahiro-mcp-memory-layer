@@ -5,21 +5,11 @@ import { SubagentSessionStore } from "../../../orchestration/subagents/subagent-
 import { extractInteractiveGeminiResponse } from "../shell/interactive-gemini-response.js";
 import { buildGeminiInteractiveShellArgs, buildGeminiInteractiveTmuxSessionArgs } from "../shell/shell-gemini-runtime.js";
 import type { GeminiCommandRunResult, GeminiWorkerInput, GeminiWorkerRuntime } from "../../types.js";
+import { geminiApprovalPromptMatchers, hasGeminiCompleted, inspectGeminiPane } from "./gemini-pane-state.js";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-function hasGeminiCompleted(output: string): boolean {
-  return output.includes("✦ ") && output.includes("Type your message or @path/to/file");
-}
-
-const approvalPromptMatchers = [
-  "Approve this action?",
-  "Do you want to proceed?",
-  "Press enter to confirm",
-  "Allow this action?",
-] as const;
 
 function toGeminiResult(
   output: string,
@@ -28,6 +18,10 @@ function toGeminiResult(
   extra?: {
     approvalRequired?: boolean;
     approvalPrompt?: string;
+    paneState?: "completed" | "thinking" | "approval_required" | "unhealthy" | "idle";
+    paneStateReason?: string;
+    lastVisiblePaneExcerpt?: string;
+    promptSubmissionAttempted?: boolean;
   },
 ): GeminiCommandRunResult {
   const response = extractInteractiveGeminiResponse(output);
@@ -38,6 +32,10 @@ function toGeminiResult(
       rawOutput: output,
       ...(extra?.approvalRequired ? { approvalRequired: true } : {}),
       ...(extra?.approvalPrompt ? { approvalPrompt: extra.approvalPrompt } : {}),
+      ...(extra?.paneState ? { paneState: extra.paneState } : {}),
+      ...(extra?.paneStateReason ? { paneStateReason: extra.paneStateReason } : {}),
+      ...(extra?.lastVisiblePaneExcerpt ? { lastVisiblePaneExcerpt: extra.lastVisiblePaneExcerpt } : {}),
+      ...(extra?.promptSubmissionAttempted !== undefined ? { promptSubmissionAttempted: extra.promptSubmissionAttempted } : {}),
     }),
     stderr: "",
     exitCode: timedOut ? null : 0,
@@ -102,7 +100,7 @@ export class InteractiveGeminiTmuxRuntime implements GeminiWorkerRuntime {
           input: "1",
         },
       ],
-      interruptOnMatches: [...approvalPromptMatchers],
+      interruptOnMatches: [...geminiApprovalPromptMatchers],
     });
     let finalResult = result;
     if (result.timedOut && hasGeminiCompleted(result.output)) {
@@ -112,7 +110,7 @@ export class InteractiveGeminiTmuxRuntime implements GeminiWorkerRuntime {
         completionDetected: true,
       };
     }
-    if (!result.timedOut && !result.completionDetected) {
+    if (!result.timedOut && !result.completionDetected && result.interruptedReason !== "approval_required") {
       const deadline = Date.now() + Math.max(5_000, timeoutMs);
       let latestOutput = result.output;
 
@@ -149,9 +147,14 @@ export class InteractiveGeminiTmuxRuntime implements GeminiWorkerRuntime {
       }
     }
 
+    const paneSnapshot = inspectGeminiPane(finalResult.output);
     const commandResult = toGeminiResult(finalResult.output, input, finalResult.timedOut, {
       ...(finalResult.interruptedReason === "approval_required" ? { approvalRequired: true } : {}),
       ...(finalResult.matchedText ? { approvalPrompt: finalResult.matchedText } : {}),
+      paneState: paneSnapshot.paneState,
+      ...(paneSnapshot.paneStateReason ? { paneStateReason: paneSnapshot.paneStateReason } : {}),
+      ...(paneSnapshot.lastVisiblePaneExcerpt ? { lastVisiblePaneExcerpt: paneSnapshot.lastVisiblePaneExcerpt } : {}),
+      promptSubmissionAttempted: finalResult.promptSubmissionAttempted,
     });
     return {
       ...commandResult,

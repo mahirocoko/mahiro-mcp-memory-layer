@@ -56,4 +56,59 @@ describe("runWorkerJob", () => {
       },
     });
   });
+
+  it("preserves pane evidence for timed out Gemini sessions", async () => {
+    const runtime = {
+      run: vi.fn().mockResolvedValue({
+        stdout: JSON.stringify({
+          response: "Thinking...",
+          paneState: "unhealthy",
+          paneStateReason: "api_error_400_function_call_mismatch",
+          lastVisiblePaneExcerpt: "API Error 400:\nPlease ensure that the number of function response parts is equal to the number of function call parts of the function call turn.",
+          promptSubmissionAttempted: true,
+          subagentId: "subagent_unhealthy",
+          sessionName: "session-unhealthy",
+          paneId: "%99",
+          stats: {
+            model: "gemini-3.1-pro-preview",
+          },
+        }),
+        stderr: "",
+        exitCode: null,
+        signal: "SIGTERM",
+        timedOut: true,
+        startedAt: "2026-04-21T00:00:00.000Z",
+        finishedAt: "2026-04-21T00:00:05.000Z",
+        durationMs: 5000,
+      }),
+    };
+
+    const result = await runWorkerJob({
+      kind: "gemini",
+      input: {
+        taskId: "gemini_timeout",
+        prompt: "Do the work.",
+        model: "gemini-3.1-pro-preview",
+      },
+      dependencies: {
+        runtime,
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "gemini",
+      retryCount: 0,
+      result: {
+        status: "timeout",
+        paneState: "unhealthy",
+        paneStateReason: "api_error_400_function_call_mismatch",
+        lastVisiblePaneExcerpt: expect.stringContaining("API Error 400"),
+        promptSubmissionAttempted: true,
+        subagentId: "subagent_unhealthy",
+        sessionName: "session-unhealthy",
+        paneId: "%99",
+        error: "Gemini command timed out after pane state 'api_error_400_function_call_mismatch'.",
+      },
+    });
+  });
 });

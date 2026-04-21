@@ -19,6 +19,10 @@ export interface OrchestrationResultRecord {
       readonly resolvedExecutor?: string;
       readonly approvalRequired?: boolean;
       readonly approvalPrompt?: string;
+      readonly paneState?: string;
+      readonly paneStateReason?: string;
+      readonly lastVisiblePaneExcerpt?: string;
+      readonly promptSubmissionAttempted?: boolean;
       readonly workerRuntime?: string;
       readonly routeReason?: string;
       readonly subagentId?: string;
@@ -59,6 +63,34 @@ function buildMetadata(spec: OrchestrateWorkflowSpec, result?: OrchestrationRunR
     return jobResult.approvalPrompt;
   };
 
+  const resolveGeminiPaneState = (index: number) => {
+    const jobResult = resolveJobResult(index);
+    return jobResult && "paneState" in jobResult && typeof jobResult.paneState === "string"
+      ? jobResult.paneState
+      : undefined;
+  };
+
+  const resolveGeminiPaneStateReason = (index: number) => {
+    const jobResult = resolveJobResult(index);
+    return jobResult && "paneStateReason" in jobResult && typeof jobResult.paneStateReason === "string"
+      ? jobResult.paneStateReason
+      : undefined;
+  };
+
+  const resolveGeminiPaneExcerpt = (index: number) => {
+    const jobResult = resolveJobResult(index);
+    return jobResult && "lastVisiblePaneExcerpt" in jobResult && typeof jobResult.lastVisiblePaneExcerpt === "string"
+      ? jobResult.lastVisiblePaneExcerpt
+      : undefined;
+  };
+
+  const resolvePromptSubmissionAttempted = (index: number) => {
+    const jobResult = resolveJobResult(index);
+    return jobResult && "promptSubmissionAttempted" in jobResult && typeof jobResult.promptSubmissionAttempted === "boolean"
+      ? jobResult.promptSubmissionAttempted
+      : undefined;
+  };
+
   return {
     mode: spec.mode,
     taskIds: jobs.map((job) => job.input.taskId),
@@ -73,6 +105,10 @@ function buildMetadata(spec: OrchestrateWorkflowSpec, result?: OrchestrationRunR
       ...(typeof job.input.subagentId === "string" ? { subagentId: job.input.subagentId } : {}),
       ...(resolveJobResult(index)?.status === "approval_required" ? { approvalRequired: true } : {}),
       ...(typeof resolveApprovalPrompt(index) === "string" ? { approvalPrompt: resolveApprovalPrompt(index) } : {}),
+      ...(typeof resolveGeminiPaneState(index) === "string" ? { paneState: resolveGeminiPaneState(index) } : {}),
+      ...(typeof resolveGeminiPaneStateReason(index) === "string" ? { paneStateReason: resolveGeminiPaneStateReason(index) } : {}),
+      ...(typeof resolveGeminiPaneExcerpt(index) === "string" ? { lastVisiblePaneExcerpt: resolveGeminiPaneExcerpt(index) } : {}),
+      ...(typeof resolvePromptSubmissionAttempted(index) === "boolean" ? { promptSubmissionAttempted: resolvePromptSubmissionAttempted(index) } : {}),
       ...(resolveJobResult(index)?.sessionName ? { sessionName: resolveJobResult(index)?.sessionName } : {}),
       ...(resolveJobResult(index)?.paneId ? { paneId: resolveJobResult(index)?.paneId } : {}),
       ...(job.retries !== undefined ? { configuredRetries: job.retries } : {}),

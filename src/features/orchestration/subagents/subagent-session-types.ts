@@ -11,6 +11,10 @@ export interface SubagentSessionRecord {
   readonly cwd?: string;
   readonly taskIds: string[];
   readonly status: SubagentSessionStatus;
+  readonly paneState?: "completed" | "thinking" | "approval_required" | "unhealthy" | "idle";
+  readonly paneStateReason?: string;
+  readonly approvalPrompt?: string;
+  readonly lastVisiblePaneExcerpt?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastPromptAt?: string;

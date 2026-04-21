@@ -36,6 +36,10 @@ export interface GeminiWorkerRunResult {
   readonly subagentId?: string;
   readonly sessionName?: string;
   readonly paneId?: string;
+  readonly paneState?: "completed" | "thinking" | "approval_required" | "unhealthy" | "idle";
+  readonly paneStateReason?: string;
+  readonly lastVisiblePaneExcerpt?: string;
+  readonly promptSubmissionAttempted?: boolean;
 }
 
 export interface GeminiWorkerRuntime {

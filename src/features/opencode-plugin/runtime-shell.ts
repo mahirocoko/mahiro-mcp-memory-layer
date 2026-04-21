@@ -185,8 +185,9 @@ export function createOpenCodePluginRuntime(
     subagentIds: string[];
     changed: boolean;
     rawStatus?: string;
-    attentionReason?: "approval_required";
+    attentionReason?: "approval_required" | "unhealthy_session";
     approvalPrompt?: string;
+    paneStateReason?: string;
   } => {
     const sessionState = runtimeState.sessions.get(sessionId);
     const taskEntry = sessionState?.operator?.tasks.find((task) => task.requestId === requestId);
@@ -210,6 +211,10 @@ export function createOpenCodePluginRuntime(
       .map((job) => job.approvalPrompt)
       .find((value): value is string => typeof value === "string");
     const approvalRequired = jobs.some((job) => job.approvalRequired === true);
+    const paneStateReason = jobs
+      .map((job) => job.paneStateReason)
+      .find((value): value is string => typeof value === "string");
+    const unhealthySession = jobs.some((job) => job.paneState === "unhealthy");
 
     if (!nextStatus) {
       return {
@@ -217,7 +222,9 @@ export function createOpenCodePluginRuntime(
         changed: false,
         rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
         ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
+        ...(!approvalRequired && unhealthySession ? { attentionReason: "unhealthy_session" as const } : {}),
         ...(approvalPrompt ? { approvalPrompt } : {}),
+        ...(paneStateReason ? { paneStateReason } : {}),
       };
     }
 
@@ -228,7 +235,7 @@ export function createOpenCodePluginRuntime(
 
     taskEntry.status = nextStatus;
     taskEntry.subagentIds = subagentIds;
-    taskEntry.attentionReason = approvalRequired ? "approval_required" : undefined;
+    taskEntry.attentionReason = approvalRequired ? "approval_required" : (unhealthySession ? "unhealthy_session" : undefined);
     taskEntry.approvalPrompt = approvalPrompt;
     taskEntry.updatedAt = new Date().toISOString();
 
@@ -238,7 +245,9 @@ export function createOpenCodePluginRuntime(
       changed,
       rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
       ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
+      ...(!approvalRequired && unhealthySession ? { attentionReason: "unhealthy_session" as const } : {}),
       ...(approvalPrompt ? { approvalPrompt } : {}),
+      ...(paneStateReason ? { paneStateReason } : {}),
     };
   };
 
@@ -285,6 +294,8 @@ export function createOpenCodePluginRuntime(
         sessionId,
         synced.attentionReason === "approval_required"
           ? `Task — ${category} is waiting on Gemini approval and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}${synced.approvalPrompt ? ` approvalPrompt=${JSON.stringify(synced.approvalPrompt)}` : ""}`
+          : synced.attentionReason === "unhealthy_session"
+            ? `Task — ${category} hit an unhealthy Gemini session and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}${synced.paneStateReason ? ` paneStateReason=${JSON.stringify(synced.paneStateReason)}` : ""}`
           : `Task — ${category} ended with status ${synced.rawStatus ?? "unknown"} and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
       );
     };

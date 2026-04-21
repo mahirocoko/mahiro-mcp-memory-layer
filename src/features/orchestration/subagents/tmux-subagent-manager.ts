@@ -1,4 +1,5 @@
 import { newId } from "../../../lib/ids.js";
+import { inspectGeminiPane } from "../../gemini/runtime/tmux/gemini-pane-state.js";
 import { appendTaskCompletionInstruction, buildTaskCompletionToken, TmuxRuntimeOwner } from "../runtime/tmux-runtime-owner.js";
 import { SubagentSessionStore } from "./subagent-session-store.js";
 import type { SubagentSessionRecord, SubagentWorkerKind } from "./subagent-session-types.js";
@@ -66,7 +67,19 @@ export class TmuxSubagentManager {
     }
     const stillExists = await this.tmuxRuntimeOwner.hasSession(existing.sessionName);
     if (stillExists) {
-      return existing;
+      if (existing.workerKind !== "gemini") {
+        return existing;
+      }
+
+      const output = await this.tmuxRuntimeOwner.capturePane(existing.paneId);
+      const paneSnapshot = inspectGeminiPane(output);
+      return await this.store.upsert({
+        ...existing,
+        paneState: paneSnapshot.paneState,
+        paneStateReason: paneSnapshot.paneStateReason,
+        approvalPrompt: paneSnapshot.approvalPrompt,
+        lastVisiblePaneExcerpt: paneSnapshot.lastVisiblePaneExcerpt,
+      });
     }
     return await this.store.upsert({
       ...existing,

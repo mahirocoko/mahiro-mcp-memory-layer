@@ -33,6 +33,7 @@ export interface TmuxRuntimeTaskResult {
   readonly paneId: string;
   readonly interruptedReason?: "approval_required";
   readonly matchedText?: string;
+  readonly promptSubmissionAttempted: boolean;
 }
 
 function quoteShellArg(value: string): string {
@@ -163,6 +164,7 @@ export class TmuxRuntimeOwner {
             completionDetected: false,
             sessionName: spawned.sessionName,
             paneId: spawned.paneId,
+            promptSubmissionAttempted: promptSent,
           };
         }
       }
@@ -176,6 +178,7 @@ export class TmuxRuntimeOwner {
           completionDetected: true,
           sessionName: spawned.sessionName,
           paneId: spawned.paneId,
+          promptSubmissionAttempted: promptSent,
         };
       }
 
@@ -189,6 +192,7 @@ export class TmuxRuntimeOwner {
             paneId: spawned.paneId,
             interruptedReason: "approval_required",
             matchedText: interruptMatch,
+            promptSubmissionAttempted: promptSent,
           };
         }
       }
@@ -218,6 +222,7 @@ export class TmuxRuntimeOwner {
           completionDetected: false,
           sessionName: spawned.sessionName,
           paneId: spawned.paneId,
+          promptSubmissionAttempted: promptSent,
         };
       }
 
@@ -234,6 +239,7 @@ export class TmuxRuntimeOwner {
           completionDetected: false,
           sessionName: spawned.sessionName,
           paneId: spawned.paneId,
+          promptSubmissionAttempted: promptSent,
         };
       }
       missingSessionChecks = 0;
