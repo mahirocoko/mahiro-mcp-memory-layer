@@ -17,10 +17,8 @@ export class RetrievalTraceStore {
   }
 
   public async readLatestMatching(filter: {
-    readonly userId?: string;
     readonly projectId?: string;
     readonly containerId?: string;
-    readonly sessionId?: string;
   }): Promise<RetrievalTraceEntry | undefined> {
     const entries = await this.readAll();
 
@@ -61,30 +59,15 @@ export class RetrievalTraceStore {
 function matchesLatestScopeFilter(
   entry: RetrievalTraceEntry,
   filter: {
-    readonly userId?: string;
     readonly projectId?: string;
     readonly containerId?: string;
-    readonly sessionId?: string;
   },
 ): boolean {
-  if (filter.userId && entry.enforcedFilters.userId !== filter.userId) {
-    return false;
-  }
-
   if (filter.projectId && entry.enforcedFilters.projectId !== filter.projectId) {
     return false;
   }
 
   if (filter.containerId && entry.enforcedFilters.containerId !== filter.containerId) {
-    return false;
-  }
-
-  if (
-    filter.sessionId &&
-    entry.enforcedFilters.scope === "session" &&
-    entry.enforcedFilters.sessionId &&
-    entry.enforcedFilters.sessionId !== filter.sessionId
-  ) {
     return false;
   }
 

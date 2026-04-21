@@ -1,4 +1,3 @@
-import os from "node:os";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -19,7 +18,6 @@ const openCodePluginConfigFileSchema = z
     runtime: z
       .object({
         messageDebounceMs: z.number().int().nonnegative().optional(),
-        userId: z.string().trim().min(1).optional(),
         remindersEnabled: z.boolean().optional(),
       })
       .partial()
@@ -77,7 +75,6 @@ export async function loadOpenCodePluginConfig(
     },
     runtime: {
       messageDebounceMs: resolveMessageDebounceMs(mergedConfigFile, env),
-      userId: resolveUserId(mergedConfigFile, env),
       remindersEnabled: resolveRemindersEnabled(mergedConfigFile, env),
     },
     routing: {
@@ -196,18 +193,6 @@ function resolveMessageDebounceMs(configFile: OpenCodePluginConfigFile, env: Nod
   );
 }
 
-function resolveUserId(configFile: OpenCodePluginConfigFile, env: NodeJS.ProcessEnv): string {
-  const explicitUserId =
-    toNonEmptyString(env[opencodePluginConfigEnv.userId]) ??
-    toNonEmptyString(configFile.runtime?.userId);
-
-  if (explicitUserId) {
-    return explicitUserId;
-  }
-
-  return resolveStableLocalUserId(env);
-}
-
 function resolveRemindersEnabled(configFile: OpenCodePluginConfigFile, env: NodeJS.ProcessEnv): boolean {
   const envValue = toOptionalBoolean(env[opencodePluginConfigEnv.remindersEnabled]);
 
@@ -256,41 +241,6 @@ function resolveNonNegativeInteger(value: string | undefined, fallback: number):
   }
 
   return parsedValue;
-}
-
-function resolveStableLocalUserId(env: NodeJS.ProcessEnv): string {
-  const username =
-    toNonEmptyString(readOsUsername()) ??
-    toNonEmptyString(env.USER) ??
-    toNonEmptyString(env.USERNAME);
-
-  if (username) {
-    return `local:${username}`;
-  }
-
-  return "local:opencode";
-}
-
-function readOsUsername(): string | undefined {
-  try {
-    return os.userInfo().username;
-  } catch {
-    return undefined;
-  }
-}
-
-function toNonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const normalizedValue = value.trim();
-
-  if (normalizedValue.length === 0) {
-    return undefined;
-  }
-
-  return normalizedValue;
 }
 
 function toOptionalBoolean(value: unknown): boolean | undefined {

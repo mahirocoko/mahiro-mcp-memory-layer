@@ -12,18 +12,14 @@ function scopeIdsComplete(
   scope: MemorySuggestionCandidate["scope"],
   input: Pick<
     ApplyConservativeMemoryPolicyInput,
-    "userId" | "projectId" | "containerId" | "sessionId"
+    "projectId" | "containerId"
   >,
 ): boolean {
   switch (scope) {
     case "global":
       return true;
-    case "user":
-      return Boolean(input.userId);
     case "project":
-      return Boolean(input.userId && input.projectId && input.containerId);
-    case "session":
-      return Boolean(input.userId && input.projectId && input.containerId && input.sessionId);
+      return Boolean(input.projectId && input.containerId);
     default:
       return false;
   }
@@ -37,10 +33,8 @@ function toRememberInput(
     content: candidate.draftContent,
     kind: candidate.kind,
     scope: candidate.scope,
-    userId: input.userId,
     projectId: input.projectId,
     containerId: input.containerId,
-    sessionId: input.sessionId,
     source: input.sourceOverride ?? { type: "tool" as const, title: "apply_conservative_memory_policy" },
     tags: [...(input.extraTags ?? []), "conservative_auto_save", "strong_candidate"],
     summary: candidate.reason,
@@ -114,10 +108,8 @@ function toSuggestInput(payload: ApplyConservativeMemoryPolicyInput): SuggestMem
   const conversation = payload.conversation?.trim() ?? "";
   return {
     conversation,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
     maxCandidates: payload.maxCandidates,
   };
 }

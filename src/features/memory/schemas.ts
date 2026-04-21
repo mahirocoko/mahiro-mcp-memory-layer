@@ -20,10 +20,8 @@ export const rememberInputSchema = z.object({
   content: z.string().trim().min(1),
   kind: z.enum(memoryKinds),
   scope: z.enum(memoryScopes),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   source: sourceSchema,
   summary: z.string().trim().min(1).optional(),
   tags: z.array(z.string().trim().min(1)).optional(),
@@ -34,10 +32,8 @@ export const searchMemoriesInputSchema = z.object({
   query: z.string().trim().min(1),
   mode: z.enum(retrievalModes),
   scope: z.enum(memoryScopes),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   limit: z.number().int().positive().max(50).optional(),
 });
 
@@ -45,10 +41,8 @@ export const searchMemoriesInputSchema = z.object({
 export const buildContextForTaskInputObjectSchema = z.object({
   task: z.string().trim().min(1),
   mode: z.enum(retrievalModes),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   maxItems: z.number().int().positive().max(50).optional(),
   maxChars: z.number().int().positive().max(50_000).optional(),
   /** When true, also run heuristic memory suggestions on `recentConversation` (same scope ids as this request). */
@@ -74,9 +68,7 @@ export const buildContextForTaskInputSchema = buildContextForTaskInputObjectSche
 
 export const upsertDocumentInputSchema = z.object({
   projectId: z.string().trim().min(1).optional(),
-  userId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   source: upsertDocumentSourceSchema,
   content: z.string().trim().min(1),
   tags: z.array(z.string().trim().min(1)).optional(),
@@ -86,20 +78,16 @@ export const upsertDocumentInputSchema = z.object({
 
 export const listMemoriesInputSchema = z.object({
   scope: z.enum(memoryScopes).optional(),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   kind: z.enum(memoryKinds).optional(),
   limit: z.number().int().positive().max(100).optional(),
 });
 
 export const suggestMemoryCandidatesInputSchema = z.object({
   conversation: z.string().trim().min(1),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   maxCandidates: z.number().int().positive().max(10).optional(),
 });
 
@@ -122,10 +110,8 @@ export const suggestMemoryCandidatesResultSchema = z.object({
 
 export const applyConservativeMemoryPolicyInputObjectSchema = z.object({
   conversation: z.string().optional(),
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   maxCandidates: z.number().int().positive().max(10).optional(),
   suggestion: suggestMemoryCandidatesResultSchema.optional(),
   sourceOverride: sourceSchema.optional(),
@@ -161,10 +147,8 @@ export const prepareHostTurnMemoryInputSchema = prepareHostTurnMemoryInputObject
 
 /** `wake_up_memory`: scope + optional limits; runs `profile` and `recent` builds internally (no suggestions). */
 export const wakeUpMemoryInputObjectSchema = z.object({
-  userId: z.string().trim().min(1).optional(),
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),
-  sessionId: z.string().trim().min(1).optional(),
   maxItems: z.number().int().positive().max(50).optional(),
   maxChars: z.number().int().positive().max(50_000).optional(),
 });

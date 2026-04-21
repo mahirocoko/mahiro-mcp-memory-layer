@@ -5,10 +5,9 @@ import { describe, expect, it } from "vitest";
 import { resolveOpenCodeScope } from "../src/features/opencode-plugin/resolve-scope.js";
 
 describe("resolveOpenCodeScope", () => {
-  it("resolves a complete scope deterministically when the runtime provides a stable user id", () => {
+  it("resolves a complete scope deterministically from project, container, and session", () => {
     expect(
       resolveOpenCodeScope({
-        providedUserId: "user-1",
         context: {
           project: {
             id: "project-1",
@@ -29,14 +28,12 @@ describe("resolveOpenCodeScope", () => {
     ).toEqual({
       status: "complete",
       scope: {
-        userId: "user-1",
         projectId: "project-1",
         containerId: `worktree:${path.resolve("/workspace/project/./")}`,
         sessionId: "session-1",
       },
       missing: [],
       resolvedFrom: {
-        userId: "providedUserId",
         projectId: "context.project.id",
         containerId: "context.worktree",
         sessionId: "event.properties.sessionID",
@@ -44,7 +41,7 @@ describe("resolveOpenCodeScope", () => {
     });
   });
 
-  it("uses explicit fallbacks for project, container, and session before reporting an incomplete scope", () => {
+  it("uses explicit fallbacks for project, container, and session", () => {
     expect(
       resolveOpenCodeScope({
         context: {
@@ -64,14 +61,13 @@ describe("resolveOpenCodeScope", () => {
         },
       }),
     ).toEqual({
-      status: "incomplete",
-      reason: "incomplete_scope_ids",
+      status: "complete",
       scope: {
         projectId: "project-name",
         containerId: `directory:${path.resolve("./repo/project-name")}`,
         sessionId: "session-2",
       },
-      missing: ["userId"],
+      missing: [],
       resolvedFrom: {
         projectId: "context.project.name",
         containerId: "context.project.directory",
@@ -100,7 +96,7 @@ describe("resolveOpenCodeScope", () => {
       status: "incomplete",
       reason: "incomplete_scope_ids",
       scope: {},
-      missing: ["userId", "projectId", "containerId", "sessionId"],
+      missing: ["projectId", "containerId", "sessionId"],
       resolvedFrom: {},
     });
   });

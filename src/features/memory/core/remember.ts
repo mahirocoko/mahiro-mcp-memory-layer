@@ -17,10 +17,8 @@ export async function rememberMemory(input: {
   const payload = rememberInputSchema.parse(input.payload);
   assertValidScope({
     scope: payload.scope,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
   });
 
   const now = nowIso();
@@ -28,10 +26,8 @@ export async function rememberMemory(input: {
     id: newId("mem"),
     kind: payload.kind,
     scope: payload.scope,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
     source: payload.source,
     content: payload.content,
     summary: payload.summary,

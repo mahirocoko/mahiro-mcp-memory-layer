@@ -20,41 +20,15 @@ export async function buildContextForTask(input: {
   const basePayload = {
     query: payload.task,
     mode: payload.mode,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
   };
 
-  if (!payload.sessionId) {
-    const result = await searchMemories({
-      payload: {
-        ...basePayload,
-        scope: "project",
-        limit: maxItems,
-      },
-      table: input.table,
-      embeddingProvider: input.embeddingProvider,
-      traceStore: input.traceStore,
-      traceProvenance: input.traceProvenance,
-    });
-
-    const built = buildContextFromItems({
-      task: payload.task,
-      mode: payload.mode,
-      items: result.items,
-      maxItems,
-      maxChars: payload.maxChars ?? defaultContextMaxChars,
-      degraded: result.degraded,
-    });
-
-    return attachMemorySuggestionsIfRequested(payload, built);
-  }
-
-  const sessionResult = await searchMemories({
+  const scope = payload.projectId || payload.containerId ? "project" : "global";
+  const result = await searchMemories({
     payload: {
       ...basePayload,
-      scope: "session",
-      sessionId: payload.sessionId,
+      scope,
       limit: maxItems,
     },
     table: input.table,
@@ -63,44 +37,13 @@ export async function buildContextForTask(input: {
     traceProvenance: input.traceProvenance,
   });
 
-  const seenIds = new Set(sessionResult.items.map((item) => item.id));
-  const merged = [...sessionResult.items];
-  let degraded = sessionResult.degraded;
-
-  if (merged.length < maxItems) {
-    const projectResult = await searchMemories({
-      payload: {
-        ...basePayload,
-        scope: "project",
-        limit: maxItems - merged.length,
-      },
-      table: input.table,
-      embeddingProvider: input.embeddingProvider,
-      traceStore: input.traceStore,
-      traceProvenance: input.traceProvenance,
-    });
-
-    degraded = degraded || projectResult.degraded;
-
-    for (const item of projectResult.items) {
-      if (seenIds.has(item.id)) {
-        continue;
-      }
-      seenIds.add(item.id);
-      merged.push(item);
-      if (merged.length >= maxItems) {
-        break;
-      }
-    }
-  }
-
   const base = buildContextFromItems({
     task: payload.task,
     mode: payload.mode,
-    items: merged,
+    items: result.items,
     maxItems,
     maxChars: payload.maxChars ?? defaultContextMaxChars,
-    degraded,
+    degraded: result.degraded,
   });
 
   return attachMemorySuggestionsIfRequested(payload, base);
@@ -110,10 +53,8 @@ function attachMemorySuggestionsIfRequested(
   payload: {
     readonly includeMemorySuggestions?: boolean;
     readonly recentConversation?: string;
-    readonly userId?: string;
     readonly projectId?: string;
     readonly containerId?: string;
-    readonly sessionId?: string;
     readonly suggestionMaxCandidates?: number;
   },
   base: BuildContextForTaskResult,
@@ -125,10 +66,8 @@ function attachMemorySuggestionsIfRequested(
   const conversation = payload.recentConversation!.trim();
   const memorySuggestions = suggestMemoryCandidates({
     conversation,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
     maxCandidates: payload.suggestionMaxCandidates,
   });
 

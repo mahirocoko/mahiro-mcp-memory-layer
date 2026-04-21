@@ -261,16 +261,14 @@ describe("memory service core", () => {
     expect(recentResult.context).toContain("·");
   });
 
-  it("buildContextForTask with sessionId backfills from project when session scope is sparse", async () => {
+  it("buildContextForTask uses project scope directly", async () => {
     const fixture = await createFixture();
-    const sessionId = "session-backfill";
 
     const projectOnly = await rememberMemory({
       payload: {
         content: "Project-wide retrieval layer design using LanceDB.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: { type: "manual" },
@@ -284,10 +282,8 @@ describe("memory service core", () => {
       payload: {
         task: "How is retrieval implemented?",
         mode: "full",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
-        sessionId,
         maxItems: 5,
         maxChars: 2000,
       },
@@ -300,19 +296,16 @@ describe("memory service core", () => {
     expect(result.context).toContain("LanceDB");
   });
 
-  it("buildContextForTask orders session memories before project when both match", async () => {
+  it("buildContextForTask ranks stronger project matches ahead of weaker ones", async () => {
     const fixture = await createFixture();
-    const sessionId = "session-order";
 
-    const sessionMem = await rememberMemory({
+    const strongerProjectMem = await rememberMemory({
       payload: {
-        content: "Session note: prioritize LanceDB index tuning for this chat.",
+        content: "Project probe: prioritize LanceDB index tuning for retrieval work.",
         kind: "fact",
-        scope: "session",
-        userId: "mahiro",
+        scope: "project",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
-        sessionId,
         source: { type: "manual" },
       },
       logStore: fixture.logStore,
@@ -325,7 +318,6 @@ describe("memory service core", () => {
         content: "Project note: LanceDB is the canonical retrieval store.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: { type: "manual" },
@@ -339,10 +331,8 @@ describe("memory service core", () => {
       payload: {
         task: "LanceDB retrieval tuning and store choice",
         mode: "full",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
-        sessionId,
         maxItems: 5,
         maxChars: 4000,
       },
@@ -351,9 +341,9 @@ describe("memory service core", () => {
       traceStore: fixture.traceStore,
     });
 
-    expect(result.items).toContain(sessionMem.id);
+    expect(result.items).toContain(strongerProjectMem.id);
     expect(result.items).toContain(projectMem.id);
-    expect(result.items.indexOf(sessionMem.id)).toBeLessThan(result.items.indexOf(projectMem.id));
+    expect(result.context).toContain("prioritize LanceDB index tuning");
   });
 
   it("rebuilds the LanceDB index from the canonical log", async () => {
@@ -761,7 +751,7 @@ describe("memory service core", () => {
     });
   });
 
-  it("inspects the latest retrieval trace for a matching live scope instead of the global latest", async () => {
+  it("inspects the latest retrieval trace for a matching project scope instead of the global latest", async () => {
     const fixture = await createFixture();
     const service = new MemoryService(
       fixture.logStore,
@@ -771,24 +761,20 @@ describe("memory service core", () => {
     );
 
     await service.remember({
-      content: "Repo-local session memory.",
+      content: "Repo-local project memory.",
       kind: "decision",
-      scope: "session",
-      userId: "mahiro",
+      scope: "project",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "worktree:/repo-a",
-      sessionId: "session-a",
       source: { type: "manual" },
     });
 
     await service.remember({
       content: "Different workspace memory.",
       kind: "decision",
-      scope: "session",
-      userId: "mahiro",
+      scope: "project",
       projectId: "other-project",
       containerId: "worktree:/repo-b",
-      sessionId: "session-b",
       source: { type: "manual" },
     });
 
@@ -797,10 +783,8 @@ describe("memory service core", () => {
         task: "Continue from the previous session in repo A.",
         mode: "query",
         recentConversation: "Continue from the previous session in repo A.",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "worktree:/repo-a",
-        sessionId: "session-a",
       },
       {
         surface: "opencode-plugin",
@@ -814,10 +798,8 @@ describe("memory service core", () => {
         task: "Continue from the previous session in repo B.",
         mode: "query",
         recentConversation: "Continue from the previous session in repo B.",
-        userId: "mahiro",
         projectId: "other-project",
         containerId: "worktree:/repo-b",
-        sessionId: "session-b",
       },
       {
         surface: "opencode-plugin",
@@ -828,10 +810,8 @@ describe("memory service core", () => {
 
     const audit = await service.inspectMemoryRetrieval({
       latestScopeFilter: {
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "worktree:/repo-a",
-        sessionId: "session-a",
       },
     });
 
@@ -840,7 +820,6 @@ describe("memory service core", () => {
       lookup: "latest",
       trace: {
         enforcedFilters: {
-          userId: "mahiro",
           projectId: "mahiro-mcp-memory-layer",
           containerId: "worktree:/repo-a",
         },

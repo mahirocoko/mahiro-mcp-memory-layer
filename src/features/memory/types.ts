@@ -14,10 +14,8 @@ export interface MemoryRecord {
   readonly id: string;
   readonly kind: MemoryKind;
   readonly scope: MemoryScope;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly source: MemorySource;
   readonly content: string;
   readonly summary?: string;
@@ -31,10 +29,8 @@ export interface RememberInput {
   readonly content: string;
   readonly kind: MemoryKind;
   readonly scope: MemoryScope;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly source: MemorySource;
   readonly summary?: string;
   readonly tags?: readonly string[];
@@ -45,10 +41,8 @@ export interface SearchMemoriesInput {
   readonly query: string;
   readonly mode: RetrievalMode;
   readonly scope: MemoryScope;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly limit?: number;
 }
 
@@ -79,10 +73,8 @@ export interface RetrievalTraceProvenance {
 export interface BuildContextForTaskInput {
   readonly task: string;
   readonly mode: RetrievalMode;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly maxItems?: number;
   readonly maxChars?: number;
   /** Opt-in: attach `suggest_memory_candidates` output for the same scope as this build. */
@@ -102,9 +94,7 @@ export interface BuildContextForTaskResult {
 
 export interface UpsertDocumentInput {
   readonly projectId?: string;
-  readonly userId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly source: MemorySource;
   readonly content: string;
   readonly tags?: readonly string[];
@@ -114,10 +104,8 @@ export interface UpsertDocumentInput {
 
 export interface ListMemoriesInput {
   readonly scope?: MemoryScope;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly kind?: MemoryKind;
   readonly limit?: number;
 }
@@ -128,10 +116,8 @@ export type MemorySaveRecommendation = "likely_skip" | "consider_saving" | "stro
 
 export interface SuggestMemoryCandidatesInput {
   readonly conversation: string;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly maxCandidates?: number;
 }
 
@@ -156,10 +142,8 @@ export interface SuggestMemoryCandidatesResult {
 export interface ApplyConservativeMemoryPolicyInput {
   /** Required unless `suggestion` is provided (hosts may reuse a prior `suggest_memory_candidates` result). */
   readonly conversation?: string;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   readonly maxCandidates?: number;
   /** When set, heuristics are skipped and policy applies to this snapshot. */
   readonly suggestion?: SuggestMemoryCandidatesResult;
@@ -200,10 +184,8 @@ export type PrepareTurnMemoryResult = PrepareHostTurnMemoryResult;
 
 /** Input for `wake_up_memory`: session-start retrieval bundle with stable profile + recent activity sections for the same scope. */
 export interface WakeUpMemoryInput {
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
   /** Applied per section (`profile` and `recent`). */
   readonly maxItems?: number;
   /** Applied per section (`profile` and `recent`). */
@@ -222,10 +204,8 @@ export interface WakeUpMemoryResult {
 
 export interface ScopeFilter {
   readonly scope: MemoryScope;
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
-  readonly sessionId?: string;
 }
 
 export interface RetrievalRow {
@@ -235,10 +215,8 @@ export interface RetrievalRow {
   readonly embedding: readonly number[];
   readonly kind: MemoryKind;
   readonly scope: MemoryScope;
-  readonly userId: string;
   readonly projectId: string;
   readonly containerId: string;
-  readonly sessionId: string;
   readonly importance: number;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -272,10 +250,8 @@ export interface InspectMemoryRetrievalInput {
    * instead of the global latest trace across every workspace.
    */
   readonly latestScopeFilter?: {
-    readonly userId?: string;
     readonly projectId?: string;
     readonly containerId?: string;
-    readonly sessionId?: string;
   };
 }
 

@@ -18,10 +18,8 @@ export class JsonlLogStore implements CanonicalLogStore {
     return records
       .filter((record) => !input.scope || record.scope === input.scope)
       .filter((record) => !input.kind || record.kind === input.kind)
-      .filter((record) => !input.userId || record.userId === input.userId)
       .filter((record) => !input.projectId || record.projectId === input.projectId)
       .filter((record) => !input.containerId || record.containerId === input.containerId)
-      .filter((record) => !input.sessionId || record.sessionId === input.sessionId)
       .slice(0, input.limit ?? 100);
   }
 

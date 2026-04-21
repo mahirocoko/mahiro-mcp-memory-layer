@@ -16,10 +16,8 @@ export async function searchMemories(input: {
   const payload = searchMemoriesInputSchema.parse(input.payload);
   const filter = toScopeFilter({
     scope: payload.scope,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
   });
   const { result, trace } = await runHybridSearch({
     search: payload,

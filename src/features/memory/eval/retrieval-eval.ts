@@ -22,17 +22,14 @@ import type {
 const EVAL_CREATED_AT = "2026-04-01T12:00:00.000Z";
 
 export const retrievalEvalScope = {
-  userId: "mahiro",
   projectId: "mahiro-mcp-memory-layer-eval",
   containerId: "workspace:mahiro-mcp-memory-layer-eval",
-  sessionWithNotes: "eval-session-probes",
-  sessionSparse: "eval-session-sparse",
 } as const;
 
 const manualSource = { type: "manual" as const };
 
 /**
- * Fixed corpus: requestId / result-store vs trace-store probes, session rows, and a few
+ * Fixed corpus: requestId / result-store vs trace-store probes and a few
  * project-level distractors that share vocabulary but describe the wrong contract.
  * Importance nudges break ties when keyword + vector + recency align.
  */
@@ -41,7 +38,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-request-id",
     kind: "decision",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -57,7 +53,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-generic-hardening",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -72,7 +67,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-result-store",
     kind: "decision",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -88,7 +82,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-trace-store",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -104,7 +97,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-orchestration-store-tangle",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -120,7 +112,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-session-language-residual",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -136,7 +127,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-webhook-reqid-distractor",
     kind: "decision",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -152,7 +142,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-result-archive-distractor",
     kind: "decision",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -165,16 +154,14 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     updatedAt: EVAL_CREATED_AT,
   },
   {
-    id: "eval-sess-reqid",
+    id: "eval-proj-reqid-probe",
     kind: "fact",
-    scope: "session",
-    userId: retrievalEvalScope.userId,
+    scope: "project",
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
-    sessionId: retrievalEvalScope.sessionWithNotes,
     source: manualSource,
     content:
-      "Session probe: requestId must be rejected when missing before touching result-store; requestId hardening precedes writes; session-first retrieval should surface this.",
+      "Project probe: requestId must be rejected when missing before touching result-store; requestId hardening precedes writes.",
     summary: "",
     tags: [],
     importance: 0.75,
@@ -182,16 +169,14 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     updatedAt: EVAL_CREATED_AT,
   },
   {
-    id: "eval-sess-reqid-noise",
+    id: "eval-proj-reqid-probe-noise",
     kind: "fact",
-    scope: "session",
-    userId: retrievalEvalScope.userId,
+    scope: "project",
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
-    sessionId: retrievalEvalScope.sessionWithNotes,
     source: manualSource,
     content:
-      "Per-request identifier validation at the middleware boundary before result-store writes; generic guardrail without session-scoped probe wording.",
+      "Per-request identifier validation at the middleware boundary before result-store writes; generic guardrail without project-probe wording.",
     summary: "",
     tags: [],
     importance: 0.52,
@@ -202,7 +187,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-embedding-cache-invalidation",
     kind: "decision",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -218,7 +202,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-embedding-cache-hit",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -234,7 +217,6 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     id: "eval-proj-verbose-sandbox-rehearsal",
     kind: "fact",
     scope: "project",
-    userId: retrievalEvalScope.userId,
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
@@ -253,7 +235,6 @@ export interface RetrievalEvalSearchCase {
   readonly query: string;
   readonly mode: RetrievalMode;
   readonly scope: MemoryScope;
-  readonly sessionId?: string;
   /** When set, overrides the eval harness default projectId (e.g. wrong-project empty results). */
   readonly projectId?: string;
   readonly limit: number;
@@ -312,22 +293,20 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     expectedTop1: "eval-proj-trace-store",
   },
   {
-    id: "search-session-request-id",
-    query: "session probe requestId rejected result-store",
+    id: "search-project-request-id-probe",
+    query: "project probe requestId rejected result-store",
     mode: "full",
-    scope: "session",
-    sessionId: retrievalEvalScope.sessionWithNotes,
+    scope: "project",
     limit: 8,
-    expectedTop1: "eval-sess-reqid",
+    expectedTop1: "eval-proj-reqid-probe",
   },
   {
-    id: "search-session-probe-beats-reqid-noise",
-    query: "session probe requestId hardening before result-store writes",
+    id: "search-project-probe-beats-reqid-noise",
+    query: "project probe requestId hardening before result-store writes",
     mode: "full",
-    scope: "session",
-    sessionId: retrievalEvalScope.sessionWithNotes,
+    scope: "project",
     limit: 8,
-    expectedTop1: "eval-sess-reqid",
+    expectedTop1: "eval-proj-reqid-probe",
   },
   {
     id: "search-store-roles-paraphrase",
@@ -393,11 +372,10 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     expectedTop1: "",
   },
   {
-    id: "search-session-scope-no-matching-rows",
-    query: "session probe requestId rejected result-store",
+    id: "search-global-scope-no-matching-rows",
+    query: "project probe requestId rejected result-store",
     mode: "full",
-    scope: "session",
-    sessionId: "eval-session-without-memories",
+    scope: "global",
     limit: 8,
     expectEmpty: true,
     expectedTop1: "",
@@ -445,7 +423,6 @@ export const retrievalEvalEmptyTableContextCases: readonly RetrievalEvalContextC
     payload: {
       task: "Summarize requestId hardening for the orchestration result store",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
       maxItems: 6,
@@ -463,14 +440,12 @@ export const retrievalEvalDegradedContextCases: readonly RetrievalEvalContextCas
     payload: {
       task: "requestId hardening before result-store writes",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionWithNotes,
       maxItems: 6,
       maxChars: 8000,
     },
-    expectedFirstItemId: "eval-sess-reqid",
+    expectedFirstItemId: "eval-proj-reqid-probe",
     contextMustInclude: ["requestId"],
     expectDegraded: true,
   },
@@ -478,30 +453,26 @@ export const retrievalEvalDegradedContextCases: readonly RetrievalEvalContextCas
 
 export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
   {
-    id: "context-session-first-then-project",
+    id: "context-project-request-id-probe",
     payload: {
-      task: "requestId hardening and session probe before result-store writes",
+      task: "requestId hardening and project probe before result-store writes",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionWithNotes,
       maxItems: 6,
       maxChars: 8000,
     },
-    expectedFirstItemId: "eval-sess-reqid",
-    contextMustInclude: ["Session probe:", "requestId"],
-    mustIncludeItemIds: ["eval-sess-reqid", "eval-proj-request-id"],
+    expectedFirstItemId: "eval-proj-reqid-probe",
+    contextMustInclude: ["Project probe:", "requestId"],
+    mustIncludeItemIds: ["eval-proj-reqid-probe", "eval-proj-request-id"],
   },
   {
-    id: "context-project-fallback-when-session-sparse",
+    id: "context-project-result-store",
     payload: {
       task: "Explain durable workflow outputs in the result store versus trace jsonl",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionSparse,
       maxItems: 6,
       maxChars: 8000,
     },
@@ -513,10 +484,8 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
     payload: {
       task: "What is the live orchestration result-store contract for downstream tool integrators?",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionSparse,
       maxItems: 6,
       maxChars: 8000,
     },
@@ -527,17 +496,15 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
   {
     id: "context-tight-maxchars-only-top-item",
     payload: {
-      task: "requestId hardening and session probe before result-store writes",
+      task: "requestId hardening and project probe before result-store writes",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionWithNotes,
       maxItems: 6,
       maxChars: 320,
     },
-    expectedFirstItemId: "eval-sess-reqid",
-    contextMustInclude: ["Session probe:", "requestId"],
+    expectedFirstItemId: "eval-proj-reqid-probe",
+    contextMustInclude: ["Project probe:", "requestId"],
     expectTruncated: true,
     mustExcludeItemIds: ["eval-proj-request-id"],
   },
@@ -546,10 +513,8 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
     payload: {
       task: "What is the live orchestration result-store contract for downstream tool integrators?",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionSparse,
       maxItems: 10,
       maxChars: 380,
     },
@@ -564,10 +529,8 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
     payload: {
       task: "requestId hardening before result-store writes",
       mode: "full",
-      userId: retrievalEvalScope.userId,
       projectId: "mahiro-mcp-memory-layer-eval-missing-project",
       containerId: retrievalEvalScope.containerId,
-      sessionId: retrievalEvalScope.sessionWithNotes,
       maxItems: 6,
       maxChars: 8000,
     },
@@ -756,7 +719,6 @@ export async function runRetrievalEval(): Promise<RetrievalEvalOkResult> {
     await table.replaceAll(rows);
 
     const baseScope = {
-      userId: retrievalEvalScope.userId,
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
     };
@@ -771,7 +733,6 @@ export async function runRetrievalEval(): Promise<RetrievalEvalOkResult> {
           scope: spec.scope,
           ...baseScope,
           ...(spec.projectId ? { projectId: spec.projectId } : {}),
-          ...(spec.sessionId ? { sessionId: spec.sessionId } : {}),
           limit: spec.limit,
         },
         table,
@@ -810,7 +771,6 @@ export async function runRetrievalEval(): Promise<RetrievalEvalOkResult> {
           scope: spec.scope,
           ...baseScope,
           ...(spec.projectId ? { projectId: spec.projectId } : {}),
-          ...(spec.sessionId ? { sessionId: spec.sessionId } : {}),
           limit: spec.limit,
         },
         table: emptyTable,
@@ -844,7 +804,6 @@ export async function runRetrievalEval(): Promise<RetrievalEvalOkResult> {
           scope: spec.scope,
           ...baseScope,
           ...(spec.projectId ? { projectId: spec.projectId } : {}),
-          ...(spec.sessionId ? { sessionId: spec.sessionId } : {}),
           limit: spec.limit,
         },
         table,

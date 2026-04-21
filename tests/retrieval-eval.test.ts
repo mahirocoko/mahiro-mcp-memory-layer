@@ -36,11 +36,11 @@ describe("evaluateSearchCase", () => {
     expect(evaluateSearchCase(["other", "eval-proj-request-id"], spec).pass).toBe(false);
   });
 
-  it("session probe case expects session-scoped primary id", () => {
-    const spec = retrievalEvalSearchCases.find((c) => c.id === "search-session-probe-beats-reqid-noise")!;
+  it("project probe case expects the project-scoped primary id", () => {
+    const spec = retrievalEvalSearchCases.find((c) => c.id === "search-project-probe-beats-reqid-noise")!;
 
-    expect(evaluateSearchCase(["eval-sess-reqid", "eval-sess-reqid-noise"], spec).pass).toBe(true);
-    expect(evaluateSearchCase(["eval-sess-reqid-noise", "eval-sess-reqid"], spec).pass).toBe(false);
+    expect(evaluateSearchCase(["eval-proj-reqid-probe", "eval-proj-reqid-probe-noise"], spec).pass).toBe(true);
+    expect(evaluateSearchCase(["eval-proj-reqid-probe-noise", "eval-proj-reqid-probe"], spec).pass).toBe(false);
   });
 
   it("requires expected ids inside top-k when provided", () => {
@@ -146,13 +146,13 @@ describe("evaluateSearchCase", () => {
 
 describe("evaluateContextCase", () => {
   it("checks first item, substrings, and optional item ids", () => {
-    const spec = retrievalEvalContextCases.find((c) => c.id === "context-session-first-then-project")!;
+    const spec = retrievalEvalContextCases.find((c) => c.id === "context-project-request-id-probe")!;
 
     expect(
       evaluateContextCase(
         {
-          context: "Session probe: requestId x",
-          items: ["eval-sess-reqid", "eval-proj-request-id"],
+          context: "Project probe: requestId x",
+          items: ["eval-proj-reqid-probe", "eval-proj-request-id"],
           truncated: false,
         },
         spec,
@@ -163,7 +163,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "missing",
-          items: ["eval-sess-reqid", "eval-proj-request-id"],
+          items: ["eval-proj-reqid-probe", "eval-proj-request-id"],
           truncated: false,
         },
         spec,
@@ -173,7 +173,7 @@ describe("evaluateContextCase", () => {
     expect(
       evaluateContextCase(
         {
-          context: "Session probe: requestId x",
+          context: "Project probe: requestId x",
           items: ["eval-proj-request-id"],
           truncated: false,
         },
@@ -183,7 +183,7 @@ describe("evaluateContextCase", () => {
   });
 
   it("project-fallback context requires the canonical result-store item and durable wording", () => {
-    const spec = retrievalEvalContextCases.find((c) => c.id === "context-project-fallback-when-session-sparse")!;
+    const spec = retrievalEvalContextCases.find((c) => c.id === "context-project-result-store")!;
 
     expect(
       evaluateContextCase(
@@ -245,8 +245,8 @@ describe("evaluateContextCase", () => {
     expect(
       evaluateContextCase(
         {
-          context: "Session probe: requestId ok",
-          items: ["eval-sess-reqid"],
+          context: "Project probe: requestId ok",
+          items: ["eval-proj-reqid-probe"],
           truncated: true,
         },
         tight,
@@ -256,8 +256,8 @@ describe("evaluateContextCase", () => {
     expect(
       evaluateContextCase(
         {
-          context: "Session probe: requestId ok",
-          items: ["eval-sess-reqid", "eval-proj-request-id"],
+          context: "Project probe: requestId ok",
+          items: ["eval-proj-reqid-probe", "eval-proj-request-id"],
           truncated: true,
         },
         tight,
@@ -267,8 +267,8 @@ describe("evaluateContextCase", () => {
     expect(
       evaluateContextCase(
         {
-          context: "Session probe: requestId ok",
-          items: ["eval-sess-reqid"],
+          context: "Project probe: requestId ok",
+          items: ["eval-proj-reqid-probe"],
           truncated: false,
         },
         tight,
@@ -361,7 +361,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "Task: x\n\nRelevant memories:\n- [fact] requestId hardening",
-          items: ["eval-sess-reqid"],
+          items: ["eval-proj-reqid-probe"],
           truncated: false,
           degraded: true,
         },
@@ -373,7 +373,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "Task: x\n\nRelevant memories:\n- [fact] requestId hardening",
-          items: ["eval-sess-reqid"],
+          items: ["eval-proj-reqid-probe"],
           truncated: false,
           degraded: false,
         },

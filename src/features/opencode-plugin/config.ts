@@ -22,7 +22,6 @@ export type AgentTaskRouteOverrides = Partial<
 
 export const opencodePluginConfigEnv = {
   messageDebounceMs: "MAHIRO_OPENCODE_PLUGIN_MESSAGE_DEBOUNCE_MS",
-  userId: "MAHIRO_OPENCODE_PLUGIN_USER_ID",
   remindersEnabled: "MAHIRO_OPENCODE_PLUGIN_REMINDERS_ENABLED",
 } as const;
 
@@ -39,7 +38,6 @@ export interface OpenCodePluginConfig {
   };
   readonly runtime: {
     readonly messageDebounceMs: number;
-    readonly userId: string;
     readonly remindersEnabled: boolean;
   };
   readonly routing: {

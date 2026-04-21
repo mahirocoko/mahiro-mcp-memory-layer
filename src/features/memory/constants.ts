@@ -1,6 +1,6 @@
 export const memoryKinds = ["fact", "conversation", "decision", "doc", "task"] as const;
 
-export const memoryScopes = ["global", "user", "project", "session"] as const;
+export const memoryScopes = ["global", "project"] as const;
 
 export const retrievalModes = ["profile", "query", "full", "recent"] as const;
 

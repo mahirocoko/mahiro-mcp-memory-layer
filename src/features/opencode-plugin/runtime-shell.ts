@@ -325,7 +325,6 @@ export function createOpenCodePluginRuntime(
       context,
       event,
       config.runtime.messageDebounceMs,
-      config.runtime.userId,
     );
   };
 
@@ -342,22 +341,19 @@ export function createOpenCodePluginRuntime(
       service: "opencode-memory-plugin",
       level: "debug",
       message: "OpenCode plugin session-start wake-up started.",
-      extra: {
-        sessionId: sessionState.sessionId,
-        userId: wakeUpScope.userId,
-        projectId: wakeUpScope.projectId,
-        containerId: wakeUpScope.containerId,
-        scopeSessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
-        hasStartedWakeUpBeforeStart: false,
-      },
-    });
+        extra: {
+          sessionId: sessionState.sessionId,
+          projectId: wakeUpScope.projectId,
+          containerId: wakeUpScope.containerId,
+          scopeSessionId: wakeUpScope.sessionId,
+          hasStartedWakeUpBeforeStart: false,
+        },
+      });
     const wakeUpPromise = getOpenCodePluginMemoryBackend(options.__test).then((backend) =>
       backend.wakeUpMemory(
         {
-          userId: wakeUpScope.userId,
           projectId: wakeUpScope.projectId,
           containerId: wakeUpScope.containerId,
-          sessionId: wakeUpScope.sessionId ?? sessionState.sessionId,
         },
         {
           surface: "opencode-plugin",
@@ -496,10 +492,8 @@ export function createOpenCodePluginRuntime(
           task: routing.task,
           mode: "query",
           recentConversation,
-          userId: scope.userId,
           projectId: scope.projectId,
           containerId: scope.containerId,
-          sessionId: scope.sessionId ?? sessionId,
         },
         {
           surface: "opencode-plugin",
@@ -618,10 +612,8 @@ export function createOpenCodePluginRuntime(
             task: routing.task,
             mode: "query",
             recentConversation,
-            userId: scope.userId,
             projectId: scope.projectId,
             containerId: scope.containerId,
-            sessionId: scope.sessionId ?? sessionState.sessionId,
           },
           {
             surface: "opencode-plugin",
@@ -737,10 +729,8 @@ export function createOpenCodePluginRuntime(
 
       return backend.inspectMemoryRetrieval({
         latestScopeFilter: {
-          userId: scope.userId,
           projectId: scope.projectId,
           containerId: scope.containerId,
-          sessionId: scope.sessionId,
         },
       });
     },

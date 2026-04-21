@@ -15,14 +15,12 @@ function normStr(value: string | undefined): string {
 }
 
 function scopeMatches(record: MemoryRecord, payload: UpsertPayload): boolean {
-  const scope = payload.sessionId ? "session" : "project";
+  const scope = "project";
 
   return (
     record.scope === scope &&
-    normStr(record.userId) === normStr(payload.userId) &&
     normStr(record.projectId) === normStr(payload.projectId) &&
-    normStr(record.containerId) === normStr(payload.containerId) &&
-    normStr(record.sessionId) === normStr(payload.sessionId)
+    normStr(record.containerId) === normStr(payload.containerId)
   );
 }
 
@@ -63,14 +61,12 @@ export async function upsertDocument(input: {
   readonly embeddingProvider: EmbeddingProvider;
 }) {
   const payload = upsertDocumentInputSchema.parse(input.payload);
-  const scope = payload.sessionId ? "session" : "project";
+  const scope = "project";
 
   assertValidScope({
     scope,
-    userId: payload.userId,
     projectId: payload.projectId,
     containerId: payload.containerId,
-    sessionId: payload.sessionId,
   });
 
   const existing = findLatestMatchingDoc(await input.logStore.readAll(), payload);
@@ -107,10 +103,8 @@ export async function upsertDocument(input: {
       content: payload.content,
       kind: "doc",
       scope,
-      userId: payload.userId,
       projectId: payload.projectId,
       containerId: payload.containerId,
-      sessionId: payload.sessionId,
       source: payload.source,
       summary: payload.summary,
       tags: payload.tags,

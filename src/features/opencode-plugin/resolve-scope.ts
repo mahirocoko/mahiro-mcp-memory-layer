@@ -2,12 +2,11 @@ import path from "node:path";
 
 import type { PluginInput } from "@opencode-ai/plugin";
 
-export const openCodeScopeFieldNames = ["userId", "projectId", "containerId", "sessionId"] as const;
+export const openCodeScopeFieldNames = ["projectId", "containerId", "sessionId"] as const;
 
 export type OpenCodeScopeField = (typeof openCodeScopeFieldNames)[number];
 
 export type OpenCodeScopeSource =
-  | "providedUserId"
   | "context.project.id"
   | "context.project.name"
   | "context.worktree"
@@ -29,7 +28,6 @@ export interface OpenCodePluginEvent {
 }
 
 export interface OpenCodeResolvedScope {
-  readonly userId: string;
   readonly projectId: string;
   readonly containerId: string;
   readonly sessionId: string;
@@ -38,11 +36,6 @@ export interface OpenCodeResolvedScope {
 export interface ResolveOpenCodeScopeInput {
   readonly context: OpenCodePluginContext;
   readonly event: OpenCodePluginEvent;
-  /**
-   * OpenCode's public plugin docs do not currently document a stable user/account identifier on hook context or event payloads.
-   * The runtime shell may provide one explicitly; otherwise the result stays incomplete instead of guessing.
-   */
-  readonly providedUserId?: string;
 }
 
 export interface CompleteOpenCodeScopeResolution {
@@ -64,7 +57,6 @@ export type OpenCodeScopeResolution = CompleteOpenCodeScopeResolution | Incomple
 
 export function resolveOpenCodeScope(input: ResolveOpenCodeScopeInput): OpenCodeScopeResolution {
   const resolvedScope = {
-    userId: toNonEmptyString(input.providedUserId),
     projectId: resolveProjectId(input.context),
     containerId: resolveContainerId(input.context),
     sessionId: resolveSessionId(input.event),
@@ -72,7 +64,6 @@ export function resolveOpenCodeScope(input: ResolveOpenCodeScopeInput): OpenCode
   const partialScope = toPartialScope(resolvedScope);
 
   const resolvedFrom = {
-    ...(resolvedScope.userId ? { userId: "providedUserId" as const } : {}),
     ...resolveProjectSource(input.context),
     ...resolveContainerSource(input.context),
     ...resolveSessionSource(input.event),
@@ -201,13 +192,11 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function toPartialScope(scope: {
-  readonly userId?: string;
   readonly projectId?: string;
   readonly containerId?: string;
   readonly sessionId?: string;
 }): Partial<OpenCodeResolvedScope> {
   return {
-    ...(scope.userId ? { userId: scope.userId } : {}),
     ...(scope.projectId ? { projectId: scope.projectId } : {}),
     ...(scope.containerId ? { containerId: scope.containerId } : {}),
     ...(scope.sessionId ? { sessionId: scope.sessionId } : {}),

@@ -2,9 +2,7 @@ import type { MemoryScope, ScopeFilter } from "../types.js";
 
 const scopeRequirementByName: Record<MemoryScope, readonly (keyof ScopeFilter)[]> = {
   global: [],
-  user: ["userId"],
-  project: ["userId", "projectId", "containerId"],
-  session: ["userId", "projectId", "containerId", "sessionId"],
+  project: ["projectId", "containerId"],
 };
 
 export function assertValidScope(filter: ScopeFilter): void {
@@ -25,20 +23,12 @@ export function toScopeFilter(input: ScopeFilter): ScopeFilter {
 export function toSqlScopeWhereClause(filter: ScopeFilter): string {
   const parts = [`scope = '${escapeSqlValue(filter.scope)}'`];
 
-  if (filter.userId) {
-    parts.push(`user_id = '${escapeSqlValue(filter.userId)}'`);
-  }
-
   if (filter.projectId) {
     parts.push(`project_id = '${escapeSqlValue(filter.projectId)}'`);
   }
 
   if (filter.containerId) {
     parts.push(`container_id = '${escapeSqlValue(filter.containerId)}'`);
-  }
-
-  if (filter.sessionId) {
-    parts.push(`session_id = '${escapeSqlValue(filter.sessionId)}'`);
   }
 
   return parts.join(" AND ");

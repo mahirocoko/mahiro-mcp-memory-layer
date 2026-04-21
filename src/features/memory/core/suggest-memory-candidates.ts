@@ -89,14 +89,8 @@ function splitLines(text: string): readonly string[] {
 }
 
 function suggestScope(input: SuggestMemoryCandidatesInput): MemorySuggestionCandidate["scope"] {
-  if (input.sessionId) {
-    return "session";
-  }
   if (input.projectId || input.containerId) {
     return "project";
-  }
-  if (input.userId) {
-    return "user";
   }
   return "global";
 }

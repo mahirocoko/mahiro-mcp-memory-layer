@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -13,8 +12,6 @@ import type { MemoryService } from "../src/features/memory/memory-service.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
-const expectedLocalUserId = `local:${os.userInfo().username}`;
-
 function createSessionCreatedEvent(sessionId = "session-1") {
   return {
     type: "session.created" as const,
@@ -353,10 +350,8 @@ describe("OpenCode plugin package", () => {
       );
 
       expect(sharedMemoryBackend.wakeUpMemory).toHaveBeenCalledWith({
-        userId: expectedLocalUserId,
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
-        sessionId: "session-1",
       }, {
         surface: "opencode-plugin",
         trigger: "session-start",
@@ -366,10 +361,8 @@ describe("OpenCode plugin package", () => {
         task: "Summarize relevant memory context for the latest OpenCode turn.",
         mode: "query",
         recentConversation: "Summarize recent memory context for this turn.",
-        userId: expectedLocalUserId,
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
-        sessionId: "session-1",
       }, {
         surface: "opencode-plugin",
         trigger: "message.updated",
@@ -379,10 +372,8 @@ describe("OpenCode plugin package", () => {
         task: "Summarize relevant memory context for the latest OpenCode turn.",
         mode: "query",
         recentConversation: "Summarize recent memory context for this turn.",
-        userId: expectedLocalUserId,
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
-        sessionId: "session-1",
       }, {
         surface: "opencode-plugin",
         trigger: "session.idle",
@@ -396,14 +387,12 @@ describe("OpenCode plugin package", () => {
           scopeResolution: {
             status: "complete",
             scope: {
-              userId: expectedLocalUserId,
               projectId: "mahiro-mcp-memory-layer",
               containerId: `worktree:${repoRoot}`,
               sessionId: "session-1",
             },
             missing: [],
             resolvedFrom: {
-              userId: "providedUserId",
               projectId: "context.project.id",
               containerId: "context.worktree",
               sessionId: "event.properties.sessionID",

@@ -41,7 +41,6 @@ describe("applyConservativeMemoryPolicy", () => {
     const out = await applyConservativeMemoryPolicy({
       payload: {
         conversation: "We decided to use Bun for all runtime scripts in this repository.",
-        userId: "u1",
         projectId: "p1",
         containerId: "c1",
       },

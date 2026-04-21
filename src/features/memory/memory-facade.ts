@@ -48,22 +48,20 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
   ): Promise<WakeUpMemoryResult> => {
     const parsed = wakeUpMemoryInputSchema.parse(payload);
     const base = {
-      userId: parsed.userId,
       projectId: parsed.projectId,
       containerId: parsed.containerId,
-      sessionId: parsed.sessionId,
       maxItems: parsed.maxItems,
       maxChars: parsed.maxChars,
     };
     const [profile, recent] = await Promise.all([
       dependencies.buildContext({
         ...base,
-        task: "Summarize stable user and project context for session startup.",
+        task: "Summarize stable project context for session startup.",
         mode: "profile",
       }, buildTracePhase(traceProvenance, "wake-up-profile")),
       dependencies.buildContext({
         ...base,
-        task: "Summarize recent user and project activity for session startup.",
+        task: "Summarize recent project activity for session startup.",
         mode: "recent",
       }, buildTracePhase(traceProvenance, "wake-up-recent")),
     ]);
@@ -86,10 +84,8 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
     const buildPayload: BuildContextForTaskInput = {
       task: parsed.task,
       mode: parsed.mode,
-      userId: parsed.userId,
       projectId: parsed.projectId,
       containerId: parsed.containerId,
-      sessionId: parsed.sessionId,
       maxItems: parsed.maxItems,
       maxChars: parsed.maxChars,
       includeMemorySuggestions: true,
@@ -110,10 +106,8 @@ export function createMemoryFacade(dependencies: MemoryFacadeDependencies): Memo
 
     const conservativePolicy = await dependencies.applyConservativeMemoryPolicy({
       suggestion: memorySuggestions,
-      userId: parsed.userId,
       projectId: parsed.projectId,
       containerId: parsed.containerId,
-      sessionId: parsed.sessionId,
       sourceOverride: parsed.sourceOverride,
       extraTags: parsed.extraTags,
     });

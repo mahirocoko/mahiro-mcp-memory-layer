@@ -39,7 +39,6 @@ describe("loadOpenCodePluginConfig", () => {
       },
       runtime: {
         messageDebounceMs: defaultOpenCodePluginMessageDebounceMs,
-        userId: expect.stringMatching(/^local:/),
         remindersEnabled: defaultOpenCodePluginRemindersEnabled,
       },
       routing: {
@@ -47,20 +46,9 @@ describe("loadOpenCodePluginConfig", () => {
       },
       env: {
         messageDebounceMs: opencodePluginConfigEnv.messageDebounceMs,
-        userId: opencodePluginConfigEnv.userId,
         remindersEnabled: opencodePluginConfigEnv.remindersEnabled,
       },
     });
-  });
-
-  it("prefers explicit user id overrides from environment variables", async () => {
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-          [opencodePluginConfigEnv.userId]: "project-user",
-        },
-      }).then((config) => config.runtime.userId),
-    ).resolves.toBe("project-user");
   });
 
   it("parses message debounce overrides from environment variables", async () => {
@@ -87,7 +75,6 @@ describe("loadOpenCodePluginConfig", () => {
         // user default
         "runtime": {
           "messageDebounceMs": 320,
-          "userId": "user-scope",
           "remindersEnabled": true
         },
         "routing": {
@@ -129,7 +116,6 @@ describe("loadOpenCodePluginConfig", () => {
     ).resolves.toMatchObject({
       runtime: {
         messageDebounceMs: 120,
-        userId: "user-scope",
         remindersEnabled: true,
       },
       routing: {

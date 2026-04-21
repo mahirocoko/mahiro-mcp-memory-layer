@@ -16,8 +16,6 @@ vi.mock("node:child_process", () => ({
 }));
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const expectedLocalUserId = `local:${os.userInfo().username}`;
-
 const pluginModulePath = "../src/features/opencode-plugin/index.js";
 
 interface PluginEvent {
@@ -1183,9 +1181,11 @@ describe("product memory OpenCode plugin contract", () => {
         sessionId: "session-tool",
         scopeResolution: {
           status: "complete",
-          scope: {
-            userId: expectedLocalUserId,
-          },
+          scope: expect.objectContaining({
+            projectId: "mahiro-mcp-memory-layer",
+            containerId: `worktree:${repoRoot}`,
+            sessionId: "session-tool",
+          }),
         },
         lastEventType: "session.created",
         coordination: {
@@ -1298,10 +1298,8 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.inspectMemoryRetrieval).toHaveBeenCalledWith({
       latestScopeFilter: {
-        userId: expectedLocalUserId,
         projectId: "mahiro-mcp-memory-layer",
         containerId: `worktree:${repoRoot}`,
-        sessionId: "session-trace",
       },
     });
     expectNoSelfSpawn(harness);
@@ -1320,8 +1318,6 @@ describe("product memory OpenCode plugin contract", () => {
     expect(harness.memory.wakeUpMemory).toHaveBeenCalledWith({
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-a",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session-start",
@@ -1366,7 +1362,6 @@ describe("product memory OpenCode plugin contract", () => {
           message: "OpenCode plugin session-start wake-up started.",
           extra: expect.objectContaining({
             sessionId: "session-debug",
-            userId: expectedLocalUserId,
             projectId: "mahiro-mcp-memory-layer",
             containerId: `worktree:${repoRoot}`,
             scopeSessionId: "session-debug",
@@ -1428,10 +1423,8 @@ describe("product memory OpenCode plugin contract", () => {
 
     expect(harness.memory.wakeUpMemory).toHaveBeenCalledTimes(1);
     expect(harness.memory.wakeUpMemory).toHaveBeenCalledWith({
-      userId: expectedLocalUserId,
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-fallback",
     }, {
       surface: "opencode-plugin",
       trigger: "session-start",
@@ -1499,8 +1492,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "draft three",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "message.updated",
@@ -1564,8 +1555,6 @@ describe("product memory OpenCode plugin contract", () => {
         "Continue from the previous orchestration debugging session and recall what we decided earlier.",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-continuity",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "message.updated",
@@ -1599,8 +1588,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "Continue from the previous session and compare it with what we decided earlier.",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-part-continuity",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "message.part.updated",
@@ -1715,8 +1702,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "partial draft three",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-part-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "message.part.updated",
@@ -1914,8 +1899,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "latest turn",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-idle",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",
@@ -1976,8 +1959,6 @@ describe("product memory OpenCode plugin contract", () => {
         "Resume from the previous session and remember the project context before we continue.",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-idle-continuity",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",
@@ -2012,8 +1993,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "first turn",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-next-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",
@@ -2025,8 +2004,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "second turn",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-next-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",
@@ -2064,8 +2041,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "first turn",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-empty-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",
@@ -2133,8 +2108,6 @@ describe("product memory OpenCode plugin contract", () => {
       recentConversation: "first partial turn",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoRoot}`,
-      sessionId: "session-empty-part-turn",
-      userId: expectedLocalUserId,
     }, {
       surface: "opencode-plugin",
       trigger: "session.idle",

@@ -26,13 +26,12 @@ describe("suggestMemoryCandidates", () => {
     expect(result.recommendation).toBe("strong_candidate");
   });
 
-  it("suggests user scope when only userId is provided", () => {
+  it("suggests global scope when no project identifiers are provided", () => {
     const result = suggestMemoryCandidates({
       conversation: "I prefer two-space indentation in this codebase.",
-      userId: "mahiro",
     });
 
-    expect(result.candidates[0]?.scope).toBe("user");
+    expect(result.candidates[0]?.scope).toBe("global");
     expect(result.candidates[0]?.kind).toBe("conversation");
   });
 
