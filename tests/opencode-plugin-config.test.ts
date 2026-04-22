@@ -5,7 +5,6 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  defaultOpenCodePluginRemindersEnabled,
   defaultOpenCodePluginMessageDebounceMs,
   opencodePluginConfigEnv,
 } from "../src/features/opencode-plugin/config.js";
@@ -28,7 +27,7 @@ async function createTempDirectory(): Promise<string> {
 }
 
 describe("loadOpenCodePluginConfig", () => {
-  it("returns plugin-first defaults without requiring manual MCP config", async () => {
+  it("returns plugin-first memory defaults without requiring manual MCP config", async () => {
     await expect(loadOpenCodePluginConfig({ env: {} })).resolves.toEqual({
       packageName: "mahiro-mcp-memory-layer",
       install: {
@@ -39,14 +38,9 @@ describe("loadOpenCodePluginConfig", () => {
       },
       runtime: {
         messageDebounceMs: defaultOpenCodePluginMessageDebounceMs,
-        remindersEnabled: defaultOpenCodePluginRemindersEnabled,
-      },
-      routing: {
-        categoryRoutes: {},
       },
       env: {
         messageDebounceMs: opencodePluginConfigEnv.messageDebounceMs,
-        remindersEnabled: opencodePluginConfigEnv.remindersEnabled,
       },
     });
   });
@@ -55,7 +49,7 @@ describe("loadOpenCodePluginConfig", () => {
     await expect(
       loadOpenCodePluginConfig({
         env: {
-        [opencodePluginConfigEnv.messageDebounceMs]: "40",
+          [opencodePluginConfigEnv.messageDebounceMs]: "40",
         },
       }).then((config) => config.runtime.messageDebounceMs),
     ).resolves.toBe(40);
@@ -72,38 +66,15 @@ describe("loadOpenCodePluginConfig", () => {
     await writeFile(
       path.join(userConfigDirectory, "mahiro-mcp-memory-layer.jsonc"),
       `{
-        // user default
         "runtime": {
-          "messageDebounceMs": 320,
-          "remindersEnabled": true
-        },
-        "routing": {
-          "categories": {
-            "quick": {
-              "model": "claude-opus-4-7-high"
-            },
-            "interactive-gemini": {
-              "model": "gemini-2.5-pro"
-            }
-          }
-        },
-      }
-      `,
+          "messageDebounceMs": 320
+        }
+      }`,
     );
     await writeFile(
       path.join(projectConfigDirectory, "mahiro-mcp-memory-layer.json"),
       JSON.stringify({
         runtime: { messageDebounceMs: 120 },
-        routing: {
-          categories: {
-            quick: {
-              workerRuntime: "mcp",
-            },
-            "interactive-gemini": {
-              workerRuntime: "shell",
-            },
-          },
-        },
       }),
     );
 
@@ -116,84 +87,7 @@ describe("loadOpenCodePluginConfig", () => {
     ).resolves.toMatchObject({
       runtime: {
         messageDebounceMs: 120,
-        remindersEnabled: true,
-      },
-      routing: {
-        categoryRoutes: {
-          quick: {
-            model: "claude-opus-4-7-high",
-            workerRuntime: "mcp",
-          },
-          "interactive-gemini": {
-            model: "gemini-2.5-pro",
-            workerRuntime: "shell",
-          },
-        },
       },
     });
-  });
-
-  it("lets environment overrides win over config files", async () => {
-    const homeDirectory = await createTempDirectory();
-    const userConfigDirectory = path.join(homeDirectory, ".config", "opencode");
-
-    await mkdir(userConfigDirectory, { recursive: true });
-    await writeFile(
-      path.join(userConfigDirectory, "mahiro-mcp-memory-layer.json"),
-      JSON.stringify({ runtime: { messageDebounceMs: 320 } }),
-    );
-
-    await expect(
-      loadOpenCodePluginConfig({
-        homeDirectory,
-        env: {
-          [opencodePluginConfigEnv.messageDebounceMs]: "40",
-        },
-      }).then((config) => config.runtime.messageDebounceMs),
-    ).resolves.toBe(40);
-  });
-
-  it("falls back to defaults when the environment override is invalid", async () => {
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-        [opencodePluginConfigEnv.messageDebounceMs]: "  ",
-        },
-      }).then((config) => config.runtime.messageDebounceMs),
-    ).resolves.toBe(defaultOpenCodePluginMessageDebounceMs);
-
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-        [opencodePluginConfigEnv.messageDebounceMs]: "fast",
-        },
-      }).then((config) => config.runtime.messageDebounceMs),
-    ).resolves.toBe(defaultOpenCodePluginMessageDebounceMs);
-
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-        [opencodePluginConfigEnv.messageDebounceMs]: "-5",
-        },
-      }).then((config) => config.runtime.messageDebounceMs),
-    ).resolves.toBe(defaultOpenCodePluginMessageDebounceMs);
-  });
-
-  it("parses remindersEnabled from environment variables", async () => {
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-          [opencodePluginConfigEnv.remindersEnabled]: "true",
-        },
-      }).then((config) => config.runtime.remindersEnabled),
-    ).resolves.toBe(true);
-
-    await expect(
-      loadOpenCodePluginConfig({
-        env: {
-          [opencodePluginConfigEnv.remindersEnabled]: "false",
-        },
-      }).then((config) => config.runtime.remindersEnabled),
-    ).resolves.toBe(false);
   });
 });

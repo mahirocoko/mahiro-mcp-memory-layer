@@ -29,7 +29,7 @@ export const retrievalEvalScope = {
 const manualSource = { type: "manual" as const };
 
 /**
- * Fixed corpus: requestId / result-store vs trace-store probes and a few
+ * Fixed corpus: requestId / memory-records vs retrieval-trace probes and a few
  * project-level distractors that share vocabulary but describe the wrong contract.
  * Importance nudges break ties when keyword + vector + recency align.
  */
@@ -64,14 +64,14 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     updatedAt: EVAL_CREATED_AT,
   },
   {
-    id: "eval-proj-result-store",
+    id: "eval-proj-memory-records",
     kind: "decision",
     scope: "project",
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
     content:
-      "orchestration result-store persists durable workflow outputs (structured results) for downstream tools; distinct from trace metadata. Integrators consume structured workflow artifacts via this handoff path.",
+      "memory records persist durable outputs for downstream tools; distinct from retrieval trace metadata. Integrators consume structured artifacts through this handoff path.",
     summary: "",
     tags: [],
     importance: 0.88,
@@ -79,14 +79,14 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     updatedAt: EVAL_CREATED_AT,
   },
   {
-    id: "eval-proj-trace-store",
+    id: "eval-proj-retrieval-trace",
     kind: "fact",
     scope: "project",
     projectId: retrievalEvalScope.projectId,
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
     content:
-      "orchestration trace-store is append-only canonical jsonl for lifecycle/debugging; not a substitute for durable result payloads. Failure review and engineering inspection use this record stream.",
+      "retrieval trace storage is append-only canonical jsonl for lifecycle and debugging; not a substitute for durable memory records. Failure review and engineering inspection use this record stream.",
     summary: "",
     tags: [],
     importance: 0.5,
@@ -94,7 +94,7 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     updatedAt: EVAL_CREATED_AT,
   },
   {
-    id: "eval-proj-orchestration-store-tangle",
+    id: "eval-proj-memory-store-distractor",
     kind: "fact",
     scope: "project",
     projectId: retrievalEvalScope.projectId,
@@ -131,7 +131,7 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
     content:
-      "Webhook delivery deduplication: requestId hardening on the inbound webhook receiver rejects duplicate deliveries at the hook entry-point; unrelated to orchestration write gating or status-polling correctness.",
+      "Webhook delivery deduplication: requestId hardening on the inbound webhook receiver rejects duplicate deliveries at the hook entry-point; unrelated to memory write gating or polling correctness.",
     summary: "",
     tags: [],
     importance: 0.85,
@@ -221,7 +221,7 @@ export const retrievalEvalMemoryRecords: readonly MemoryRecord[] = [
     containerId: retrievalEvalScope.containerId,
     source: manualSource,
     content:
-      "Sandbox rehearsal note (non-production): teams often walk through durable workflow outputs, structured results, downstream tools, integrators, handoff paths, trace metadata, and lifecycle logging while preparing QA checklists. During rehearsal, engineers repeat phrases about durable workflow outputs and structured results for downstream tools, compare trace metadata side notes with integrator-facing handoff paths, and rehearse how downstream tools might skim structured results even though this paragraph is explicitly about dry-run practice rather than the live orchestration contract. The rehearsal script mentions durable workflow outputs again, downstream tools again, structured results again, trace metadata again, and integrator handoff vocabulary again to simulate noisy meeting minutes. None of this substitutes for reading the canonical orchestration plane design notes: it is intentionally verbose padding so lexical overlap stays high while the described intent remains sandbox-only drill documentation.",
+      "Sandbox rehearsal note (non-production): teams often walk through durable outputs, structured records, downstream tools, integrators, handoff paths, trace metadata, and lifecycle logging while preparing QA checklists. During rehearsal, engineers repeat phrases about durable outputs and structured records for downstream tools, compare trace metadata side notes with integrator-facing handoff paths, and rehearse how downstream tools might skim structured records even though this paragraph is explicitly about dry-run practice rather than the live memory contract. The rehearsal script mentions durable outputs again, downstream tools again, structured records again, trace metadata again, and integrator handoff vocabulary again to simulate noisy meeting minutes. None of this substitutes for reading the canonical memory design notes: it is intentionally verbose padding so lexical overlap stays high while the described intent remains sandbox-only drill documentation.",
     summary: "",
     tags: [],
     importance: 0.42,
@@ -282,15 +282,15 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     mode: "full",
     scope: "project",
     limit: 8,
-    expectedTop1: "eval-proj-result-store",
+    expectedTop1: "eval-proj-memory-records",
   },
   {
     id: "search-trace-store-project",
-    query: "append-only canonical orchestration trace jsonl debugging",
+    query: "append-only canonical retrieval trace jsonl debugging",
     mode: "full",
     scope: "project",
     limit: 8,
-    expectedTop1: "eval-proj-trace-store",
+    expectedTop1: "eval-proj-retrieval-trace",
   },
   {
     id: "search-project-request-id-probe",
@@ -315,13 +315,13 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     mode: "full",
     scope: "project",
     limit: 8,
-    expectedTop1: "eval-proj-result-store",
-    expectedInTopK: { k: 6, ids: ["eval-proj-result-store", "eval-proj-trace-store"] },
+    expectedTop1: "eval-proj-memory-records",
+    expectedInTopK: { k: 6, ids: ["eval-proj-memory-records", "eval-proj-retrieval-trace"] },
   },
   {
     id: "search-semantic-replay-gate",
     query:
-      "hook validation must precede durable writes when orchestration traffic looks malformed or replayed so polling cannot attach to the wrong run",
+      "hook validation must precede durable writes when memory traffic looks malformed or replayed so polling cannot attach to the wrong run",
     mode: "full",
     scope: "project",
     limit: 8,
@@ -329,7 +329,7 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
   },
   {
     id: "search-reqid-gating-vs-webhook-dedup",
-    query: "requestId hardening reject hook before result-store writes orchestration gating",
+    query: "requestId hardening reject hook before result-store writes memory gating",
     mode: "full",
     scope: "project",
     limit: 10,
@@ -341,7 +341,7 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
     mode: "full",
     scope: "project",
     limit: 10,
-    expectedTop1: "eval-proj-result-store",
+    expectedTop1: "eval-proj-memory-records",
   },
   {
     id: "search-same-topic-embedding-cache-invalidation-beats-reuse",
@@ -355,11 +355,11 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
   {
     id: "search-long-noisy-sandbox-doc-vs-result-store-contract",
     query:
-      "orchestration result-store persists durable workflow outputs structured results downstream tools distinct trace metadata integrators consume handoff path",
+      "memory records persist durable outputs structured records downstream tools distinct trace metadata integrators consume handoff path",
     mode: "full",
     scope: "project",
     limit: 10,
-    expectedTop1: "eval-proj-result-store",
+    expectedTop1: "eval-proj-memory-records",
   },
   {
     id: "search-wrong-project-scope-empty",
@@ -386,7 +386,7 @@ export const retrievalEvalSearchCases: readonly RetrievalEvalSearchCase[] = [
 export const retrievalEvalEmptyTableSearchCases: readonly RetrievalEvalSearchCase[] = [
   {
     id: "search-empty-corpus-project-scope",
-    query: "requestId orchestration durable workflow outputs",
+    query: "requestId memory durable outputs",
     mode: "full",
     scope: "project",
     limit: 8,
@@ -411,7 +411,7 @@ export const retrievalEvalDegradedSearchCases: readonly RetrievalEvalSearchCase[
     mode: "full",
     scope: "project",
     limit: 8,
-    expectedTop1: "eval-proj-result-store",
+    expectedTop1: "eval-proj-memory-records",
     expectDegraded: true,
   },
 ];
@@ -421,7 +421,7 @@ export const retrievalEvalEmptyTableContextCases: readonly RetrievalEvalContextC
   {
     id: "context-empty-corpus-no-memory-items",
     payload: {
-      task: "Summarize requestId hardening for the orchestration result store",
+      task: "Summarize requestId hardening for the memory records store",
       mode: "full",
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
@@ -476,22 +476,22 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
       maxItems: 6,
       maxChars: 8000,
     },
-    expectedFirstItemId: "eval-proj-result-store",
+    expectedFirstItemId: "eval-proj-memory-records",
     contextMustInclude: ["result-store", "durable"],
   },
   {
     id: "context-adversarial-sandbox-noise-excluded",
     payload: {
-      task: "What is the live orchestration result-store contract for downstream tool integrators?",
+      task: "What is the live memory-records contract for downstream tool integrators?",
       mode: "full",
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
       maxItems: 6,
       maxChars: 8000,
     },
-    expectedFirstItemId: "eval-proj-result-store",
-    contextMustInclude: ["durable workflow outputs", "downstream tools"],
-    mustIncludeItemIds: ["eval-proj-result-store"],
+    expectedFirstItemId: "eval-proj-memory-records",
+    contextMustInclude: ["durable outputs", "downstream tools"],
+    mustIncludeItemIds: ["eval-proj-memory-records"],
   },
   {
     id: "context-tight-maxchars-only-top-item",
@@ -511,15 +511,15 @@ export const retrievalEvalContextCases: readonly RetrievalEvalContextCase[] = [
   {
     id: "context-maxchars-drops-verbose-sandbox-distractor",
     payload: {
-      task: "What is the live orchestration result-store contract for downstream tool integrators?",
+      task: "What is the live memory-records contract for downstream tool integrators?",
       mode: "full",
       projectId: retrievalEvalScope.projectId,
       containerId: retrievalEvalScope.containerId,
       maxItems: 10,
       maxChars: 380,
     },
-    expectedFirstItemId: "eval-proj-result-store",
-    contextMustInclude: ["durable workflow outputs"],
+    expectedFirstItemId: "eval-proj-memory-records",
+    contextMustInclude: ["durable outputs"],
     expectTruncated: true,
     mustExcludeItemIds: ["eval-proj-verbose-sandbox-rehearsal"],
     contextMustExclude: ["Sandbox rehearsal note (non-production)"],

@@ -4,13 +4,11 @@ import { fileURLToPath } from "node:url";
 import type { Config } from "@opencode-ai/plugin";
 
 const packagedMcpUsageInstructionPath = fileURLToPath(new URL("../../../MCP_USAGE.md", import.meta.url));
-const packagedOrchestrationInstructionPath = fileURLToPath(new URL("../../../ORCHESTRATION.md", import.meta.url));
 const packagedContinuityDebuggingInstructionPath = fileURLToPath(
   new URL("../../../CONTINUITY_DEBUGGING.md", import.meta.url),
 );
 const packagedInstructionPaths = [
   packagedMcpUsageInstructionPath,
-  packagedOrchestrationInstructionPath,
   packagedContinuityDebuggingInstructionPath,
 ];
 

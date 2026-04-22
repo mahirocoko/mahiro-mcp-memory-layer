@@ -24,7 +24,9 @@
     "README.md",
     "AGENTS.md",
     "MCP_USAGE.md",
-    "ORCHESTRATION.md",
+    "CONTINUITY_DEBUGGING.md",
+    "ARCHITECTURE_BOUNDARIES.md",
+    "AGENT_NEXT_STEPS.md",
     "package.json"
   ],
   "scripts": {

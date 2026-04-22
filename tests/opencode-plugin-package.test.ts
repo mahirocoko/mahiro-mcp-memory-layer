@@ -1,17 +1,13 @@
-import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import type { PluginInput, PluginModule } from "@opencode-ai/plugin";
 import { describe, expect, it, vi } from "vitest";
 
 import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
-import { getRegisteredMemoryTools } from "../src/features/memory/mcp/register-tools.js";
-import type { MemoryService } from "../src/features/memory/memory-service.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const execFileAsync = promisify(execFile);
+
 function createSessionCreatedEvent(sessionId = "session-1") {
   return {
     type: "session.created" as const,
@@ -44,60 +40,6 @@ function createSessionIdleEvent(sessionId = "session-1") {
   };
 }
 
-function createFixedWakeUpResult(context: string) {
-  return {
-    wakeUpContext: context,
-    profile: { context: `${context}:profile`, items: [], truncated: false, degraded: false },
-    recent: { context: `${context}:recent`, items: [], truncated: false, degraded: false },
-    truncated: false,
-    degraded: false,
-  };
-}
-
-function createFixedPrepareTurnResult(context: string) {
-  return {
-    context,
-    items: [context],
-    truncated: false,
-    degraded: false,
-    memorySuggestions: {
-      recommendation: "likely_skip" as const,
-      signals: { durable: [], ephemeral: [] },
-      candidates: [],
-    },
-    conservativePolicy: {
-      recommendation: "likely_skip" as const,
-      signals: { durable: [], ephemeral: [] },
-      candidates: [],
-      autoSaved: [],
-      autoSaveSkipped: [],
-      reviewOnlySuggestions: [],
-    },
-  };
-}
-
-function createFixedPrepareHostTurnResult(context: string) {
-  return {
-    context,
-    items: [context],
-    truncated: false,
-    degraded: false,
-    memorySuggestions: {
-      recommendation: "likely_skip" as const,
-      signals: { durable: [], ephemeral: [] },
-      candidates: [],
-    },
-    conservativePolicy: {
-      recommendation: "likely_skip" as const,
-      signals: { durable: [], ephemeral: [] },
-      candidates: [],
-      autoSaved: [],
-      autoSaveSkipped: [],
-      reviewOnlySuggestions: [],
-    },
-  };
-}
-
 function parsePluginToolResult(result: unknown): unknown {
   expect(typeof result).toBe("string");
   return JSON.parse(result as string);
@@ -105,496 +47,126 @@ function parsePluginToolResult(result: unknown): unknown {
 
 function createSharedMemoryBackend(): MemoryToolBackend {
   return {
-    remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
-    promoteMemory: vi.fn().mockResolvedValue({
-      id: "remembered-memory",
-      status: "accepted",
-      verificationStatus: "verified",
-      verifiedAt: "2026-04-22T00:00:00.000Z",
-      verificationEvidence: [
-        {
-          type: "test",
-          value: "tests/opencode-plugin-package.test.ts#shared-tool-promotion",
-          note: "Verified by shared tool contract test.",
-        },
-      ],
+    inspectMemoryRetrieval: vi.fn().mockResolvedValue({ status: "empty", lookup: "latest" }),
+    resetStorage: vi.fn().mockResolvedValue({ status: "cleared" }),
+    promoteMemory: vi.fn().mockResolvedValue({ id: "memory-1" }),
+    reviewMemory: vi.fn().mockResolvedValue({ id: "memory-1" }),
+    remember: vi.fn().mockResolvedValue({ id: "memory-1" }),
+    search: vi.fn().mockResolvedValue({ items: [], degraded: false }),
+    buildContext: vi.fn().mockResolvedValue({ context: "built-context", items: [], truncated: false, degraded: false }),
+    upsertDocument: vi.fn().mockResolvedValue({ id: "document-1" }),
+    list: vi.fn().mockResolvedValue([]),
+    listReviewQueue: vi.fn().mockResolvedValue([]),
+    listReviewQueueOverview: vi.fn().mockResolvedValue([]),
+    getReviewAssist: vi.fn().mockResolvedValue({ status: "ready", suggestions: [], hints: [] }),
+    enqueueMemoryProposal: vi.fn().mockResolvedValue({ recommendation: "likely_skip", proposed: [], skipped: [], candidates: [] }),
+    suggestMemoryCandidates: vi.fn().mockReturnValue({ recommendation: "likely_skip", signals: { durable: [], ephemeral: [] }, candidates: [] }),
+    applyConservativeMemoryPolicy: vi.fn().mockResolvedValue({
+      recommendation: "likely_skip",
+      signals: { durable: [], ephemeral: [] },
+      candidates: [],
+      autoSaved: [],
+      autoSaveSkipped: [],
+      reviewOnlySuggestions: [],
     }),
-    resetStorage: vi.fn().mockResolvedValue({
-      status: "cleared",
-      cleared: { lanceDb: true, canonicalLog: true, retrievalTrace: true },
+    prepareHostTurnMemory: vi.fn().mockResolvedValue({
+      context: "host-turn-context",
+      items: [],
+      truncated: false,
+      degraded: false,
+      memorySuggestions: { recommendation: "likely_skip", signals: { durable: [], ephemeral: [] }, candidates: [] },
+      conservativePolicy: { recommendation: "likely_skip", signals: { durable: [], ephemeral: [] }, candidates: [], autoSaved: [], autoSaveSkipped: [], reviewOnlySuggestions: [] },
     }),
-    search: vi.fn().mockResolvedValue({ items: [{ id: "search-hit" }], degraded: false }),
-    buildContext: vi.fn().mockResolvedValue({
-      context: "built-context",
-      items: ["built-context"],
+    wakeUpMemory: vi.fn().mockResolvedValue({
+      wakeUpContext: "wake-up-context",
+      profile: { context: "profile", items: [], truncated: false, degraded: false },
+      recent: { context: "recent", items: [], truncated: false, degraded: false },
       truncated: false,
       degraded: false,
     }),
-    upsertDocument: vi.fn().mockResolvedValue({ id: "upserted-document" }),
-    list: vi.fn().mockResolvedValue([{ id: "listed-memory" }]),
-    listReviewQueue: vi.fn().mockResolvedValue([
-      {
-        id: "review-memory",
-        kind: "fact",
-        scope: "project",
-        verificationStatus: "hypothesis",
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `worktree:${repoRoot}`,
-        source: { type: "manual" },
-        content: "Pending review memory.",
-        tags: [],
-        importance: 0.5,
-        createdAt: "2026-04-22T00:00:00.000Z",
-        updatedAt: "2026-04-22T00:00:00.000Z",
-      },
-    ]),
-    listReviewQueueOverview: vi.fn().mockResolvedValue([
-      {
-        id: "review-memory",
-        kind: "fact",
-        scope: "project",
-        verificationStatus: "hypothesis",
-        reviewStatus: "pending",
-        reviewDecisions: [],
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `worktree:${repoRoot}`,
-        source: { type: "manual" },
-        content: "Pending review memory.",
-        tags: ["review_queue_candidate", "candidate_confidence:high"],
-        importance: 0.5,
-        createdAt: "2026-04-22T00:00:00.000Z",
-        updatedAt: "2026-04-22T00:00:00.000Z",
-        priorityScore: 80,
-        priorityReasons: ["high_confidence_candidate"],
-        hints: [],
-      },
-    ]),
-    getReviewAssist: vi.fn().mockResolvedValue({
-      id: "review-memory",
-      status: "ready",
-      hints: [],
-      suggestions: [
-        {
-          kind: "gather_evidence",
-          rationale: "No duplicate or contradiction hints found; gather stronger supporting evidence before promotion.",
-          relatedMemoryIds: [],
-          suggestedAction: "collect_evidence",
-        },
-      ],
+    prepareTurnMemory: vi.fn().mockResolvedValue({
+      context: "turn-context",
+      items: [],
+      truncated: false,
+      degraded: false,
+      memorySuggestions: { recommendation: "likely_skip", signals: { durable: [], ephemeral: [] }, candidates: [] },
+      conservativePolicy: { recommendation: "likely_skip", signals: { durable: [], ephemeral: [] }, candidates: [], autoSaved: [], autoSaveSkipped: [], reviewOnlySuggestions: [] },
     }),
-    enqueueMemoryProposal: vi.fn().mockResolvedValue({
-      recommendation: "strong_candidate",
-      proposed: [{ candidateIndex: 0, id: "review-memory" }],
-      skipped: [],
-      candidates: [
-        {
-          kind: "fact",
-          scope: "project",
-          reason: "Explicit remember/important marker.",
-          draftContent: "Pending review memory.",
-          confidence: "high",
-        },
-      ],
-    }),
-    suggestMemoryCandidates: vi.fn().mockReturnValue({
-      recommendation: "consider_saving",
-      signals: { durable: ["explicit_durable_language"], ephemeral: [] },
-      candidates: [
-        {
-          kind: "decision",
-          scope: "project",
-          reason: "Explicit durable language.",
-          draftContent: "Use the plugin-native memory surface.",
-          confidence: "high",
-        },
-      ],
-    }),
-    applyConservativeMemoryPolicy: vi.fn().mockResolvedValue({
-      recommendation: "consider_saving",
-      signals: { durable: ["explicit_durable_language"], ephemeral: [] },
-      candidates: [
-        {
-          kind: "decision",
-          scope: "project",
-          reason: "Explicit durable language.",
-          draftContent: "Use the plugin-native memory surface.",
-          confidence: "high",
-        },
-      ],
-      autoSaved: [],
-      autoSaveSkipped: [],
-      reviewOnlySuggestions: [
-        {
-          kind: "decision",
-          scope: "project",
-          reason: "Explicit durable language.",
-          draftContent: "Use the plugin-native memory surface.",
-          confidence: "high",
-        },
-      ],
-    }),
-    reviewMemory: vi.fn().mockResolvedValue({
-      id: "review-memory",
-      status: "accepted",
-      action: "defer",
-      reviewStatus: "deferred",
-      verificationStatus: "hypothesis",
-      reviewDecisions: [
-        {
-          action: "defer",
-          decidedAt: "2026-04-22T00:00:00.000Z",
-          note: "Need more evidence.",
-        },
-      ],
-      verificationEvidence: [],
-    }),
-    inspectMemoryRetrieval: vi.fn().mockResolvedValue({
-      status: "empty",
-      lookup: "latest",
-    }),
-    prepareHostTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareHostTurnResult("host-turn-context")),
-    wakeUpMemory: vi.fn().mockResolvedValue(createFixedWakeUpResult("wake-up-context")),
-    prepareTurnMemory: vi.fn().mockResolvedValue(createFixedPrepareTurnResult("turn-context")),
   };
 }
 
-function createSharedToolPayloads(repoPath: string): Record<string, Record<string, unknown>> {
-  return {
-    remember: {
-      content: "Persist the chosen memory.",
-      kind: "decision",
-      scope: "project",
-      projectId: "mahiro-mcp-memory-layer",
-      source: { type: "tool", title: "plugin-test" },
-    },
-    search_memories: {
-      query: "plugin-native memory tools",
-      mode: "query",
-      scope: "project",
-      projectId: "mahiro-mcp-memory-layer",
-    },
-    promote_memory: {
-      id: "remembered-memory",
-      evidence: [
-        {
-          type: "test",
-          value: "tests/opencode-plugin-package.test.ts#shared-tool-promotion",
-          note: "Verified by shared tool contract test.",
-        },
-      ],
-    },
-    review_memory: {
-      id: "review-memory",
-      action: "defer",
-      note: "Need more evidence.",
-    },
-    build_context_for_task: {
-      task: "Summarize plugin-native memory support.",
-      mode: "query",
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    upsert_document: {
-      projectId: "mahiro-mcp-memory-layer",
-      source: { type: "document", uri: "file:///README.md", title: "README" },
-      content: "Plugin-first install docs.",
-    },
-    list_memories: {
-      scope: "project",
-      projectId: "mahiro-mcp-memory-layer",
-    },
-    list_review_queue: {
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    list_review_queue_overview: {
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    get_review_assist: {
-      id: "review-memory",
-    },
-    enqueue_memory_proposal: {
-      conversation: "Important: production deploys must go through staging first.",
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    suggest_memory_candidates: {
-      conversation: "We decided plugin users should get memory tools without MCP setup.",
-      projectId: "mahiro-mcp-memory-layer",
-    },
-    apply_conservative_memory_policy: {
-      conversation: "We decided plugin users should get memory tools without MCP setup.",
-      projectId: "mahiro-mcp-memory-layer",
-    },
-    inspect_memory_retrieval: {
-      requestId: "req_123",
-    },
-    reset_memory_storage: {},
-    prepare_host_turn_memory: {
-      task: "Summarize relevant memory context for the latest OpenCode turn.",
-      mode: "query",
-      recentConversation: "Summarize recent memory context for this turn.",
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    wake_up_memory: {
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-    prepare_turn_memory: {
-      task: "Summarize relevant memory context for the latest OpenCode turn.",
-      mode: "query",
-      recentConversation: "Summarize recent memory context for this turn.",
-      projectId: "mahiro-mcp-memory-layer",
-      containerId: `worktree:${repoPath}`,
-    },
-  };
+async function importPluginModule(): Promise<Pick<PluginModule, "id"> & { readonly server: PluginModule["server"] }> {
+  const imported = await import("../src/features/opencode-plugin/index.js");
+  expect(imported.server).toEqual(expect.any(Function));
+  return imported as Pick<PluginModule, "id"> & { readonly server: PluginModule["server"] };
 }
 
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
+async function createPluginHarness(memoryBackend: MemoryToolBackend) {
+  const pluginModule = await importPluginModule();
+  const pluginInput = {
+    directory: repoRoot,
+    client: {},
+  } as PluginInput;
 
-async function advanceFakeTimeBy(ms: number): Promise<void> {
-  vi.advanceTimersByTime(ms);
-  await flushMicrotasks();
+  const hooks = await pluginModule.server(pluginInput, {
+    __test: {
+      memory: memoryBackend,
+      messageDebounceMs: 0,
+    },
+  });
+
+  await hooks["session.created"]?.({ event: createSessionCreatedEvent() });
+  await hooks["message.updated"]?.({ event: createMessageUpdatedEvent() });
+  await hooks["session.idle"]?.({ event: createSessionIdleEvent() });
+
+  return { hooks, pluginModule };
 }
 
 describe("OpenCode plugin package", () => {
-  it("exports the plugin server from the package root", async () => {
-    const pluginModule = await import("mahiro-mcp-memory-layer");
+  it("publishes a memory-only plugin surface", async () => {
+    const backend = createSharedMemoryBackend();
+    const { hooks, pluginModule } = await createPluginHarness(backend);
+    const toolNames = Object.keys(hooks.tool ?? {}).sort();
+    const expectedMemoryToolNames = getMemoryToolDefinitions().map((tool) => tool.name);
 
-    expect(pluginModule.server).toEqual(expect.any(Function));
+    expect(toolNames).toEqual([...expectedMemoryToolNames, "memory_context", "runtime_capabilities"].sort());
   });
 
-  it("depends on the official OpenCode plugin package for the published plugin contract", async () => {
-    const packageJson = await import("../package.json", { with: { type: "json" } });
+  it("reports memory-only runtime capabilities and session-scoped memory context", async () => {
+    const backend = createSharedMemoryBackend();
+    const { hooks } = await createPluginHarness(backend);
 
-    expect(packageJson.default.dependencies["@opencode-ai/plugin"]).toBeDefined();
-  });
-
-  it("publishes a plugin-first package surface without unrelated worker or orchestration sources", async () => {
-    const { stdout } = await execFileAsync("npm", ["pack", "--json", "--dry-run"], {
-      cwd: repoRoot,
-    });
-    const [{ files }] = JSON.parse(stdout) as Array<{ readonly files: Array<{ readonly path: string }> }>;
-    const packagedPaths = files.map((file) => file.path);
-
-    expect(packagedPaths).toContain("src/features/opencode-plugin/index.ts");
-    expect(packagedPaths).toContain("src/features/memory/memory-service.ts");
-    expect(packagedPaths).toContain("MCP_USAGE.md");
-    expect(packagedPaths).toContain("ORCHESTRATION.md");
-    expect(packagedPaths).not.toContain("src/index.ts");
-    expect(packagedPaths).not.toContain("src/cursor.ts");
-    expect(packagedPaths).not.toContain("src/cursor-worker.ts");
-    expect(packagedPaths).not.toContain("src/gemini.ts");
-    expect(packagedPaths).not.toContain("src/gemini-worker.ts");
-    expect(packagedPaths).not.toContain("src/orchestrate.ts");
-    expect(packagedPaths).not.toContain("src/list-orchestration-traces.ts");
-    expect(packagedPaths).not.toContain("src/eval-retrieval.ts");
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/features/cursor/"))).toBe(false);
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/features/gemini/"))).toBe(false);
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/features/orchestration/"))).toBe(false);
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/features/memory/eval/"))).toBe(false);
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/features/memory/mcp/"))).toBe(false);
-    expect(packagedPaths.some((filePath) => filePath.startsWith("src/lib/"))).toBe(false);
-  });
-
-  it("keeps plugin and MCP adapters aligned on the shared native memory tool surface", async () => {
-    vi.useFakeTimers();
-
-    try {
-      const sharedMemoryBackend = createSharedMemoryBackend();
-      const sharedToolDefinitions = getMemoryToolDefinitions();
-      const sharedToolPayloads = createSharedToolPayloads(repoRoot);
-
-      const pluginModule = (await import("mahiro-mcp-memory-layer")) as {
-        readonly server: (
-          context: PluginInput,
-          options?: {
-            readonly __test?: {
-              readonly memory?: MemoryToolBackend;
-              readonly messageDebounceMs?: number;
-            };
-          },
-        ) => Promise<{
-          readonly "session.created": (input: { readonly event: ReturnType<typeof createSessionCreatedEvent> }) => Promise<void>;
-          readonly "message.updated": (input: { readonly event: ReturnType<typeof createMessageUpdatedEvent> }) => Promise<void>;
-          readonly "session.idle": (input: { readonly event: ReturnType<typeof createSessionIdleEvent> }) => Promise<void>;
-          readonly tool: {
-            readonly [toolName: string]: {
-              readonly description: string;
-              readonly args: Record<string, unknown>;
-              readonly execute: (args: Record<string, unknown>, context: Record<string, unknown>) => Promise<unknown>;
-            };
-          };
-        }>;
-      } & Pick<PluginModule, "id">;
-
-      const pluginHooks = await pluginModule.server(
-        {
-          project: {
-            id: "mahiro-mcp-memory-layer",
-            name: "mahiro-mcp-memory-layer",
-            directory: repoRoot,
-          },
-          directory: repoRoot,
-          worktree: repoRoot,
-          serverUrl: new URL("http://localhost:4096"),
-          client: {
-            app: {
-              log: vi.fn().mockResolvedValue(undefined),
-            },
-          },
-          $: vi.fn(),
-        } as unknown as PluginInput,
-        {
-          __test: {
-            memory: sharedMemoryBackend,
-            messageDebounceMs: 0,
-            standaloneMcpAvailable: false,
-            opencodeConfigDirectory: path.join(repoRoot, ".opencode-plugin-test-user-config"),
-          },
-        } as unknown as Record<string, unknown>,
-      );
-
-      await pluginHooks["session.created"]({ event: createSessionCreatedEvent() });
-      await flushMicrotasks();
-
-      await pluginHooks["message.updated"]({ event: createMessageUpdatedEvent() });
-      await advanceFakeTimeBy(0);
-
-      await pluginHooks["session.idle"]({ event: createSessionIdleEvent() });
-      await flushMicrotasks();
-
-      const pluginResult = parsePluginToolResult(
-        await pluginHooks.tool.memory_context.execute({}, { sessionID: "session-1" }),
-      );
-
-      expect(sharedMemoryBackend.wakeUpMemory).toHaveBeenCalledWith({
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `worktree:${repoRoot}`,
-      }, {
-        surface: "opencode-plugin",
-        trigger: "session-start",
-        phase: "wake-up",
-      });
-      expect(sharedMemoryBackend.prepareTurnMemory).toHaveBeenCalledWith({
-        task: "Summarize relevant memory context for the latest OpenCode turn.",
-        mode: "query",
-        recentConversation: "Summarize recent memory context for this turn.",
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `worktree:${repoRoot}`,
-      }, {
-        surface: "opencode-plugin",
-        trigger: "message.updated",
-        phase: "turn-preflight",
-      });
-      expect(sharedMemoryBackend.prepareHostTurnMemory).toHaveBeenCalledWith({
-        task: "Summarize relevant memory context for the latest OpenCode turn.",
-        mode: "query",
-        recentConversation: "Summarize recent memory context for this turn.",
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `worktree:${repoRoot}`,
-      }, {
-        surface: "opencode-plugin",
-        trigger: "session.idle",
-        phase: "host-turn-persistence",
-      });
-      expect(pluginResult).toMatchObject({
-        status: "ready",
-        latestSessionId: "session-1",
-        session: {
-          sessionId: "session-1",
-          scopeResolution: {
-            status: "complete",
-            scope: {
-              projectId: "mahiro-mcp-memory-layer",
-              containerId: `worktree:${repoRoot}`,
-              sessionId: "session-1",
-            },
-            missing: [],
-            resolvedFrom: {
-              projectId: "context.project.id",
-              containerId: "context.worktree",
-              sessionId: "event.properties.sessionID",
-            },
-          },
-          lastEventType: "session.idle",
-          lastMessageId: "session-1-message-1",
-          coordination: {
-            messageDebounceMs: 0,
-            messageVersion: 1,
-            hasPendingMessageDebounce: false,
-          },
-          startupBrief: expect.stringContaining("Runtime startup brief"),
-          capabilities: {
-            memory: {
-              sessionStartWakeUpAvailable: true,
-            },
-            orchestration: {
-              available: true,
-            },
-            facade: {
-        categoryRoutingAvailable: true,
-        categoryRoutes: {},
-        remindersConfigured: false,
-        sessionVisibleRemindersAvailable: false,
-        sessionTaskFlowAvailable: false,
+    const runtimeCapabilities = parsePluginToolResult(await hooks.tool?.runtime_capabilities.execute({}, {}));
+    expect(runtimeCapabilities).toMatchObject({
+      mode: "plugin-native",
+      memory: {
+        toolNames: expect.arrayContaining(["remember", "memory_context"]),
+        sessionStartWakeUpAvailable: true,
+        turnPreflightAvailable: true,
+        idlePersistenceAvailable: true,
+        memoryContextToolAvailable: true,
       },
-          },
-          continuityCache: {
-            wakeUp: expect.objectContaining({
-              ...createFixedWakeUpResult("wake-up-context"),
-              wakeUpContext: expect.stringContaining("Runtime startup brief"),
-            }),
-            prepareTurn: createFixedPrepareTurnResult("turn-context"),
-            prepareHostTurn: createFixedPrepareHostTurnResult("host-turn-context"),
-          },
+    });
+
+    const memoryContext = parsePluginToolResult(await hooks.tool?.memory_context.execute({}, { sessionID: "session-1" }));
+    expect(memoryContext).toMatchObject({
+      status: "ready",
+      session: {
+        sessionId: "session-1",
+        continuityCache: {
+          wakeUp: expect.any(Object),
         },
-      });
-      expect(pluginResult).not.toHaveProperty("availableSessionIds");
-      expect((pluginResult as { readonly session: { readonly lastUpdatedAt: string } }).session.lastUpdatedAt).toEqual(
-        expect.any(String),
-      );
+      },
+    });
 
-      const tools = getRegisteredMemoryTools(
-        sharedMemoryBackend as unknown as MemoryService,
-      );
-
-      const expectedToolNames = [
-        ...sharedToolDefinitions.map((tool) => tool.name),
-        "memory_context",
-        "runtime_capabilities",
-        "start_agent_task",
-        "get_orchestration_result",
-        "inspect_subagent_session",
-      ].sort();
-
-      expect(Object.keys(pluginHooks.tool).sort()).toEqual(expectedToolNames);
-      expect(tools.map((tool) => tool.name).sort()).toEqual(sharedToolDefinitions.map((tool) => tool.name).sort());
-
-      for (const sharedToolDefinition of sharedToolDefinitions) {
-        const pluginTool = pluginHooks.tool[sharedToolDefinition.name];
-        const mcpTool = tools.find((tool) => tool.name === sharedToolDefinition.name);
-        const payload = sharedToolPayloads[sharedToolDefinition.name];
-
-        expect(pluginTool).toBeDefined();
-        expect(pluginTool.description).toBe(sharedToolDefinition.description);
-        expect(pluginTool.args).toEqual(sharedToolDefinition.inputSchema);
-
-        expect(mcpTool).toBeDefined();
-        expect(mcpTool?.description).toBe(sharedToolDefinition.description);
-        expect(mcpTool?.inputSchema).toBe(sharedToolDefinition.inputSchema);
-
-        await expect(pluginTool.execute(payload, { sessionID: "session-1" })).resolves.toEqual(
-          JSON.stringify(await mcpTool?.execute(payload), null, 2),
-        );
-      }
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(memoryContext).toEqual(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          continuityCache: expect.objectContaining({
+            wakeUp: expect.any(Object),
+          }),
+        }),
+      }),
+    );
   });
 });

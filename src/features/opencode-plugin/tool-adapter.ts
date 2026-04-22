@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { getMemoryToolDefinitions } from "../memory/lib/tool-definitions.js";
 
 import type {
@@ -19,19 +18,17 @@ export function createOpenCodePluginTools(
           if (tool.name === "inspect_memory_retrieval") {
             return serializeOpenCodeToolResult(
               await runtime.inspectMemoryRetrieval(args, toolContext),
-              tool.name,
             );
           }
 
           if (tool.name === "reset_memory_storage") {
             return serializeOpenCodeToolResult(
               await runtime.resetMemoryStorage(),
-              tool.name,
             );
           }
 
           const backend = await runtime.ensureBackend();
-          return serializeOpenCodeToolResult(await tool.execute(backend, args), tool.name);
+          return serializeOpenCodeToolResult(await tool.execute(backend, args));
         },
       },
     ]),
@@ -39,87 +36,34 @@ export function createOpenCodePluginTools(
 
   return {
     ...memoryTools,
-    start_agent_task: {
-      description: "Start a background executor task from the current plugin session.",
-      args: {
-        category: z.string().min(1).optional(),
-        prompt: z.string().min(1),
-        model: z.string().optional(),
-        intent: z.enum(["proposal", "implementation"]),
-        executor: z.enum(["gemini", "cursor"]).optional(),
-        mode: z.enum(["plan", "ask"]).optional(),
-        trust: z.boolean().optional(),
-        force: z.boolean().optional(),
-        taskKind: z.string().optional(),
-        approvalMode: z.enum(["default", "auto_edit", "yolo", "plan"]).optional(),
-        allowedMcpServerNames: z.union([z.array(z.string()), z.literal("none")]).optional(),
-      },
-      execute: async (args, toolContext) => {
-        return serializeOpenCodeToolResult(await runtime.startAgentTask(args, toolContext), "start_agent_task");
-      },
-    },
-    get_orchestration_result: {
-      description: "Read the latest stored orchestration result for a tracked task.",
-      args: {
-        requestId: z.string().min(1),
-      },
-      execute: async (args, toolContext) => {
-        return serializeOpenCodeToolResult(await runtime.getOrchestrationResult(args, toolContext), "get_orchestration_result");
-      },
-    },
-    inspect_subagent_session: {
-      description: "Observe the latest tracked tmux subagent session state by subagent id.",
-      args: {
-        subagentId: z.string().min(1),
-      },
-      execute: async (args) => {
-        return serializeOpenCodeToolResult(await runtime.inspectSubagentSession(args), "inspect_subagent_session");
-      },
-    },
     runtime_capabilities: {
-      description: "Read the active OpenCode runtime capability contract for memory and optional orchestration surfaces.",
+      description: "Read the active OpenCode runtime capability contract for plugin-native memory surfaces.",
       args: {},
       execute: async () => {
-        return serializeOpenCodeToolResult(await runtime.readRuntimeCapabilities(), "runtime_capabilities");
+        return serializeOpenCodeToolResult(await runtime.readRuntimeCapabilities());
       },
     },
     memory_context: {
       description: "Read continuity-cache state for the active OpenCode session, separate from durable memory records.",
       args: {},
         execute: async (_args, toolContext) => {
-          return serializeOpenCodeToolResult(await runtime.readMemoryContext(toolContext), "memory_context");
+          return serializeOpenCodeToolResult(await runtime.readMemoryContext(toolContext));
         },
       },
   };
 }
 
-function serializeOpenCodeToolResult(result: unknown, toolName: string): string {
+function serializeOpenCodeToolResult(result: unknown): string {
   if (typeof result === "string") {
     return result;
   }
 
-  return JSON.stringify(compactOpenCodeToolResult(result, toolName), null, 2);
+  return JSON.stringify(compactOpenCodeToolResult(result), null, 2);
 }
 
-function compactOpenCodeToolResult(result: unknown, toolName: string): unknown {
+function compactOpenCodeToolResult(result: unknown): unknown {
   if (!isRecord(result)) {
     return result;
-  }
-
-  if (
-    toolName === "start_agent_task" ||
-    toolName === "get_orchestration_result"
-  ) {
-    const {
-      recommendedFollowUp: _recommendedFollowUp,
-      superviseWith: _superviseWith,
-      superviseResultWith: _superviseResultWith,
-      waitWith: _waitWith,
-      message: _message,
-      ...rest
-    } = result;
-
-    return rest;
   }
 
   return result;

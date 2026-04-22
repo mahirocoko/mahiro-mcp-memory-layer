@@ -3,7 +3,6 @@ import type {
   PrepareTurnMemoryResult,
   WakeUpMemoryResult,
 } from "../memory/types.js";
-import type { DelegatedTaskIntent } from "../orchestration/workflow-spec.js";
 import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
 import {
   resolveOpenCodeScope,
@@ -63,23 +62,6 @@ export interface OpenCodePluginSessionState {
   lastHandledPrepareHostTurnKey?: string;
   startupBrief?: string;
   capabilities?: OpenCodePluginRuntimeCapabilities;
-  operator?: {
-    orchModeEnabled: boolean;
-    tasks: Array<{
-      taskId: string;
-      requestId: string;
-      category: string;
-      intent: DelegatedTaskIntent;
-      requestedExecutor?: "gemini" | "cursor";
-      resolvedExecutor?: "gemini" | "cursor";
-      resolvedModel?: string;
-      status: "requested" | "running" | "awaiting_verification" | "needs_attention";
-      attentionReason?: "approval_required" | "unhealthy_session";
-      approvalPrompt?: string;
-      subagentIds?: string[];
-      updatedAt: string;
-    }>;
-  };
   wakeUp?: WakeUpMemoryResult;
   prepareTurn?: PrepareTurnMemoryResult;
   prepareHostTurn?: PrepareHostTurnMemoryResult;
@@ -160,10 +142,6 @@ export function syncSessionStateFromEvent(
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
     startupBrief: existingState?.startupBrief,
     capabilities: existingState?.capabilities,
-    operator: existingState?.operator ?? {
-      orchModeEnabled: false,
-      tasks: [],
-    },
     wakeUp: existingState?.wakeUp,
     prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
     prepareHostTurn: existingState?.prepareHostTurn,
@@ -211,7 +189,6 @@ export function buildMemoryContextResult(
       },
       ...(sessionState.startupBrief ? { startupBrief: sessionState.startupBrief } : {}),
       ...(sessionState.capabilities ? { capabilities: sessionState.capabilities } : {}),
-      ...(sessionState.operator ? { operator: sessionState.operator } : {}),
       continuityCache: {
         ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
@@ -242,11 +219,6 @@ export function buildPrepareHostTurnKey(sessionState: OpenCodePluginSessionState
   }
 
   return undefined;
-}
-
-export function hasActiveRunningImplementationTask(sessionState: OpenCodePluginSessionState): boolean {
-  return sessionState.operator?.orchModeEnabled === true
-    && sessionState.operator.tasks.some((task) => task.intent === "implementation" && task.status === "running");
 }
 
 function resolveMessageId(event: OpenCodePluginEvent): string | undefined {

@@ -512,14 +512,14 @@ describe("buildContextFromItems", () => {
         {
           ...baseItem,
           id: "mem-earlier",
-          summary: "The orchestration default is async for workflows.",
+          summary: "The retrieval mode default is full for memory lookups.",
           importance: 0.5,
           createdAt: ts,
         },
         {
           ...baseItem,
           id: "mem-later",
-          summary: "The orchestration default is sync for workflows.",
+          summary: "The retrieval mode default is query for memory lookups.",
           importance: 0.5,
           createdAt: ts,
         },
@@ -529,8 +529,8 @@ describe("buildContextFromItems", () => {
       degraded: false,
     });
 
-    expect(result.context).toContain("sync");
-    expect(result.context).not.toContain("async");
+    expect(result.context).toContain("query");
+    expect(result.context).not.toContain("full");
     expect(result.items).toEqual(["mem-later"]);
   });
 

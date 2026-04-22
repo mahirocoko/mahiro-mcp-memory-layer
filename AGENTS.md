@@ -3,29 +3,27 @@
 Start here, then load the narrower doc that matches your task.
 
 - Use `README.md` for package overview, install, and human-facing command/reference material.
-- Use `ARCHITECTURE_BOUNDARIES.md` when the task is about long-term package scope, memory versus orchestration ownership, or the intended repo cut.
-- Use `AGENT_NEXT_STEPS.md` when the task is about current direction, follow-up work, or what should happen next.
-- Use `MCP_USAGE.md` for the practical runtime/tool surface and the plugin-vs-MCP mode split.
-- Use `ORCHESTRATION.md` for orchestrator posture, worker routing, and the current operator-loop rules.
+- Use `ARCHITECTURE_BOUNDARIES.md` when the task is about long-term package scope or the intended memory boundary.
+- Use `AGENT_NEXT_STEPS.md` when the task is about current direction or follow-up work.
+- Use `MCP_USAGE.md` for the practical runtime/tool surface.
 - Use `CONTINUITY_DEBUGGING.md` when the task is about memory continuity, recall, or why continuity did or did not trigger.
 
 ## Repo identity
 
 - Package / MCP server: `mahiro-mcp-memory-layer`
-- Stable default surface today: plugin-native memory tools plus a thin plugin-native orchestration façade
-- Source checkout path: may additionally expose the standalone MCP orchestration surface
+- Stable default surface today: plugin-native memory tools plus memory-focused plugin helpers
+- Source checkout path: may also expose the standalone memory MCP server
 
 ## Current posture
 
-- Treat memory as the stable foundation.
-- Treat orchestration as a thin control-plane layer over worker execution, not as a second copy of the memory system.
-- Keep memory and orchestration decoupled.
-- Prefer the plugin-native façade first when you are on the plugin path.
+- Treat memory as the product identity.
+- Keep continuity-cache helpers memory-facing.
+- Do not promise workflow or executor features that this package does not own.
 
 ## Documentation boundaries
 
 - `README.md` is human-facing.
-- `MCP_USAGE.md` and `ORCHESTRATION.md` are AI-consumer-facing.
+- `MCP_USAGE.md` and `CONTINUITY_DEBUGGING.md` are AI-consumer-facing.
 - Do not promise tools or states that the current runtime does not actually expose.
 
 ## Minimal guardrails
@@ -33,6 +31,3 @@ Start here, then load the narrower doc that matches your task.
 - Verify before declaring done.
 - Default verification order: `bun run typecheck`, `bun run test`, `bun run build`.
 - Preserve history and never force-push.
-- Check `runtime_capabilities` before claiming orchestration is available.
-- On the plugin path, `start_agent_task` now requires an explicit task `intent` (`proposal` or `implementation`).
-- A `requested` implementation task on the plugin path does not block continuity-style local fallback; only a truly `running` implementation task does.

@@ -29,15 +29,12 @@ import {
   clearOpenCodePluginRuntimeState,
   extractRecentConversation,
   getOrCreateSingletonRuntimeState,
-  hasActiveRunningImplementationTask,
   resetOpenCodePluginRuntimeStateForTests,
   resolveSessionIdFromUnknown,
   syncSessionStateFromEvent,
   type OpenCodePluginMemoryContextResult,
   type OpenCodePluginSessionState,
 } from "./runtime-state.js";
-import { getRegisteredOrchestrationTools } from "../orchestration/mcp/register-tools.js";
-import type { DelegatedTaskIntent } from "../orchestration/workflow-spec.js";
 
 export interface OpenCodePluginToolExecutionContext {
   readonly sessionID?: ToolContext["sessionID"];
@@ -99,15 +96,6 @@ export interface OpenCodePluginRuntime {
   ) => Promise<unknown>;
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
   readonly resetMemoryStorage: () => Promise<unknown>;
-  readonly startAgentTask: (
-    args: Record<string, unknown>,
-    context: OpenCodePluginToolExecutionContext,
-  ) => Promise<unknown>;
-  readonly getOrchestrationResult: (
-    args: Record<string, unknown>,
-    context: OpenCodePluginToolExecutionContext,
-  ) => Promise<unknown>;
-  readonly inspectSubagentSession: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
 export function createOpenCodePluginRuntime(
@@ -116,195 +104,7 @@ export function createOpenCodePluginRuntime(
   config: OpenCodePluginConfig,
 ): OpenCodePluginRuntime {
   const runtimeState = getOrCreateSingletonRuntimeState();
-  const sessionVisibleRemindersAvailable =
-    options.__test?.sessionVisibleRemindersAvailable ??
-    options.__test?.sessionPromptAsyncAvailable ??
-    typeof context.client.session?.promptAsync === "function";
-  const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities({
-    sessionVisibleRemindersAvailable,
-    facadeConfig: {
-      remindersEnabled: config.runtime.remindersEnabled,
-      categoryRoutes: config.routing.categoryRoutes,
-    },
-  });
-  const orchestrationTools = Object.fromEntries(
-    getRegisteredOrchestrationTools().map((tool) => [tool.name, tool]),
-  );
-
-  const notifySession = async (sessionId: string, message: string): Promise<void> => {
-    if (typeof context.client.session?.promptAsync !== "function") {
-      return;
-    }
-
-    await context.client.session.promptAsync({
-      path: { id: sessionId },
-      body: {
-        parts: [
-          {
-            type: "text",
-            text: message,
-          },
-        ],
-      },
-    });
-  };
-
-  const resolveDelegatedTaskIntent = (value: unknown): DelegatedTaskIntent =>
-    value === "implementation" ? "implementation" : "proposal";
-
-  const resolveTrackedTaskStatus = (
-    status: unknown,
-  ): "requested" | "running" | "awaiting_verification" | "needs_attention" | undefined => {
-    if (status === "requested") {
-      return "requested";
-    }
-
-    if (status === "running") {
-      return "running";
-    }
-
-    if (status === "completed") {
-      return "awaiting_verification";
-    }
-
-    if (
-      status === "failed"
-      || status === "timed_out"
-      || status === "step_failed"
-      || status === "runner_failed"
-    ) {
-      return "needs_attention";
-    }
-
-    return undefined;
-  };
-
-  const syncTrackedTaskFromResult = (
-    sessionId: string,
-    requestId: string,
-    result: unknown,
-  ): {
-    taskStatus?: "requested" | "running" | "awaiting_verification" | "needs_attention";
-    subagentIds: string[];
-    changed: boolean;
-    rawStatus?: string;
-    attentionReason?: "approval_required" | "unhealthy_session";
-    approvalPrompt?: string;
-    paneStateReason?: string;
-  } => {
-    const sessionState = runtimeState.sessions.get(sessionId);
-    const taskEntry = sessionState?.operator?.tasks.find((task) => task.requestId === requestId);
-
-    if (!sessionState || !taskEntry || typeof result !== "object" || result === null) {
-      return { subagentIds: [], changed: false };
-    }
-
-    const resultRecord = result as Record<string, unknown>;
-    const nextStatus = resolveTrackedTaskStatus(resultRecord.status);
-    const metadata = typeof resultRecord.metadata === "object" && resultRecord.metadata !== null
-      ? resultRecord.metadata as Record<string, unknown>
-      : undefined;
-    const jobs = Array.isArray(metadata?.jobs)
-      ? metadata.jobs as Array<Record<string, unknown>>
-      : [];
-    const subagentIds = jobs
-      .map((job) => job.subagentId)
-      .filter((value): value is string => typeof value === "string");
-    const approvalPrompt = jobs
-      .map((job) => job.approvalPrompt)
-      .find((value): value is string => typeof value === "string");
-    const approvalRequired = jobs.some((job) => job.approvalRequired === true);
-    const paneStateReason = jobs
-      .map((job) => job.paneStateReason)
-      .find((value): value is string => typeof value === "string");
-    const unhealthySession = jobs.some((job) => job.paneState === "unhealthy");
-
-    if (!nextStatus) {
-      return {
-        subagentIds,
-        changed: false,
-        rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
-        ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
-        ...(!approvalRequired && unhealthySession ? { attentionReason: "unhealthy_session" as const } : {}),
-        ...(approvalPrompt ? { approvalPrompt } : {}),
-        ...(paneStateReason ? { paneStateReason } : {}),
-      };
-    }
-
-    const previousSubagentIds = taskEntry.subagentIds ?? [];
-    const changed = taskEntry.status !== nextStatus
-      || previousSubagentIds.length !== subagentIds.length
-      || previousSubagentIds.some((value, index) => value !== subagentIds[index]);
-
-    taskEntry.status = nextStatus;
-    taskEntry.subagentIds = subagentIds;
-    taskEntry.attentionReason = approvalRequired ? "approval_required" : (unhealthySession ? "unhealthy_session" : undefined);
-    taskEntry.approvalPrompt = approvalPrompt;
-    taskEntry.updatedAt = new Date().toISOString();
-
-    return {
-      taskStatus: nextStatus,
-      subagentIds,
-      changed,
-      rawStatus: typeof resultRecord.status === "string" ? resultRecord.status : undefined,
-      ...(approvalRequired ? { attentionReason: "approval_required" as const } : {}),
-      ...(!approvalRequired && unhealthySession ? { attentionReason: "unhealthy_session" as const } : {}),
-      ...(approvalPrompt ? { approvalPrompt } : {}),
-      ...(paneStateReason ? { paneStateReason } : {}),
-    };
-  };
-
-  const watchTaskForSession = (
-    sessionId: string,
-    taskId: string,
-    requestId: string,
-    category: string,
-  ): void => {
-    const pollIntervalMs = 1500;
-
-    const tick = async (): Promise<void> => {
-      const sessionState = runtimeState.sessions.get(sessionId);
-      const taskEntry = sessionState?.operator?.tasks.find((task) => task.taskId === taskId);
-      if (!sessionState || !taskEntry || (taskEntry.status !== "requested" && taskEntry.status !== "running")) {
-        return;
-      }
-
-      const result = await orchestrationTools.get_orchestration_result?.execute({ requestId }) as Record<string, unknown> | null;
-      if (!result || typeof result.status !== "string") {
-        setTimeout(() => void tick(), pollIntervalMs);
-        return;
-      }
-
-      const synced = syncTrackedTaskFromResult(sessionId, requestId, result);
-
-      if (result.status === "requested" || result.status === "running") {
-        setTimeout(() => void tick(), pollIntervalMs);
-        return;
-      }
-      if (!synced.changed || !synced.taskStatus) {
-        return;
-      }
-
-      if (synced.taskStatus === "awaiting_verification") {
-        await notifySession(
-          sessionId,
-          `Task — ${category} finished background work and is awaiting verification. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
-        );
-        return;
-      }
-
-      await notifySession(
-        sessionId,
-        synced.attentionReason === "approval_required"
-          ? `Task — ${category} is waiting on Gemini approval and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}${synced.approvalPrompt ? ` approvalPrompt=${JSON.stringify(synced.approvalPrompt)}` : ""}`
-          : synced.attentionReason === "unhealthy_session"
-            ? `Task — ${category} hit an unhealthy Gemini session and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}${synced.paneStateReason ? ` paneStateReason=${JSON.stringify(synced.paneStateReason)}` : ""}`
-          : `Task — ${category} ended with status ${synced.rawStatus ?? "unknown"} and needs attention. requestId=${requestId}${synced.subagentIds.length > 0 ? ` subagentId=${synced.subagentIds[0]}` : ""}`,
-      );
-    };
-
-    setTimeout(() => void tick(), pollIntervalMs);
-  };
+  const runtimeCapabilitiesPromise = resolveOpenCodePluginRuntimeCapabilities();
 
   const routeEvent = async (
     event: OpenCodePluginEvent,
@@ -344,14 +144,14 @@ export function createOpenCodePluginRuntime(
       service: "opencode-memory-plugin",
       level: "debug",
       message: "OpenCode plugin session-start wake-up started.",
-        extra: {
-          sessionId: sessionState.sessionId,
-          projectId: wakeUpScope.projectId,
-          containerId: wakeUpScope.containerId,
-          scopeSessionId: wakeUpScope.sessionId,
-          hasStartedWakeUpBeforeStart: false,
-        },
-      });
+      extra: {
+        sessionId: sessionState.sessionId,
+        projectId: wakeUpScope.projectId,
+        containerId: wakeUpScope.containerId,
+        scopeSessionId: wakeUpScope.sessionId,
+        hasStartedWakeUpBeforeStart: false,
+      },
+    });
     const wakeUpPromise = getOpenCodePluginMemoryBackend(options.__test).then((backend) =>
       backend.wakeUpMemory(
         {
@@ -418,6 +218,7 @@ export function createOpenCodePluginRuntime(
           ...wakeUp,
           wakeUpContext: prependStartupBrief(wakeUp.wakeUpContext, latestSessionState.startupBrief),
         };
+
         void logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
           level: "debug",
@@ -476,10 +277,6 @@ export function createOpenCodePluginRuntime(
     }
 
     currentSessionState.pendingMessageDebounce = undefined;
-
-    if (hasActiveRunningImplementationTask(currentSessionState)) {
-      return;
-    }
 
     const scope = currentSessionState.scopeResolution.scope;
     const routing = resolveMemoryPreflightRouting(recentConversation);
@@ -592,10 +389,6 @@ export function createOpenCodePluginRuntime(
     const recentConversation = sessionState.recentConversation;
 
     if (!recentConversation) {
-      return;
-    }
-
-    if (hasActiveRunningImplementationTask(sessionState)) {
       return;
     }
 
@@ -744,94 +537,6 @@ export function createOpenCodePluginRuntime(
       resetOpenCodePluginMemoryBackendSingleton();
       clearOpenCodePluginRuntimeState(runtimeState);
       return result;
-    },
-    startAgentTask: async (args, toolContext) => {
-      const sessionId = resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties);
-      if (!sessionId) {
-        throw new Error("start_agent_task requires a live plugin session context.");
-      }
-
-      const sessionState = runtimeState.sessions.get(sessionId);
-      if (sessionState?.operator) {
-        sessionState.operator.orchModeEnabled = true;
-      }
-
-      const startAgentTaskTool = orchestrationTools.start_agent_task;
-      if (!startAgentTaskTool) {
-        throw new Error("Missing start_agent_task orchestration tool.");
-      }
-      const result = await startAgentTaskTool.execute({
-        ...args,
-        workerRuntime: "shell",
-      }) as Record<string, unknown>;
-
-      const requestId = typeof result.requestId === "string" ? result.requestId : undefined;
-      if (!requestId) {
-        return result;
-      }
-
-      const taskId = `task_${requestId.replace(/^workflow_/, "")}`;
-      const category = typeof args.category === "string"
-        ? args.category
-        : (typeof args.executor === "string" ? `${args.executor}-task` : "task");
-      const intent = resolveDelegatedTaskIntent(args.intent);
-      const requestedExecutor = args.executor === "gemini" || args.executor === "cursor"
-        ? args.executor
-        : undefined;
-      const route = typeof result.route === "object" && result.route !== null
-        ? result.route as Record<string, unknown>
-        : undefined;
-      const resolvedExecutor = route?.workerKind === "gemini" || route?.workerKind === "cursor"
-        ? route.workerKind
-        : undefined;
-      const resolvedModel = typeof route?.model === "string" ? route.model : undefined;
-      const latestSessionState = runtimeState.sessions.get(sessionId);
-      if (latestSessionState?.operator) {
-        latestSessionState.operator.tasks = [
-          ...latestSessionState.operator.tasks,
-          {
-            taskId,
-            requestId,
-            category,
-            intent,
-            ...(requestedExecutor ? { requestedExecutor } : {}),
-            ...(resolvedExecutor ? { resolvedExecutor } : {}),
-            ...(resolvedModel ? { resolvedModel } : {}),
-            status: "requested",
-            updatedAt: new Date().toISOString(),
-          },
-        ];
-      }
-
-      await notifySession(sessionId, `Task — ${category} request accepted in background. requestId=${requestId} taskId=${taskId}`);
-      watchTaskForSession(sessionId, taskId, requestId, category);
-
-      return {
-        ...result,
-        taskId,
-      };
-    },
-    getOrchestrationResult: async (args, toolContext) => {
-      const tool = orchestrationTools.get_orchestration_result;
-      if (!tool) {
-        throw new Error("Missing get_orchestration_result orchestration tool.");
-      }
-      const result = await tool.execute(args);
-      const requestId = typeof args.requestId === "string" ? args.requestId : undefined;
-      const sessionId = resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties);
-
-      if (requestId && sessionId) {
-        syncTrackedTaskFromResult(sessionId, requestId, result);
-      }
-
-      return result;
-    },
-    inspectSubagentSession: async (args) => {
-      const tool = orchestrationTools.inspect_subagent_session;
-      if (!tool) {
-        throw new Error("Missing inspect_subagent_session orchestration tool.");
-      }
-      return await tool.execute(args);
     },
   };
 }

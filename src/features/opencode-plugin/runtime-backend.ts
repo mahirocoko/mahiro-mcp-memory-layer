@@ -7,9 +7,6 @@ export interface OpenCodePluginTestOptions {
   readonly memory?: OpenCodePluginMemoryBackend;
   readonly createMemoryBackend?: () => Promise<OpenCodePluginMemoryBackend>;
   readonly messageDebounceMs?: number;
-  readonly standaloneMcpAvailable?: boolean;
-  readonly sessionVisibleRemindersAvailable?: boolean;
-  readonly sessionPromptAsyncAvailable?: boolean;
   readonly homeDirectory?: string;
   readonly opencodeConfigDirectory?: string;
 }

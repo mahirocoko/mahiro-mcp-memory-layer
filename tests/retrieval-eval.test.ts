@@ -64,20 +64,20 @@ describe("evaluateSearchCase", () => {
 
     expect(spec.expectedInTopK).toEqual({
       k: 6,
-      ids: ["eval-proj-result-store", "eval-proj-trace-store"],
+      ids: ["eval-proj-memory-records", "eval-proj-retrieval-trace"],
     });
     expect(
       evaluateSearchCase(
         [
-          "eval-proj-result-store",
-          "eval-proj-orchestration-store-tangle",
-          "eval-proj-trace-store",
+          "eval-proj-memory-records",
+          "eval-proj-memory-store-distractor",
+          "eval-proj-retrieval-trace",
           "eval-proj-request-id",
         ],
         spec,
       ).pass,
     ).toBe(true);
-    expect(evaluateSearchCase(["eval-proj-trace-store", "eval-proj-result-store"], spec).pass).toBe(false);
+    expect(evaluateSearchCase(["eval-proj-retrieval-trace", "eval-proj-memory-records"], spec).pass).toBe(false);
   });
 
   it("semantic replay gate search expects request-id policy at top1", () => {
@@ -88,7 +88,7 @@ describe("evaluateSearchCase", () => {
     expect(evaluateSearchCase(["eval-proj-generic-hardening", "eval-proj-request-id"], spec).pass).toBe(false);
   });
 
-  it("adversarial requestId distractor does not outrank orchestration gating", () => {
+  it("adversarial requestId distractor does not outrank memory write gating", () => {
     const spec = retrievalEvalSearchCases.find((c) => c.id === "search-reqid-gating-vs-webhook-dedup")!;
 
     expect(evaluateSearchCase(["eval-proj-request-id", "eval-proj-webhook-reqid-distractor"], spec).pass).toBe(true);
@@ -98,8 +98,8 @@ describe("evaluateSearchCase", () => {
   it("adversarial result-store archive distractor does not outrank the live handoff contract", () => {
     const spec = retrievalEvalSearchCases.find((c) => c.id === "search-live-handoff-vs-archival-mirror")!;
 
-    expect(evaluateSearchCase(["eval-proj-result-store", "eval-proj-result-archive-distractor"], spec).pass).toBe(true);
-    expect(evaluateSearchCase(["eval-proj-result-archive-distractor", "eval-proj-result-store"], spec).pass).toBe(false);
+    expect(evaluateSearchCase(["eval-proj-memory-records", "eval-proj-result-archive-distractor"], spec).pass).toBe(true);
+    expect(evaluateSearchCase(["eval-proj-result-archive-distractor", "eval-proj-memory-records"], spec).pass).toBe(false);
   });
 
   it("same-topic embedding cache invalidation outranks cache reuse policy for staleness query", () => {
@@ -118,8 +118,8 @@ describe("evaluateSearchCase", () => {
   it("long noisy sandbox rehearsal doc does not outrank canonical result-store contract", () => {
     const spec = retrievalEvalSearchCases.find((c) => c.id === "search-long-noisy-sandbox-doc-vs-result-store-contract")!;
 
-    expect(evaluateSearchCase(["eval-proj-result-store", "eval-proj-verbose-sandbox-rehearsal"], spec).pass).toBe(true);
-    expect(evaluateSearchCase(["eval-proj-verbose-sandbox-rehearsal", "eval-proj-result-store"], spec).pass).toBe(false);
+    expect(evaluateSearchCase(["eval-proj-memory-records", "eval-proj-verbose-sandbox-rehearsal"], spec).pass).toBe(true);
+    expect(evaluateSearchCase(["eval-proj-verbose-sandbox-rehearsal", "eval-proj-memory-records"], spec).pass).toBe(false);
   });
 
   it("expectEmpty passes only when no ids are returned", () => {
@@ -189,7 +189,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "Task: …\n\nRelevant memories:\n- [decision] result-store keeps durable workflow outputs for downstream tools.",
-          items: ["eval-proj-result-store"],
+          items: ["eval-proj-memory-records"],
           truncated: false,
         },
         spec,
@@ -200,7 +200,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "Task: …\n\nRelevant memories:\n- [fact] trace metadata only",
-          items: ["eval-proj-trace-store"],
+          items: ["eval-proj-retrieval-trace"],
           truncated: false,
         },
         spec,
@@ -215,8 +215,8 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context:
-            "Task: …\n\nRelevant memories:\n- [decision] orchestration result-store persists durable workflow outputs for downstream tools and integrator handoffs.\n- [fact] sandbox rehearsal note with overlapping vocabulary.",
-          items: ["eval-proj-result-store", "eval-proj-verbose-sandbox-rehearsal"],
+            "Task: …\n\nRelevant memories:\n- [decision] memory records persist durable outputs for downstream tools and integrator handoffs.\n- [fact] sandbox rehearsal note with overlapping vocabulary.",
+          items: ["eval-proj-memory-records", "eval-proj-verbose-sandbox-rehearsal"],
           truncated: false,
         },
         spec,
@@ -228,7 +228,7 @@ describe("evaluateContextCase", () => {
         {
           context:
             "Task: …\n\nRelevant memories:\n- [fact] sandbox rehearsal note repeats durable workflow outputs and downstream tools for drill purposes.",
-          items: ["eval-proj-verbose-sandbox-rehearsal", "eval-proj-result-store"],
+          items: ["eval-proj-verbose-sandbox-rehearsal", "eval-proj-memory-records"],
           truncated: false,
         },
         spec,
@@ -286,7 +286,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "durable workflow outputs only",
-          items: ["eval-proj-result-store"],
+          items: ["eval-proj-memory-records"],
           truncated: true,
         },
         maxCharsCase,
@@ -297,7 +297,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "durable workflow outputs\nSandbox rehearsal note (non-production):",
-          items: ["eval-proj-result-store"],
+          items: ["eval-proj-memory-records"],
           truncated: true,
         },
         maxCharsCase,
@@ -313,7 +313,7 @@ describe("evaluateContextCase", () => {
       evaluateContextCase(
         {
           context: "durable workflow outputs",
-          items: ["eval-proj-result-store", "eval-proj-verbose-sandbox-rehearsal"],
+          items: ["eval-proj-memory-records", "eval-proj-verbose-sandbox-rehearsal"],
           truncated: true,
         },
         maxCharsCase,
