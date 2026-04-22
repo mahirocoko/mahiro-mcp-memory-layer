@@ -298,6 +298,38 @@ function createOptionalBunSpawnSpy() {
 function createToolTestMemoryBackend(overrides?: Partial<MemoryToolBackend>): MemoryToolBackend {
   return {
     remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
+    promoteMemory: vi.fn().mockResolvedValue({
+      id: "remembered-memory",
+      status: "accepted",
+      verificationStatus: "verified",
+      verifiedAt: "2026-04-22T00:00:00.000Z",
+      verificationEvidence: [
+        {
+          type: "test",
+          value: "tests/product-memory-plugin.test.ts#promote_memory-is-exposed-on-the-plugin-path",
+          note: "Verified by plugin-path test.",
+        },
+      ],
+    }),
+    reviewMemory: vi.fn().mockResolvedValue({
+      id: "review-memory",
+      status: "accepted",
+      action: "defer",
+      reviewStatus: "deferred",
+      verificationStatus: "hypothesis",
+      reviewDecisions: [
+        {
+          action: "defer",
+          decidedAt: "2026-04-22T00:00:00.000Z",
+          note: "Need more evidence.",
+        },
+      ],
+      verificationEvidence: [],
+    }),
+    resetStorage: vi.fn().mockResolvedValue({
+      status: "cleared",
+      cleared: { lanceDb: true, canonicalLog: true, retrievalTrace: true },
+    }),
     search: vi.fn().mockResolvedValue({ items: [], degraded: false }),
     buildContext: vi.fn().mockResolvedValue({
       context: "built-context",
@@ -307,6 +339,70 @@ function createToolTestMemoryBackend(overrides?: Partial<MemoryToolBackend>): Me
     }),
     upsertDocument: vi.fn().mockResolvedValue({ id: "upserted-document" }),
     list: vi.fn().mockResolvedValue([]),
+    listReviewQueue: vi.fn().mockResolvedValue([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: [],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+      },
+    ]),
+    listReviewQueueOverview: vi.fn().mockResolvedValue([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        reviewDecisions: [],
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: ["review_queue_candidate", "candidate_confidence:high"],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+        priorityScore: 80,
+        priorityReasons: ["high_confidence_candidate"],
+        hints: [],
+      },
+    ]),
+    getReviewAssist: vi.fn().mockResolvedValue({
+      id: "review-memory",
+      status: "ready",
+      hints: [],
+      suggestions: [
+        {
+          kind: "gather_evidence",
+          rationale: "No duplicate or contradiction hints found; gather stronger supporting evidence before promotion.",
+          relatedMemoryIds: [],
+          suggestedAction: "collect_evidence",
+        },
+      ],
+    }),
+    enqueueMemoryProposal: vi.fn().mockResolvedValue({
+      recommendation: "strong_candidate",
+      proposed: [{ candidateIndex: 0, id: "review-memory" }],
+      skipped: [],
+      candidates: [
+        {
+          kind: "fact",
+          scope: "project",
+          reason: "Explicit remember/important marker.",
+          draftContent: "Pending review memory.",
+          confidence: "high",
+        },
+      ],
+    }),
     suggestMemoryCandidates: vi.fn().mockReturnValue({
       recommendation: "likely_skip",
       signals: { durable: [], ephemeral: [] },
@@ -478,7 +574,7 @@ describe("product memory OpenCode plugin contract", () => {
       );
       expect(harness.hooks.tool?.[sharedMemoryTool.name]?.execute).toEqual(expect.any(Function));
     }
-    expect(harness.hooks.tool?.memory_context?.description).toContain("cached memory context");
+    expect(harness.hooks.tool?.memory_context?.description).toContain("continuity-cache state");
     expect(harness.hooks.tool?.memory_context?.args).toEqual({});
     expect(harness.hooks.tool?.memory_context?.execute).toEqual(expect.any(Function));
     expect(harness.hooks.tool?.runtime_capabilities?.description).toContain("runtime capability contract");
@@ -1199,7 +1295,7 @@ describe("product memory OpenCode plugin contract", () => {
             sessionStartWakeUpAvailable: true,
           },
         },
-        cached: {
+        continuityCache: {
           wakeUp: {
             wakeUpContext: expect.stringContaining("Runtime startup brief"),
             truncated: false,
@@ -1232,6 +1328,276 @@ describe("product memory OpenCode plugin contract", () => {
       latestSessionId: "session-tool-b",
     });
     expectNoSelfSpawn(harness);
+  });
+
+  it("reset_memory_storage clears cached plugin session state", async () => {
+    const harness = await createPluginHarness();
+
+    await harness.hooks.event?.({ event: createSessionCreatedEvent("session-reset") });
+    await flushMicrotasks();
+
+    const before = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-reset",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    const reset = parsePluginToolResult(await harness.hooks.tool?.reset_memory_storage?.execute?.(
+      {},
+      {
+        sessionID: "session-reset",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    const after = parsePluginToolResult(await harness.hooks.tool?.memory_context?.execute?.(
+      {},
+      {
+        sessionID: "session-reset",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(before).toMatchObject({ status: "ready" });
+    expect(reset).toEqual({
+      status: "cleared",
+      cleared: { lanceDb: true, canonicalLog: true, retrievalTrace: true },
+    });
+    expect(after).toEqual({ status: "empty" });
+    expectNoSelfSpawn(harness);
+  });
+
+  it("promote_memory is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.promote_memory?.execute?.(
+      {
+        id: "remembered-memory",
+        evidence: [
+          {
+            type: "test",
+            value: "tests/product-memory-plugin.test.ts#promote_memory-is-exposed-on-the-plugin-path",
+            note: "Verified by plugin-path test.",
+          },
+        ],
+      },
+      {
+        sessionID: "session-promote",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual({
+      id: "remembered-memory",
+      status: "accepted",
+      verificationStatus: "verified",
+      verifiedAt: "2026-04-22T00:00:00.000Z",
+      verificationEvidence: [
+        {
+          type: "test",
+          value: "tests/product-memory-plugin.test.ts#promote_memory-is-exposed-on-the-plugin-path",
+          note: "Verified by plugin-path test.",
+        },
+      ],
+    });
+    expect(harness.memory.promoteMemory).toHaveBeenCalledWith({
+      id: "remembered-memory",
+      evidence: [
+        {
+          type: "test",
+          value: "tests/product-memory-plugin.test.ts#promote_memory-is-exposed-on-the-plugin-path",
+          note: "Verified by plugin-path test.",
+        },
+      ],
+    });
+  });
+
+  it("list_review_queue is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.list_review_queue?.execute?.(
+      {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+      },
+      {
+        sessionID: "session-review-queue",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: [],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+      },
+    ]);
+    expect(harness.memory.listReviewQueue).toHaveBeenCalledWith({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+    });
+  });
+
+  it("list_review_queue_overview is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.list_review_queue_overview?.execute?.(
+      {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+      },
+      {
+        sessionID: "session-review-overview",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        reviewDecisions: [],
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: ["review_queue_candidate", "candidate_confidence:high"],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+        priorityScore: 80,
+        priorityReasons: ["high_confidence_candidate"],
+        hints: [],
+      },
+    ]);
+    expect(harness.memory.listReviewQueueOverview).toHaveBeenCalledWith({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+    });
+  });
+
+  it("get_review_assist is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.get_review_assist?.execute?.(
+      { id: "review-memory" },
+      {
+        sessionID: "session-review-assist",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual({
+      id: "review-memory",
+      status: "ready",
+      hints: [],
+      suggestions: [
+        {
+          kind: "gather_evidence",
+          rationale: "No duplicate or contradiction hints found; gather stronger supporting evidence before promotion.",
+          relatedMemoryIds: [],
+          suggestedAction: "collect_evidence",
+        },
+      ],
+    });
+    expect(harness.memory.getReviewAssist).toHaveBeenCalledWith({ id: "review-memory" });
+  });
+
+  it("enqueue_memory_proposal is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.enqueue_memory_proposal?.execute?.(
+      {
+        conversation: "Important: production deploys must go through staging first.",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+      },
+      {
+        sessionID: "session-proposal-queue",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual({
+      recommendation: "strong_candidate",
+      proposed: [{ candidateIndex: 0, id: "review-memory" }],
+      skipped: [],
+      candidates: [
+        {
+          kind: "fact",
+          scope: "project",
+          reason: "Explicit remember/important marker.",
+          draftContent: "Pending review memory.",
+          confidence: "high",
+        },
+      ],
+    });
+    expect(harness.memory.enqueueMemoryProposal).toHaveBeenCalledWith({
+      conversation: "Important: production deploys must go through staging first.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoRoot}`,
+    });
+  });
+
+  it("review_memory is exposed on the plugin path", async () => {
+    const harness = await createPluginHarness();
+
+    const result = parsePluginToolResult(await harness.hooks.tool?.review_memory?.execute?.(
+      {
+        id: "review-memory",
+        action: "defer",
+        note: "Need more evidence.",
+      },
+      {
+        sessionID: "session-review-action",
+        directory: repoRoot,
+        worktree: repoRoot,
+      },
+    ));
+
+    expect(result).toEqual({
+      id: "review-memory",
+      status: "accepted",
+      action: "defer",
+      reviewStatus: "deferred",
+      verificationStatus: "hypothesis",
+      reviewDecisions: [
+        {
+          action: "defer",
+          decidedAt: "2026-04-22T00:00:00.000Z",
+          note: "Need more evidence.",
+        },
+      ],
+      verificationEvidence: [],
+    });
+    expect(harness.memory.reviewMemory).toHaveBeenCalledWith({
+      id: "review-memory",
+      action: "defer",
+      note: "Need more evidence.",
+    });
   });
 
   it("keeps memory_context strictly session-scoped when multiple sessions are cached", async () => {
@@ -1435,7 +1801,7 @@ describe("product memory OpenCode plugin contract", () => {
       session: {
         sessionId: "session-fallback",
         lastEventType: "message.part.updated",
-        cached: {
+        continuityCache: {
           wakeUp: {
             wakeUpContext: expect.stringContaining("Runtime startup brief"),
           },
@@ -1479,7 +1845,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 3,
           hasPendingMessageDebounce: true,
         },
-        cached: {},
+        continuityCache: {},
       },
     });
 
@@ -1517,7 +1883,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 3,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareTurn: {
             context: "turn context: draft three",
             conservativePolicy: {
@@ -1642,7 +2008,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 2,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareTurn: {
             context: "turn context: second draft",
           },
@@ -1689,7 +2055,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 3,
           hasPendingMessageDebounce: true,
         },
-        cached: {},
+        continuityCache: {},
       },
     });
 
@@ -1726,7 +2092,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 3,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareTurn: {
             context: "turn context: partial draft three",
             conservativePolicy: {
@@ -1789,7 +2155,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 2,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareTurn: {
             context: "turn context: second partial",
           },
@@ -1827,7 +2193,7 @@ describe("product memory OpenCode plugin contract", () => {
       status: "ready",
       session: {
         sessionId: "session-turn-error",
-        cached: {},
+        continuityCache: {},
       },
     });
     expect(harness.memory.prepareTurnMemory).toHaveBeenCalledTimes(1);
@@ -1918,7 +2284,7 @@ describe("product memory OpenCode plugin contract", () => {
       status: "ready",
       session: {
         sessionId: "session-idle",
-        cached: {
+        continuityCache: {
           prepareHostTurn: {
             context: "host context: latest turn",
             conservativePolicy: {
@@ -2065,7 +2431,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 2,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareHostTurn: {
             context: "host context: first turn",
           },
@@ -2132,7 +2498,7 @@ describe("product memory OpenCode plugin contract", () => {
           messageVersion: 2,
           hasPendingMessageDebounce: false,
         },
-        cached: {
+        continuityCache: {
           prepareHostTurn: {
             context: "host context: first partial turn",
           },
@@ -2190,7 +2556,7 @@ describe("product memory OpenCode plugin contract", () => {
       status: "ready",
       session: {
         sessionId: "session-idle-error",
-        cached: {},
+        continuityCache: {},
       },
     });
     expectNoSelfSpawn(harness);
@@ -2231,7 +2597,7 @@ describe("product memory OpenCode plugin contract", () => {
     );
 
     expect(output.context).toHaveLength(1);
-    expect(output.context[0]).toContain("## Cached memory continuity");
+    expect(output.context[0]).toContain("## Continuity cache");
     expect(output.context[0]).toContain("wake-up continuity");
     expect(harness.log).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2414,7 +2780,7 @@ describe("product memory OpenCode plugin contract", () => {
       status: "ready",
       session: {
         sessionId: "session-pending",
-        cached: {},
+        continuityCache: {},
       },
     });
 
@@ -2464,7 +2830,7 @@ describe("product memory OpenCode plugin contract", () => {
       status: "ready",
       session: {
         sessionId: "session-error",
-        cached: {},
+        continuityCache: {},
       },
     });
     expect(harness.memory.wakeUpMemory).toHaveBeenCalledTimes(1);

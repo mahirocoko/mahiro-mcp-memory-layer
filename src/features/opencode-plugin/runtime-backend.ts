@@ -30,6 +30,10 @@ export function resetOpenCodePluginMemoryBackendSingletonForTests(): void {
   singletonMemoryBackendPromise = undefined;
 }
 
+export function resetOpenCodePluginMemoryBackendSingleton(): void {
+  singletonMemoryBackendPromise = undefined;
+}
+
 async function createDefaultMemoryBackend(): Promise<OpenCodePluginMemoryBackend> {
   return await MemoryService.create();
 }

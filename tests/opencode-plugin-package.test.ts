@@ -106,6 +106,23 @@ function parsePluginToolResult(result: unknown): unknown {
 function createSharedMemoryBackend(): MemoryToolBackend {
   return {
     remember: vi.fn().mockResolvedValue({ id: "remembered-memory" }),
+    promoteMemory: vi.fn().mockResolvedValue({
+      id: "remembered-memory",
+      status: "accepted",
+      verificationStatus: "verified",
+      verifiedAt: "2026-04-22T00:00:00.000Z",
+      verificationEvidence: [
+        {
+          type: "test",
+          value: "tests/opencode-plugin-package.test.ts#shared-tool-promotion",
+          note: "Verified by shared tool contract test.",
+        },
+      ],
+    }),
+    resetStorage: vi.fn().mockResolvedValue({
+      status: "cleared",
+      cleared: { lanceDb: true, canonicalLog: true, retrievalTrace: true },
+    }),
     search: vi.fn().mockResolvedValue({ items: [{ id: "search-hit" }], degraded: false }),
     buildContext: vi.fn().mockResolvedValue({
       context: "built-context",
@@ -115,6 +132,70 @@ function createSharedMemoryBackend(): MemoryToolBackend {
     }),
     upsertDocument: vi.fn().mockResolvedValue({ id: "upserted-document" }),
     list: vi.fn().mockResolvedValue([{ id: "listed-memory" }]),
+    listReviewQueue: vi.fn().mockResolvedValue([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: [],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+      },
+    ]),
+    listReviewQueueOverview: vi.fn().mockResolvedValue([
+      {
+        id: "review-memory",
+        kind: "fact",
+        scope: "project",
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        reviewDecisions: [],
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `worktree:${repoRoot}`,
+        source: { type: "manual" },
+        content: "Pending review memory.",
+        tags: ["review_queue_candidate", "candidate_confidence:high"],
+        importance: 0.5,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z",
+        priorityScore: 80,
+        priorityReasons: ["high_confidence_candidate"],
+        hints: [],
+      },
+    ]),
+    getReviewAssist: vi.fn().mockResolvedValue({
+      id: "review-memory",
+      status: "ready",
+      hints: [],
+      suggestions: [
+        {
+          kind: "gather_evidence",
+          rationale: "No duplicate or contradiction hints found; gather stronger supporting evidence before promotion.",
+          relatedMemoryIds: [],
+          suggestedAction: "collect_evidence",
+        },
+      ],
+    }),
+    enqueueMemoryProposal: vi.fn().mockResolvedValue({
+      recommendation: "strong_candidate",
+      proposed: [{ candidateIndex: 0, id: "review-memory" }],
+      skipped: [],
+      candidates: [
+        {
+          kind: "fact",
+          scope: "project",
+          reason: "Explicit remember/important marker.",
+          draftContent: "Pending review memory.",
+          confidence: "high",
+        },
+      ],
+    }),
     suggestMemoryCandidates: vi.fn().mockReturnValue({
       recommendation: "consider_saving",
       signals: { durable: ["explicit_durable_language"], ephemeral: [] },
@@ -152,6 +233,21 @@ function createSharedMemoryBackend(): MemoryToolBackend {
         },
       ],
     }),
+    reviewMemory: vi.fn().mockResolvedValue({
+      id: "review-memory",
+      status: "accepted",
+      action: "defer",
+      reviewStatus: "deferred",
+      verificationStatus: "hypothesis",
+      reviewDecisions: [
+        {
+          action: "defer",
+          decidedAt: "2026-04-22T00:00:00.000Z",
+          note: "Need more evidence.",
+        },
+      ],
+      verificationEvidence: [],
+    }),
     inspectMemoryRetrieval: vi.fn().mockResolvedValue({
       status: "empty",
       lookup: "latest",
@@ -177,12 +273,26 @@ function createSharedToolPayloads(repoPath: string): Record<string, Record<strin
       scope: "project",
       projectId: "mahiro-mcp-memory-layer",
     },
+    promote_memory: {
+      id: "remembered-memory",
+      evidence: [
+        {
+          type: "test",
+          value: "tests/opencode-plugin-package.test.ts#shared-tool-promotion",
+          note: "Verified by shared tool contract test.",
+        },
+      ],
+    },
+    review_memory: {
+      id: "review-memory",
+      action: "defer",
+      note: "Need more evidence.",
+    },
     build_context_for_task: {
       task: "Summarize plugin-native memory support.",
       mode: "query",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoPath}`,
-      sessionId: "session-1",
     },
     upsert_document: {
       projectId: "mahiro-mcp-memory-layer",
@@ -192,6 +302,22 @@ function createSharedToolPayloads(repoPath: string): Record<string, Record<strin
     list_memories: {
       scope: "project",
       projectId: "mahiro-mcp-memory-layer",
+    },
+    list_review_queue: {
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+    },
+    list_review_queue_overview: {
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
+    },
+    get_review_assist: {
+      id: "review-memory",
+    },
+    enqueue_memory_proposal: {
+      conversation: "Important: production deploys must go through staging first.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: `worktree:${repoPath}`,
     },
     suggest_memory_candidates: {
       conversation: "We decided plugin users should get memory tools without MCP setup.",
@@ -204,18 +330,17 @@ function createSharedToolPayloads(repoPath: string): Record<string, Record<strin
     inspect_memory_retrieval: {
       requestId: "req_123",
     },
+    reset_memory_storage: {},
     prepare_host_turn_memory: {
       task: "Summarize relevant memory context for the latest OpenCode turn.",
       mode: "query",
       recentConversation: "Summarize recent memory context for this turn.",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoPath}`,
-      sessionId: "session-1",
     },
     wake_up_memory: {
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoPath}`,
-      sessionId: "session-1",
     },
     prepare_turn_memory: {
       task: "Summarize relevant memory context for the latest OpenCode turn.",
@@ -223,7 +348,6 @@ function createSharedToolPayloads(repoPath: string): Record<string, Record<strin
       recentConversation: "Summarize recent memory context for this turn.",
       projectId: "mahiro-mcp-memory-layer",
       containerId: `worktree:${repoPath}`,
-      sessionId: "session-1",
     },
   };
 }
@@ -421,7 +545,7 @@ describe("OpenCode plugin package", () => {
         sessionTaskFlowAvailable: false,
       },
           },
-          cached: {
+          continuityCache: {
             wakeUp: expect.objectContaining({
               ...createFixedWakeUpResult("wake-up-context"),
               wakeUpContext: expect.stringContaining("Runtime startup brief"),

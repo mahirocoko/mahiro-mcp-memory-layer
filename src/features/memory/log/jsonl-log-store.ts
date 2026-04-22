@@ -1,7 +1,8 @@
 import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { ListMemoriesInput, MemoryRecord } from "../types.js";
+import { memoryRecordSchema } from "../schemas.js";
+import type { ListMemoriesInput, ListReviewQueueInput, MemoryRecord } from "../types.js";
 import type { CanonicalLogStore } from "./canonical-log.js";
 
 export class JsonlLogStore implements CanonicalLogStore {
@@ -23,6 +24,22 @@ export class JsonlLogStore implements CanonicalLogStore {
       .slice(0, input.limit ?? 100);
   }
 
+  public async listReviewQueue(input: ListReviewQueueInput): Promise<readonly MemoryRecord[]> {
+    const records = await this.readAll();
+
+    return records
+      .filter((record) => record.verificationStatus !== "verified")
+      .filter((record) => record.reviewStatus !== "rejected")
+      .filter((record) => !input.projectId || record.projectId === input.projectId)
+      .filter((record) => !input.containerId || record.containerId === input.containerId)
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.updatedAt ?? left.createdAt);
+        const rightTime = Date.parse(right.updatedAt ?? right.createdAt);
+        return rightTime - leftTime;
+      })
+      .slice(0, input.limit ?? 100);
+  }
+
   public async readAll(): Promise<readonly MemoryRecord[]> {
     try {
       const fileContent = await readFile(this.filePath, "utf8");
@@ -31,7 +48,10 @@ export class JsonlLogStore implements CanonicalLogStore {
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
-        .map((line) => JSON.parse(line) as MemoryRecord);
+        .flatMap((line) => {
+          const parsed = memoryRecordSchema.safeParse(JSON.parse(line));
+          return parsed.success ? [parsed.data as MemoryRecord] : [];
+        });
     } catch (error) {
       if (isMissingFileError(error)) {
         return [];
@@ -39,6 +59,11 @@ export class JsonlLogStore implements CanonicalLogStore {
 
       throw error;
     }
+  }
+
+  public async readById(id: string): Promise<MemoryRecord | undefined> {
+    const records = await this.readAll();
+    return records.find((record) => record.id === id);
   }
 
   public async replaceRecordById(id: string, record: MemoryRecord): Promise<void> {

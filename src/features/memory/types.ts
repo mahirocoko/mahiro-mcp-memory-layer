@@ -3,6 +3,22 @@ import type { memoryKinds, memoryScopes, retrievalModes } from "./constants.js";
 export type MemoryKind = (typeof memoryKinds)[number];
 export type MemoryScope = (typeof memoryScopes)[number];
 export type RetrievalMode = (typeof retrievalModes)[number];
+export type MemoryVerificationStatus = "hypothesis" | "verified";
+export type MemoryReviewStatus = "pending" | "deferred" | "rejected";
+export type MemoryReviewAction = "reject" | "defer" | "edit_then_promote";
+
+export interface MemoryVerificationEvidence {
+  readonly type: "human" | "test" | "trace" | "issue" | "link";
+  readonly value: string;
+  readonly note?: string;
+}
+
+export interface MemoryReviewDecision {
+  readonly action: MemoryReviewAction;
+  readonly decidedAt: string;
+  readonly note?: string;
+  readonly evidence?: readonly MemoryVerificationEvidence[];
+}
 
 export interface MemorySource {
   readonly type: "manual" | "chat" | "tool" | "document" | "system";
@@ -14,6 +30,11 @@ export interface MemoryRecord {
   readonly id: string;
   readonly kind: MemoryKind;
   readonly scope: MemoryScope;
+  readonly verificationStatus?: MemoryVerificationStatus;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly reviewDecisions?: readonly MemoryReviewDecision[];
+  readonly verifiedAt?: string;
+  readonly verificationEvidence?: readonly MemoryVerificationEvidence[];
   readonly projectId?: string;
   readonly containerId?: string;
   readonly source: MemorySource;
@@ -32,6 +53,11 @@ export interface RememberInput {
   readonly projectId?: string;
   readonly containerId?: string;
   readonly source: MemorySource;
+  readonly verificationStatus?: MemoryVerificationStatus;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly reviewDecisions?: readonly MemoryReviewDecision[];
+  readonly verifiedAt?: string;
+  readonly verificationEvidence?: readonly MemoryVerificationEvidence[];
   readonly summary?: string;
   readonly tags?: readonly string[];
   readonly importance?: number;
@@ -55,12 +81,133 @@ export interface SearchMemoryItem {
   readonly reasons: readonly string[];
   readonly createdAt: string;
   readonly importance: number;
+  readonly verificationStatus: MemoryVerificationStatus;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly reviewDecisions: readonly MemoryReviewDecision[];
+  readonly verifiedAt?: string;
+  readonly verificationEvidence: readonly MemoryVerificationEvidence[];
   readonly source: MemorySource;
 }
 
 export interface SearchMemoriesResult {
   readonly items: readonly SearchMemoryItem[];
   readonly degraded: boolean;
+}
+
+export interface ResetMemoryStorageResult {
+  readonly status: "cleared";
+  readonly cleared: {
+    readonly lanceDb: boolean;
+    readonly canonicalLog: boolean;
+    readonly retrievalTrace: boolean;
+  };
+}
+
+export interface PromoteMemoryInput {
+  readonly id: string;
+  readonly verificationStatus?: "verified";
+  readonly evidence: readonly MemoryVerificationEvidence[];
+}
+
+export interface PromoteMemoryResult {
+  readonly id: string;
+  readonly status: "accepted";
+  readonly verificationStatus: MemoryVerificationStatus;
+  readonly verifiedAt: string;
+  readonly verificationEvidence: readonly MemoryVerificationEvidence[];
+}
+
+export interface ReviewMemoryInput {
+  readonly id: string;
+  readonly action: MemoryReviewAction;
+  readonly note?: string;
+  readonly evidence?: readonly MemoryVerificationEvidence[];
+  readonly content?: string;
+  readonly summary?: string;
+  readonly tags?: readonly string[];
+}
+
+export interface ReviewMemoryResult {
+  readonly id: string;
+  readonly status: "accepted";
+  readonly action: MemoryReviewAction;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly verificationStatus: MemoryVerificationStatus;
+  readonly reviewDecisions: readonly MemoryReviewDecision[];
+  readonly verifiedAt?: string;
+  readonly verificationEvidence: readonly MemoryVerificationEvidence[];
+}
+
+export interface EnqueueMemoryProposalInput {
+  readonly conversation?: string;
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly maxCandidates?: number;
+  readonly suggestion?: SuggestMemoryCandidatesResult;
+  readonly sourceOverride?: MemorySource;
+  readonly extraTags?: readonly string[];
+}
+
+export interface EnqueueMemoryProposalResult {
+  readonly recommendation: MemorySaveRecommendation;
+  readonly proposed: readonly { readonly candidateIndex: number; readonly id: string }[];
+  readonly skipped: readonly { readonly candidateIndex: number; readonly reason: "incomplete_scope_ids" }[];
+  readonly candidates: readonly MemorySuggestionCandidate[];
+}
+
+export interface ListReviewQueueInput {
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly limit?: number;
+}
+
+export type MemoryReviewHintType = "likely_duplicate" | "possible_contradiction";
+export type MemoryReviewAssistKind = "merge_duplicate" | "resolve_contradiction" | "gather_evidence";
+
+export interface MemoryReviewHint {
+  readonly type: MemoryReviewHintType;
+  readonly relatedMemoryIds: readonly string[];
+  readonly note: string;
+}
+
+export interface ReviewQueueOverviewItem {
+  readonly id: string;
+  readonly kind: MemoryKind;
+  readonly scope: MemoryScope;
+  readonly content: string;
+  readonly summary?: string;
+  readonly verificationStatus: MemoryVerificationStatus;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly reviewDecisions: readonly MemoryReviewDecision[];
+  readonly source: MemorySource;
+  readonly tags: readonly string[];
+  readonly importance: number;
+  readonly createdAt: string;
+  readonly updatedAt?: string;
+  readonly priorityScore: number;
+  readonly priorityReasons: readonly string[];
+  readonly hints: readonly MemoryReviewHint[];
+}
+
+export type ListReviewQueueOverviewInput = ListReviewQueueInput;
+
+export interface GetReviewAssistInput {
+  readonly id: string;
+}
+
+export interface ReviewAssistSuggestion {
+  readonly kind: MemoryReviewAssistKind;
+  readonly rationale: string;
+  readonly relatedMemoryIds: readonly string[];
+  readonly draftContent?: string;
+  readonly suggestedAction: MemoryReviewAction | "collect_evidence";
+}
+
+export interface ReviewAssistResult {
+  readonly id: string;
+  readonly status: "ready";
+  readonly hints: readonly MemoryReviewHint[];
+  readonly suggestions: readonly ReviewAssistSuggestion[];
 }
 
 export interface RetrievalTraceProvenance {
@@ -97,6 +244,9 @@ export interface UpsertDocumentInput {
   readonly containerId?: string;
   readonly source: MemorySource;
   readonly content: string;
+  readonly verificationStatus?: MemoryVerificationStatus;
+  readonly reviewStatus?: MemoryReviewStatus;
+  readonly reviewDecisions?: readonly MemoryReviewDecision[];
   readonly tags?: readonly string[];
   readonly summary?: string;
   readonly importance?: number;
@@ -215,6 +365,11 @@ export interface RetrievalRow {
   readonly embedding: readonly number[];
   readonly kind: MemoryKind;
   readonly scope: MemoryScope;
+  readonly verificationStatus: MemoryVerificationStatus;
+  readonly reviewStatus: MemoryReviewStatus;
+  readonly reviewDecisions: string;
+  readonly verifiedAt: string;
+  readonly verificationEvidence: string;
   readonly projectId: string;
   readonly containerId: string;
   readonly importance: number;

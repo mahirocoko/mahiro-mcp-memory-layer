@@ -1,8 +1,8 @@
 import type { Connection, Table } from "@lancedb/lancedb";
 
+import { retrievalRowSchema } from "../schemas.js";
 import type { RetrievalRow, ScopeFilter } from "../types.js";
 import { extractLexicalTokensForCandidateQuery } from "../lib/lexical-tokens.js";
-import { toSqlScopeWhereClause } from "../lib/scope.js";
 
 const tableName = "memory_records";
 
@@ -55,11 +55,14 @@ export class MemoryRecordsTable {
       return [];
     }
 
-    const query = table.query().where(toSqlScopeWhereClause(filter));
+    const rows = await table.query().toArray();
 
-    const rows = await (typeof limit === "number" ? query.limit(limit) : query).toArray();
+    const scopedRows = rows.flatMap((row) => {
+      const parsed = toRetrievalRow(row);
+      return parsed && matchesScopeFilter(parsed, filter) ? [parsed] : [];
+    });
 
-    return rows.map((row) => toRetrievalRow(row));
+    return typeof limit === "number" ? scopedRows.slice(0, limit) : scopedRows;
   }
 
   /**
@@ -84,22 +87,17 @@ export class MemoryRecordsTable {
       return [];
     }
 
-    const tokenClause = tokens
-      .map((token) => {
-        const literal = escapeSqlPredicateValue(token);
-
-        return `(strpos(lower(content), '${literal}') > 0 OR strpos(lower(summary), '${literal}') > 0 OR strpos(lower(tags), '${literal}') > 0)`;
-      })
-      .join(" OR ");
-
     try {
-      const rows = await table
-        .query()
-        .where(`${toSqlScopeWhereClause(filter)} AND (${tokenClause})`)
-        .limit(limit)
-        .toArray();
+      const rows = await table.query().toArray();
 
-      return rows.map((row) => toRetrievalRow(row));
+      return rows.flatMap((row) => {
+        const parsed = toRetrievalRow(row);
+        if (!parsed || !matchesScopeFilter(parsed, filter)) {
+          return [];
+        }
+
+        return matchesLexicalCandidate(parsed, tokens) ? [parsed] : [];
+      }).slice(0, limit);
     } catch {
       return [];
     }
@@ -114,11 +112,13 @@ export class MemoryRecordsTable {
 
     const rows = await table
       .search([...queryVector])
-      .where(toSqlScopeWhereClause(filter))
-      .limit(limit)
+      .limit(Math.max(limit * 16, 100))
       .toArray();
 
-    return rows.map((row) => toRetrievalRow(row));
+    return rows.flatMap((row) => {
+      const parsed = toRetrievalRow(row);
+      return parsed && matchesScopeFilter(parsed, filter) ? [parsed] : [];
+    }).slice(0, limit);
   }
 
   private async tryOpenTable(): Promise<Table | null> {
@@ -134,6 +134,17 @@ function escapeSqlPredicateValue(value: string): string {
   return value.replaceAll("'", "''");
 }
 
+function matchesScopeFilter(row: RetrievalRow, filter: ScopeFilter): boolean {
+  return row.scope === filter.scope
+    && (!filter.projectId || row.projectId === filter.projectId)
+    && (!filter.containerId || row.containerId === filter.containerId);
+}
+
+function matchesLexicalCandidate(row: RetrievalRow, tokens: readonly string[]): boolean {
+  const haystack = `${row.content}\n${row.summary}\n${row.tags}`.toLowerCase();
+  return tokens.some((token) => haystack.includes(token));
+}
+
 function toDatabaseRow(row: RetrievalRow): Record<string, unknown> {
   return {
     id: row.id,
@@ -142,6 +153,11 @@ function toDatabaseRow(row: RetrievalRow): Record<string, unknown> {
     embedding: [...row.embedding],
     kind: row.kind,
     scope: row.scope,
+    verification_status: row.verificationStatus,
+    review_status: row.reviewStatus,
+    review_decisions: row.reviewDecisions,
+    verified_at: row.verifiedAt,
+    verification_evidence: row.verificationEvidence,
     project_id: row.projectId,
     container_id: row.containerId,
     importance: row.importance,
@@ -156,24 +172,61 @@ function toDatabaseRow(row: RetrievalRow): Record<string, unknown> {
   };
 }
 
-function toRetrievalRow(input: Record<string, unknown>): RetrievalRow {
+function toRetrievalRow(input: Record<string, unknown>): RetrievalRow | null {
+  if (
+    "user_id" in input ||
+    "userId" in input ||
+    "session_id" in input ||
+    "sessionId" in input
+  ) {
+    return null;
+  }
+
+  const parsed = retrievalRowSchema.safeParse({
+    ...input,
+    embedding: normalizeEmbedding(input.embedding),
+  });
+
+  if (!parsed.success) {
+    return null;
+  }
+
+  const row = parsed.data;
+
   return {
-    id: String(input.id ?? ""),
-    content: String(input.content ?? ""),
-    summary: String(input.summary ?? ""),
-    embedding: Array.isArray(input.embedding) ? input.embedding.map((value) => Number(value)) : [],
-    kind: String(input.kind ?? "fact") as RetrievalRow["kind"],
-    scope: String(input.scope ?? "global") as RetrievalRow["scope"],
-    projectId: String(input.project_id ?? input.projectId ?? ""),
-    containerId: String(input.container_id ?? input.containerId ?? ""),
-    importance: Number(input.importance ?? 0),
-    createdAt: String(input.created_at ?? input.createdAt ?? ""),
-    updatedAt: String(input.updated_at ?? input.updatedAt ?? ""),
-    sourceType: String(input.source_type ?? input.sourceType ?? ""),
-    sourceUri: String(input.source_uri ?? input.sourceUri ?? ""),
-    sourceTitle: String(input.source_title ?? input.sourceTitle ?? ""),
-    tags: String(input.tags ?? "[]"),
-    embeddingVersion: String(input.embedding_version ?? input.embeddingVersion ?? ""),
-    indexVersion: String(input.index_version ?? input.indexVersion ?? ""),
+    id: row.id,
+    content: row.content,
+    summary: row.summary,
+    embedding: row.embedding,
+    kind: row.kind,
+    scope: row.scope,
+    verificationStatus: row.verification_status ?? row.verificationStatus ?? "hypothesis",
+    reviewStatus: row.review_status ?? row.reviewStatus ?? "pending",
+    reviewDecisions: row.review_decisions ?? row.reviewDecisions ?? "[]",
+    verifiedAt: row.verified_at ?? row.verifiedAt ?? "",
+    verificationEvidence: row.verification_evidence ?? row.verificationEvidence ?? "[]",
+    projectId: row.project_id ?? row.projectId ?? "",
+    containerId: row.container_id ?? row.containerId ?? "",
+    importance: row.importance,
+    createdAt: row.created_at ?? row.createdAt ?? "",
+    updatedAt: row.updated_at ?? row.updatedAt ?? "",
+    sourceType: row.source_type ?? row.sourceType ?? "",
+    sourceUri: row.source_uri ?? row.sourceUri ?? "",
+    sourceTitle: row.source_title ?? row.sourceTitle ?? "",
+    tags: row.tags,
+    embeddingVersion: row.embedding_version ?? row.embeddingVersion ?? "",
+    indexVersion: row.index_version ?? row.indexVersion ?? "",
   };
+}
+
+function normalizeEmbedding(value: unknown): number[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => Number(item));
+  }
+
+  if (value && typeof value === "object" && Symbol.iterator in value) {
+    return Array.from(value as Iterable<unknown>, (item) => Number(item));
+  }
+
+  return [];
 }

@@ -52,7 +52,6 @@ describe("memory service core", () => {
         content: "The repo uses Bun for runtime scripts.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: {
@@ -69,7 +68,6 @@ describe("memory service core", () => {
         query: "What runtime scripts does the repo use?",
         mode: "full",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
       },
@@ -80,6 +78,8 @@ describe("memory service core", () => {
 
     expect(remembered.status).toBe("accepted");
     expect(result.items.some((item) => item.id === remembered.id)).toBe(true);
+    expect((await fixture.logStore.readAll())[0]?.verificationStatus).toBe("hypothesis");
+    expect(result.items[0]?.verificationStatus).toBe("hypothesis");
   });
 
   it("does not leak results across project scope", async () => {
@@ -90,7 +90,6 @@ describe("memory service core", () => {
         content: "Private memory for project A.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "project-a",
         containerId: "workspace:project-a",
         source: {
@@ -107,7 +106,6 @@ describe("memory service core", () => {
         query: "private memory",
         mode: "full",
         scope: "project",
-        userId: "mahiro",
         projectId: "project-b",
         containerId: "workspace:project-b",
       },
@@ -127,7 +125,6 @@ describe("memory service core", () => {
         content: "Use LanceDB as the retrieval layer and keep a canonical append-only log.",
         kind: "decision",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: {
@@ -143,7 +140,6 @@ describe("memory service core", () => {
       payload: {
         task: "Implement the memory retrieval layer",
         mode: "full",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         maxItems: 5,
@@ -166,7 +162,6 @@ describe("memory service core", () => {
       payload: {
         task: "Continue implementation",
         mode: "full",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         maxItems: 5,
@@ -183,6 +178,398 @@ describe("memory service core", () => {
     expect(result.memorySuggestions).toBeDefined();
     expect(result.memorySuggestions!.candidates.length).toBeGreaterThan(0);
     expect(result.memorySuggestions!.candidates[0]!.draftContent).toContain("decided");
+  });
+
+  it("preserves verificationStatus on document refresh and defaults new docs to hypothesis", async () => {
+    const fixture = await createFixture();
+
+    const first = await upsertDocument({
+      payload: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "document", uri: "file:///README.md", title: "README" },
+        content: "Version one.",
+        verificationStatus: "verified",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    await upsertDocument({
+      payload: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "document", uri: "file:///README.md", title: "README" },
+        content: "Version two.",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const records = await fixture.logStore.readAll();
+    const updated = records.find((record) => record.id === first.id);
+    expect(updated?.verificationStatus).toBe("verified");
+
+    const created = await upsertDocument({
+      payload: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "document", uri: "file:///GUIDE.md", title: "GUIDE" },
+        content: "Fresh document.",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const createdRecord = (await fixture.logStore.readAll()).find((record) => record.id === created.id);
+    expect(createdRecord?.verificationStatus).toBe("hypothesis");
+  });
+
+  it("promotes a durable memory from hypothesis to verified", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const remembered = await service.remember({
+      content: "Promotable memory.",
+      kind: "fact",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    const promoted = await service.promoteMemory({
+      id: remembered.id,
+      evidence: [
+        {
+          type: "test",
+          value: "tests/memory-service.test.ts#promotes-a-durable-memory-from-hypothesis-to-verified",
+          note: "Verified by automated test.",
+        },
+      ],
+    });
+    expect(promoted).toMatchObject({
+      id: remembered.id,
+      status: "accepted",
+      verificationStatus: "verified",
+      verificationEvidence: [
+        {
+          type: "test",
+          value: "tests/memory-service.test.ts#promotes-a-durable-memory-from-hypothesis-to-verified",
+        },
+      ],
+    });
+    expect(promoted.verifiedAt).toEqual(expect.any(String));
+
+    const listed = await service.list({
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+    expect(listed.find((item) => item.id === remembered.id)?.verificationStatus).toBe("verified");
+    expect(listed.find((item) => item.id === remembered.id)?.verificationEvidence).toEqual([
+      {
+        type: "test",
+        value: "tests/memory-service.test.ts#promotes-a-durable-memory-from-hypothesis-to-verified",
+        note: "Verified by automated test.",
+      },
+    ]);
+
+    const search = await service.search({
+      query: "Promotable memory",
+      mode: "query",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+    expect(search.items.find((item) => item.id === remembered.id)?.verificationStatus).toBe("verified");
+    expect(search.items.find((item) => item.id === remembered.id)?.verificationEvidence).toEqual([
+      {
+        type: "test",
+        value: "tests/memory-service.test.ts#promotes-a-durable-memory-from-hypothesis-to-verified",
+        note: "Verified by automated test.",
+      },
+    ]);
+  });
+
+  it("requires evidence to promote a durable memory", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const remembered = await service.remember({
+      content: "Needs evidence.",
+      kind: "fact",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    await expect(service.promoteMemory({ id: remembered.id, evidence: [] })).rejects.toThrow();
+  });
+
+  it("supports reject, defer, and edit_then_promote review decisions with history", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Reject me.",
+      kind: "fact",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+    const deferred = await service.remember({
+      content: "Defer me.",
+      kind: "fact",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+    const edited = await service.remember({
+      content: "Needs edit before promote.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    const rejectResult = await service.reviewMemory({
+      id: rejected.id,
+      action: "reject",
+      note: "Not stable enough.",
+    });
+    expect(rejectResult).toMatchObject({
+      id: rejected.id,
+      action: "reject",
+      reviewStatus: "rejected",
+      verificationStatus: "hypothesis",
+    });
+
+    const deferResult = await service.reviewMemory({
+      id: deferred.id,
+      action: "defer",
+      note: "Need more evidence.",
+    });
+    expect(deferResult).toMatchObject({
+      id: deferred.id,
+      action: "defer",
+      reviewStatus: "deferred",
+      verificationStatus: "hypothesis",
+    });
+
+    const editPromoteResult = await service.reviewMemory({
+      id: edited.id,
+      action: "edit_then_promote",
+      content: "Edited and promoted memory.",
+      note: "Edited for clarity before approval.",
+      evidence: [{ type: "human", value: "review-panel", note: "Approved after edit." }],
+    });
+    expect(editPromoteResult).toMatchObject({
+      id: edited.id,
+      action: "edit_then_promote",
+      verificationStatus: "verified",
+      verificationEvidence: [{ type: "human", value: "review-panel" }],
+    });
+
+    const queue = await service.listReviewQueue({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+    expect(queue.map((item) => item.id)).toEqual([deferred.id]);
+
+    const records = await service.list({
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+    expect(records.find((item) => item.id === rejected.id)?.reviewStatus).toBe("rejected");
+    expect(records.find((item) => item.id === deferred.id)?.reviewStatus).toBe("deferred");
+    expect(records.find((item) => item.id === edited.id)?.content).toBe("Edited and promoted memory.");
+    expect(records.find((item) => item.id === edited.id)?.reviewDecisions?.map((entry) => entry.action)).toEqual(["edit_then_promote"]);
+  });
+
+  it("lists hypothesis memories in review queue order", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const first = await service.remember({
+      content: "Old hypothesis.",
+      kind: "fact",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    const second = await service.remember({
+      content: "Newer hypothesis.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+    });
+
+    await service.promoteMemory({
+      id: first.id,
+      evidence: [{ type: "human", value: "manual-review", note: "Approved during test." }],
+    });
+
+    const queue = await service.listReviewQueue({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(queue.map((item) => item.id)).toEqual([second.id]);
+    expect(queue[0]?.verificationStatus).toBe("hypothesis");
+  });
+
+  it("builds review queue overview with priority reasons and reviewer hints", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const verified = await service.remember({
+      content: "Always run smoke tests before deploy.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" },
+      verificationStatus: "verified",
+      verifiedAt: "2026-04-22T00:00:00.000Z",
+      verificationEvidence: [{ type: "human", value: "release-review" }],
+    });
+
+    await service.remember({
+      content: "Always run smoke tests before deploy.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "tool", title: "enqueue_memory_proposal" },
+      verificationStatus: "hypothesis",
+      reviewStatus: "pending",
+      tags: ["review_queue_candidate", "candidate_confidence:high"],
+      importance: 0.8,
+    });
+
+    const contradiction = await service.remember({
+      content: "Never run smoke tests before deploy.",
+      kind: "decision",
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "tool", title: "enqueue_memory_proposal" },
+      verificationStatus: "hypothesis",
+      reviewStatus: "pending",
+      tags: ["review_queue_candidate", "candidate_confidence:medium"],
+      importance: 0.7,
+    });
+
+    const overview = await service.listReviewQueueOverview({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(overview[0]?.priorityScore).toBeGreaterThanOrEqual(overview[1]?.priorityScore ?? 0);
+    expect(overview.find((item) => item.content === "Always run smoke tests before deploy.")?.hints).toEqual([
+      {
+        type: "likely_duplicate",
+        relatedMemoryIds: [verified.id],
+        note: "Matches the content of existing verified memory.",
+      },
+    ]);
+    expect(overview.find((item) => item.id === contradiction.id)?.hints).toEqual([
+      {
+        type: "possible_contradiction",
+        relatedMemoryIds: [verified.id],
+        note: "Shares topic words with verified memory but flips policy-style polarity.",
+      },
+    ]);
+
+    const contradictionAssist = await service.getReviewAssist({ id: contradiction.id });
+    expect(contradictionAssist.suggestions).toEqual([
+      {
+        kind: "resolve_contradiction",
+        rationale: "Shares topic words with verified memory but flips policy-style polarity.",
+        relatedMemoryIds: [verified.id],
+        draftContent: `Review conflict between verified memory: "Always run smoke tests before deploy." and proposed memory: "Never run smoke tests before deploy.".`,
+        suggestedAction: "edit_then_promote",
+      },
+    ]);
+
+    const duplicateAssist = await service.getReviewAssist({ id: overview.find((item) => item.content === "Always run smoke tests before deploy.")!.id });
+    expect(duplicateAssist.suggestions).toEqual([
+      {
+        kind: "merge_duplicate",
+        rationale: "Matches the content of existing verified memory.",
+        relatedMemoryIds: [verified.id],
+        draftContent: "Always run smoke tests before deploy.",
+        suggestedAction: "edit_then_promote",
+      },
+    ]);
+  });
+
+  it("enqueues memory proposals from conversation into the review queue", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const proposed = await service.enqueueMemoryProposal({
+      conversation: "Important: production deploys must go through staging first.",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(proposed.recommendation).toBe("strong_candidate");
+    expect(proposed.proposed.length).toBeGreaterThan(0);
+
+    const queue = await service.listReviewQueue({
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(queue.length).toBeGreaterThan(0);
+    expect(queue[0]?.verificationStatus).toBe("hypothesis");
+    expect(queue[0]?.reviewStatus).toBe("pending");
+    expect(queue[0]?.source.title).toBe("enqueue_memory_proposal");
+    expect(queue[0]?.tags).toContain("review_queue_candidate");
   });
 
   it("rejects includeMemorySuggestions without recentConversation", async () => {
@@ -211,7 +598,6 @@ describe("memory service core", () => {
         summary: "Short profile summary.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: {
@@ -227,7 +613,6 @@ describe("memory service core", () => {
       payload: {
         task: "Summarize stable project context",
         mode: "profile",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         maxItems: 5,
@@ -242,7 +627,6 @@ describe("memory service core", () => {
       payload: {
         task: "Summarize recent project activity",
         mode: "recent",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         maxItems: 5,
@@ -354,7 +738,6 @@ describe("memory service core", () => {
         content: "Reindex should restore retrieval from the canonical log.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: {
@@ -377,7 +760,6 @@ describe("memory service core", () => {
         query: "restore retrieval from the canonical log",
         mode: "full",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
       },
@@ -403,7 +785,6 @@ describe("memory service core", () => {
             id: "mem-important",
             kind: "fact",
             scope: "project",
-            userId: "mahiro",
             projectId: "mahiro-mcp-memory-layer",
             containerId: "workspace:mahiro-mcp-memory-layer",
             source: {
@@ -423,7 +804,6 @@ describe("memory service core", () => {
             id: "mem-recent",
             kind: "conversation",
             scope: "project",
-            userId: "mahiro",
             projectId: "mahiro-mcp-memory-layer",
             containerId: "workspace:mahiro-mcp-memory-layer",
             source: {
@@ -445,7 +825,6 @@ describe("memory service core", () => {
           query: "runtime memory",
           mode: "recent",
           scope: "project",
-          userId: "mahiro",
           projectId: "mahiro-mcp-memory-layer",
           containerId: "workspace:mahiro-mcp-memory-layer",
         },
@@ -459,7 +838,6 @@ describe("memory service core", () => {
           query: "runtime memory",
           mode: "profile",
           scope: "project",
-          userId: "mahiro",
           projectId: "mahiro-mcp-memory-layer",
           containerId: "workspace:mahiro-mcp-memory-layer",
         },
@@ -480,7 +858,6 @@ describe("memory service core", () => {
 
     const base = {
       projectId: "mahiro-mcp-memory-layer",
-      userId: "mahiro",
       containerId: "workspace:mahiro-mcp-memory-layer",
       source: {
         type: "document" as const,
@@ -516,7 +893,6 @@ describe("memory service core", () => {
         query: "Version two replaces",
         mode: "full",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
       },
@@ -535,7 +911,6 @@ describe("memory service core", () => {
 
     const scope = {
       projectId: "mahiro-mcp-memory-layer",
-      userId: "mahiro",
       containerId: "workspace:mahiro-mcp-memory-layer",
     };
 
@@ -567,7 +942,6 @@ describe("memory service core", () => {
   it("upsert_document rejects when source.uri and source.title are both absent", async () => {
     const parsed = upsertDocumentInputSchema.safeParse({
       projectId: "mahiro-mcp-memory-layer",
-      userId: "mahiro",
       containerId: "workspace:mahiro-mcp-memory-layer",
       source: { type: "document" },
       content: "No stable identity.",
@@ -584,7 +958,6 @@ describe("memory service core", () => {
       upsertDocument({
         payload: {
           projectId: "mahiro-mcp-memory-layer",
-          userId: "mahiro",
           containerId: "workspace:mahiro-mcp-memory-layer",
           source: { type: "document" },
           content: "No stable identity.",
@@ -604,7 +977,6 @@ describe("memory service core", () => {
         content: "Graceful fallback should still return keyword matches.",
         kind: "fact",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
         source: {
@@ -629,7 +1001,6 @@ describe("memory service core", () => {
         query: "keyword matches",
         mode: "full",
         scope: "project",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
       },
@@ -659,7 +1030,6 @@ describe("memory service core", () => {
       content: "A durable project fact for retrieval.",
       kind: "fact",
       scope: "project",
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
       source: { type: "manual" },
@@ -669,7 +1039,6 @@ describe("memory service core", () => {
       query: "durable retrieval",
       mode: "query",
       scope: "project",
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
     });
@@ -711,10 +1080,8 @@ describe("memory service core", () => {
       content: "We decided to inspect trace provenance in live plugin preflight.",
       kind: "decision",
       scope: "project",
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
-      sessionId: "session-1",
       source: { type: "manual" },
     });
 
@@ -723,10 +1090,8 @@ describe("memory service core", () => {
         task: "Continue from the previous session and remember the earlier decision.",
         mode: "query",
         recentConversation: "Continue from the previous session and remember the earlier decision.",
-        userId: "mahiro",
         projectId: "mahiro-mcp-memory-layer",
         containerId: "workspace:mahiro-mcp-memory-layer",
-        sessionId: "session-1",
       },
       {
         surface: "opencode-plugin",

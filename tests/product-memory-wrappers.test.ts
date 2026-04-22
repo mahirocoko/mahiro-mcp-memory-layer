@@ -22,7 +22,6 @@ describe("product memory wrappers", () => {
     expect(tool).toBeDefined();
 
     const out = await tool?.execute({
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
     });
@@ -72,7 +71,6 @@ describe("product memory wrappers", () => {
     const { MemoryService } = await import("../src/features/memory/memory-service.js");
     const svc = await MemoryService.create();
     const out = await svc.wakeUpMemory({
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
     });
@@ -89,7 +87,6 @@ describe("product memory wrappers", () => {
       task: "test task",
       mode: "query" as const,
       recentConversation: "short chat",
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
     };

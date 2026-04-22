@@ -50,7 +50,6 @@ describe("prepareHostTurnMemory", () => {
       task: "test task",
       mode: "query",
       recentConversation: "short chat",
-      userId: "mahiro",
       projectId: "mahiro-mcp-memory-layer",
       containerId: "workspace:mahiro-mcp-memory-layer",
     });

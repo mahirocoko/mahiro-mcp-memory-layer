@@ -3,6 +3,8 @@
 Start here, then load the narrower doc that matches your task.
 
 - Use `README.md` for package overview, install, and human-facing command/reference material.
+- Use `ARCHITECTURE_BOUNDARIES.md` when the task is about long-term package scope, memory versus orchestration ownership, or the intended repo cut.
+- Use `AGENT_NEXT_STEPS.md` when the task is about current direction, follow-up work, or what should happen next.
 - Use `MCP_USAGE.md` for the practical runtime/tool surface and the plugin-vs-MCP mode split.
 - Use `ORCHESTRATION.md` for orchestrator posture, worker routing, and the current operator-loop rules.
 - Use `CONTINUITY_DEBUGGING.md` when the task is about memory continuity, recall, or why continuity did or did not trigger.

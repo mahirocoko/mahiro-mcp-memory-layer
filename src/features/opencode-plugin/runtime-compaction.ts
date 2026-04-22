@@ -101,7 +101,7 @@ function buildCompactionContinuityBlock(sessionState: OpenCodePluginSessionState
     return undefined;
   }
 
-  return [`## Cached memory continuity`, ...sections].join("\n\n");
+  return [`## Continuity cache`, ...sections].join("\n\n");
 }
 
 function asCompactionContextAppender(value: unknown): { push: (entry: string) => void } | undefined {

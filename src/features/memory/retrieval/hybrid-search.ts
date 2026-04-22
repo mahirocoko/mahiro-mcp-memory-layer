@@ -132,6 +132,10 @@ export async function runHybridSearch(input: {
           return right.vectorScore - left.vectorScore;
         }
 
+        if (left.row.verificationStatus !== right.row.verificationStatus) {
+          return left.row.verificationStatus === "verified" ? -1 : 1;
+        }
+
         return toTimestamp(right.row.updatedAt) - toTimestamp(left.row.updatedAt);
       })
       .slice(0, limit)

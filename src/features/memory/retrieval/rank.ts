@@ -1,4 +1,4 @@
-import type { MemoryRecord, RetrievalMode, RetrievalRow, SearchMemoryItem } from "../types.js";
+import type { MemoryRecord, MemoryReviewDecision, RetrievalMode, RetrievalRow, SearchMemoryItem } from "../types.js";
 
 import { nowIso, toTimestamp } from "../lib/time.js";
 
@@ -19,6 +19,11 @@ export function toRetrievalRow(record: MemoryRecord, embedding: readonly number[
     embedding,
     kind: record.kind,
     scope: record.scope,
+    verificationStatus: record.verificationStatus ?? "hypothesis",
+    reviewStatus: record.reviewStatus ?? "pending",
+    reviewDecisions: JSON.stringify(record.reviewDecisions ?? []),
+    verifiedAt: record.verifiedAt ?? "",
+    verificationEvidence: JSON.stringify(record.verificationEvidence ?? []),
     projectId: record.projectId ?? "",
     containerId: record.containerId ?? "",
     importance: record.importance,
@@ -47,12 +52,35 @@ export function toSearchMemoryItem(
     reasons,
     createdAt: row.createdAt,
     importance: row.importance,
+    verificationStatus: row.verificationStatus,
+    reviewStatus: row.reviewStatus || undefined,
+    reviewDecisions: parseReviewDecisions(row.reviewDecisions),
+    verifiedAt: row.verifiedAt || undefined,
+    verificationEvidence: parseVerificationEvidence(row.verificationEvidence),
     source: {
       type: (row.sourceType || "system") as SearchMemoryItem["source"]["type"],
       uri: row.sourceUri || undefined,
       title: row.sourceTitle || undefined,
     },
   };
+}
+
+function parseVerificationEvidence(value: string): SearchMemoryItem["verificationEvidence"] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseReviewDecisions(value: string): readonly MemoryReviewDecision[] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Split camelCase / snake_case runs so "requestId" can match "request_id" / "request id". */

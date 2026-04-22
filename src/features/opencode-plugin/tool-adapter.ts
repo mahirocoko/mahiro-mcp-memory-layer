@@ -23,6 +23,13 @@ export function createOpenCodePluginTools(
             );
           }
 
+          if (tool.name === "reset_memory_storage") {
+            return serializeOpenCodeToolResult(
+              await runtime.resetMemoryStorage(),
+              tool.name,
+            );
+          }
+
           const backend = await runtime.ensureBackend();
           return serializeOpenCodeToolResult(await tool.execute(backend, args), tool.name);
         },
@@ -77,7 +84,7 @@ export function createOpenCodePluginTools(
       },
     },
     memory_context: {
-      description: "Read cached memory context for the active OpenCode session.",
+      description: "Read continuity-cache state for the active OpenCode session, separate from durable memory records.",
       args: {},
         execute: async (_args, toolContext) => {
           return serializeOpenCodeToolResult(await runtime.readMemoryContext(toolContext), "memory_context");

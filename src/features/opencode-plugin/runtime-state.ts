@@ -25,7 +25,7 @@ export interface OpenCodePluginCachedSession {
   };
   readonly startupBrief?: string;
   readonly capabilities?: OpenCodePluginRuntimeCapabilities;
-  readonly cached: {
+  readonly continuityCache: {
     readonly wakeUp?: WakeUpMemoryResult;
     readonly prepareTurn?: PrepareTurnMemoryResult;
     readonly prepareHostTurn?: PrepareHostTurnMemoryResult;
@@ -104,14 +104,25 @@ export function getOrCreateSingletonRuntimeState(): OpenCodePluginRuntimeState {
 
 export function resetOpenCodePluginRuntimeStateForTests(): void {
   if (singletonRuntimeState) {
-    for (const sessionState of singletonRuntimeState.sessions.values()) {
-      if (sessionState.pendingMessageDebounce) {
-        clearTimeout(sessionState.pendingMessageDebounce);
-      }
-    }
+    clearOpenCodePluginRuntimeState(singletonRuntimeState);
   }
 
   singletonRuntimeState = undefined;
+}
+
+export function resetOpenCodePluginRuntimeState(): void {
+  resetOpenCodePluginRuntimeStateForTests();
+}
+
+export function clearOpenCodePluginRuntimeState(runtimeState: OpenCodePluginRuntimeState): void {
+  for (const sessionState of runtimeState.sessions.values()) {
+    if (sessionState.pendingMessageDebounce) {
+      clearTimeout(sessionState.pendingMessageDebounce);
+    }
+  }
+
+  runtimeState.sessions.clear();
+  runtimeState.latestSessionId = undefined;
 }
 
 export function syncSessionStateFromEvent(
@@ -201,7 +212,7 @@ export function buildMemoryContextResult(
       ...(sessionState.startupBrief ? { startupBrief: sessionState.startupBrief } : {}),
       ...(sessionState.capabilities ? { capabilities: sessionState.capabilities } : {}),
       ...(sessionState.operator ? { operator: sessionState.operator } : {}),
-      cached: {
+      continuityCache: {
         ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
         ...(sessionState.prepareHostTurn ? { prepareHostTurn: sessionState.prepareHostTurn } : {}),

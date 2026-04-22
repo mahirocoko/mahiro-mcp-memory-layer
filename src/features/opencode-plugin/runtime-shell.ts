@@ -12,6 +12,7 @@ import {
 } from "./runtime-compaction.js";
 import {
   getOpenCodePluginMemoryBackend,
+  resetOpenCodePluginMemoryBackendSingleton,
   resetOpenCodePluginMemoryBackendSingletonForTests as resetMemoryBackendSingletonForTests,
   type OpenCodePluginMemoryBackend,
   type OpenCodePluginTestOptions,
@@ -25,6 +26,7 @@ import {
 import {
   buildMemoryContextResult,
   buildPrepareHostTurnKey,
+  clearOpenCodePluginRuntimeState,
   extractRecentConversation,
   getOrCreateSingletonRuntimeState,
   hasActiveRunningImplementationTask,
@@ -96,6 +98,7 @@ export interface OpenCodePluginRuntime {
     context: OpenCodePluginToolExecutionContext,
   ) => Promise<unknown>;
   readonly readRuntimeCapabilities: () => Promise<OpenCodePluginRuntimeCapabilities>;
+  readonly resetMemoryStorage: () => Promise<unknown>;
   readonly startAgentTask: (
     args: Record<string, unknown>,
     context: OpenCodePluginToolExecutionContext,
@@ -735,6 +738,13 @@ export function createOpenCodePluginRuntime(
       });
     },
     readRuntimeCapabilities: () => runtimeCapabilitiesPromise,
+    resetMemoryStorage: async () => {
+      const backend = await getOpenCodePluginMemoryBackend(options.__test);
+      const result = await backend.resetStorage();
+      resetOpenCodePluginMemoryBackendSingleton();
+      clearOpenCodePluginRuntimeState(runtimeState);
+      return result;
+    },
     startAgentTask: async (args, toolContext) => {
       const sessionId = resolveSessionIdFromUnknown(toolContext) ?? resolveSessionIdFromUnknown(toolContext.properties);
       if (!sessionId) {

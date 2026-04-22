@@ -1,6 +1,13 @@
 import type { ZodRawShape } from "zod";
 
 import {
+  enqueueMemoryProposalInputSchema,
+  getReviewAssistInputSchema,
+  listReviewQueueInputSchema,
+  listReviewQueueOverviewInputSchema,
+  resetMemoryStorageInputSchema,
+  promoteMemoryInputSchema,
+  reviewMemoryInputSchema,
   inspectMemoryRetrievalInputSchema,
   applyConservativeMemoryPolicyInputObjectSchema,
   buildContextForTaskInputObjectSchema,
@@ -17,10 +24,17 @@ import type { MemoryService } from "../memory-service.js";
 export type MemoryToolBackend = Pick<
   MemoryService,
   | "remember"
+  | "promoteMemory"
+  | "reviewMemory"
+  | "resetStorage"
   | "search"
   | "buildContext"
   | "upsertDocument"
   | "list"
+  | "enqueueMemoryProposal"
+  | "getReviewAssist"
+  | "listReviewQueue"
+  | "listReviewQueueOverview"
   | "suggestMemoryCandidates"
   | "applyConservativeMemoryPolicy"
   | "prepareHostTurnMemory"
@@ -43,6 +57,24 @@ const memoryToolDefinitions: readonly MemoryToolDefinition[] = [
       "Read the latest retrieval trace or inspect one by requestId to understand why memory hit, missed, or degraded.",
     inputSchema: inspectMemoryRetrievalInputSchema.shape,
     execute: (backend, input) => backend.inspectMemoryRetrieval(input as never),
+  },
+  {
+    name: "reset_memory_storage",
+    description: "Clear the local memory store and retrieval traces so the memory layer starts fresh.",
+    inputSchema: resetMemoryStorageInputSchema.shape,
+    execute: (backend) => backend.resetStorage(),
+  },
+  {
+    name: "promote_memory",
+    description: "Promote a durable memory record to verified status after external confirmation.",
+    inputSchema: promoteMemoryInputSchema.shape,
+    execute: (backend, input) => backend.promoteMemory(input as never),
+  },
+  {
+    name: "review_memory",
+    description: "Apply a review decision to a hypothesis memory: reject, defer, or edit then promote.",
+    inputSchema: reviewMemoryInputSchema.shape,
+    execute: (backend, input) => backend.reviewMemory(input as never),
   },
   {
     name: "remember",
@@ -75,6 +107,30 @@ const memoryToolDefinitions: readonly MemoryToolDefinition[] = [
     description: "List stored memories for inspection.",
     inputSchema: listMemoriesInputSchema.shape,
     execute: (backend, input) => backend.list(input as never),
+  },
+  {
+    name: "list_review_queue",
+    description: "List hypothesis memories that are pending review before promotion to verified.",
+    inputSchema: listReviewQueueInputSchema.shape,
+    execute: (backend, input) => backend.listReviewQueue(input as never),
+  },
+  {
+    name: "list_review_queue_overview",
+    description: "List pending review memories with priority scoring and reviewer hints such as likely duplicates or possible contradictions.",
+    inputSchema: listReviewQueueOverviewInputSchema.shape,
+    execute: (backend, input) => backend.listReviewQueueOverview(input as never),
+  },
+  {
+    name: "get_review_assist",
+    description: "Generate reviewer assist suggestions such as duplicate merge drafts or contradiction resolution drafts for a specific review queue item.",
+    inputSchema: getReviewAssistInputSchema.shape,
+    execute: (backend, input) => backend.getReviewAssist(input as never),
+  },
+  {
+    name: "enqueue_memory_proposal",
+    description: "Turn conversation-derived memory suggestions into hypothesis records in the review queue without auto-promotion.",
+    inputSchema: enqueueMemoryProposalInputSchema.shape,
+    execute: (backend, input) => backend.enqueueMemoryProposal(input as never),
   },
   {
     name: "suggest_memory_candidates",
