@@ -20,7 +20,9 @@
     "src/features/memory/retrieval",
     "src/features/memory/schemas.ts",
     "src/features/memory/types.ts",
+    "src/features/memory-viewer",
     "src/features/opencode-plugin",
+    "src/memory-viewer.ts",
     "README.md",
     "AGENTS.md",
     "MCP_USAGE.md",
@@ -36,7 +38,8 @@
     "reindex": "tsx src/index.ts --reindex",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "memory-viewer": "tsx src/memory-viewer.ts"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.22.3",
