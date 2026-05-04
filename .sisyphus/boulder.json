@@ -1,0 +1,97 @@
+{
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/memory-lifecycle-contract.md",
+  "started_at": "2026-05-04T06:35:42.723Z",
+  "session_ids": [
+    "ses_20e4cdb50ffe4enRGvtv67EixT",
+    "ses_20e4bf033fferivPMOisso4pay"
+  ],
+  "session_origins": {
+    "ses_20e4cdb50ffe4enRGvtv67EixT": "direct",
+    "ses_20e4bf033fferivPMOisso4pay": "appended"
+  },
+  "plan_name": "memory-lifecycle-contract",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Establish Lifecycle Contract Baseline",
+      "session_id": "ses_20e47a2c7ffeSYAq4oOIilp9Ej",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-04T06:48:47.144Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Add Memory Protocol Text to Startup/Context Surfaces",
+      "session_id": "ses_20e31ceaeffeh3exk7tLVGFAVb",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-04T07:07:53.511Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Wire Lifecycle Diagnostics into Runtime Shell",
+      "session_id": "ses_20e1d5715ffejqttk1x41DRzxW",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-04T07:32:37.924Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Keep Runtime Capabilities Memory-Only and Additive",
+      "session_id": "ses_20e0b6270ffesmsrl7jXCFr4Rm",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-04T07:50:09.710Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Implement PreCompact as Memory Checkpoint Continuity",
+      "session_id": "ses_20df841baffeAjUt0K3h6h6Q6l",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-05-04T08:14:11.222Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Harden Idle and Session Persistence Reason Codes",
+      "session_id": "ses_20de521ceffeN0TS22tPEO8dVl",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-04T08:37:14.337Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Update Memory-Facing Documentation",
+      "session_id": "ses_20dd2f25affeyAxL89yqhEnJhI",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-04T08:50:48.966Z"
+    },
+    "todo:11": {
+      "task_key": "todo:11",
+      "task_label": "11",
+      "task_title": "Consolidate Integration Verification",
+      "session_id": "ses_20dcffdd4ffetHHV3xhePZX5Jk",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-04T08:57:08.772Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_20dc97cc4ffemuNHPEccE5Ho0m",
+      "agent": "oracle",
+      "category": "",
+      "updated_at": "2026-05-04T09:01:57.169Z"
+    }
+  }
+}

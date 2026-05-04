@@ -285,7 +285,7 @@ describe("evaluateContextCase", () => {
     expect(
       evaluateContextCase(
         {
-          context: "durable workflow outputs only",
+          context: "durable outputs only",
           items: ["eval-proj-memory-records"],
           truncated: true,
         },

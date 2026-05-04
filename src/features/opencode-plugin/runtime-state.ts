@@ -3,7 +3,11 @@ import type {
   PrepareTurnMemoryResult,
   WakeUpMemoryResult,
 } from "../memory/types.js";
-import type { OpenCodePluginRuntimeCapabilities } from "./runtime-capabilities.js";
+import {
+  buildOpenCodePluginMemoryProtocol,
+  type OpenCodePluginMemoryProtocol,
+  type OpenCodePluginRuntimeCapabilities,
+} from "./runtime-capabilities.js";
 import {
   resolveOpenCodeScope,
   type OpenCodePluginContext,
@@ -11,10 +15,85 @@ import {
   type OpenCodeScopeResolution,
 } from "./resolve-scope.js";
 
+const openCodePluginMemoryLifecycleStages = [
+  "session-start-wake-up",
+  "turn-preflight",
+  "idle-persistence",
+  "compaction-continuity",
+] as const;
+
+export type OpenCodePluginMemoryLifecycleStage = (typeof openCodePluginMemoryLifecycleStages)[number];
+
+const memoryLifecycleStagesByEventType: Readonly<Record<string, readonly OpenCodePluginMemoryLifecycleStage[]>> = {
+  "session.created": ["session-start-wake-up"],
+  "message.updated": ["turn-preflight"],
+  "message.part.updated": ["session-start-wake-up", "turn-preflight"],
+  "session.idle": ["idle-persistence"],
+  "experimental.session.compacting": ["compaction-continuity"],
+};
+
+export type OpenCodePluginMemoryLifecycleDiagnosticStatus =
+  | "not_run"
+  | "skipped"
+  | "succeeded"
+  | "failed_open";
+
+export type OpenCodePluginMemoryLifecycleDiagnosticReasonCode =
+  | "awaiting_lifecycle_signal"
+  | "already_started_or_cached"
+  | "backend_error"
+  | "backend_failed_open"
+  | "auto_save_skipped_incomplete_scope"
+  | "auto_saved"
+  | "cache_write_completed"
+  | "cached_checkpoint_reused"
+  | "cached_session_state_appended"
+  | "context_append_failed"
+  | "deduped_turn"
+  | "empty_recent_conversation"
+  | "incomplete_scope"
+  | "incomplete_scope_ids"
+  | "likely_skip"
+  | "missing_cached_session_state"
+  | "missing_session_state"
+  | "missing_turn_key"
+  | "no_candidates"
+  | "no_recent_conversation"
+  | "output_context_not_appendable"
+  | "output_prompt_already_set"
+  | "preflight_not_needed"
+  | "review_only"
+  | "small_talk"
+  | "stale_lifecycle_result"
+  | "turn_already_handled";
+
+export interface OpenCodePluginMemoryLifecycleSummaryCounts {
+  readonly retrieved?: number;
+  readonly candidates?: number;
+  readonly autoSaved?: number;
+  readonly reviewOnly?: number;
+  readonly skipped?: number;
+}
+
+export interface OpenCodePluginMemoryLifecycleDiagnostic {
+  readonly stage: OpenCodePluginMemoryLifecycleStage;
+  readonly status: OpenCodePluginMemoryLifecycleDiagnosticStatus;
+  readonly lastAttemptedAt?: string;
+  readonly reasonCode?: OpenCodePluginMemoryLifecycleDiagnosticReasonCode;
+  readonly scopeUsed?: OpenCodeScopeResolution["scope"];
+  readonly summaryCounts?: OpenCodePluginMemoryLifecycleSummaryCounts;
+}
+
+export type OpenCodePluginMemoryLifecycleDiagnostics = Readonly<
+  Record<OpenCodePluginMemoryLifecycleStage, OpenCodePluginMemoryLifecycleDiagnostic>
+>;
+
 export interface OpenCodePluginCachedSession {
   readonly sessionId: string;
   readonly scopeResolution: OpenCodeScopeResolution;
   readonly lastEventType?: string;
+  readonly lastMemoryLifecycleStages?: readonly OpenCodePluginMemoryLifecycleStage[];
+  readonly lifecycleDiagnostics: OpenCodePluginMemoryLifecycleDiagnostics;
   readonly lastUpdatedAt: string;
   readonly lastMessageId?: string;
   readonly coordination: {
@@ -24,6 +103,7 @@ export interface OpenCodePluginCachedSession {
   };
   readonly startupBrief?: string;
   readonly capabilities?: OpenCodePluginRuntimeCapabilities;
+  readonly memoryProtocol?: OpenCodePluginMemoryProtocol;
   readonly continuityCache: {
     readonly wakeUp?: WakeUpMemoryResult;
     readonly prepareTurn?: PrepareTurnMemoryResult;
@@ -50,6 +130,8 @@ export interface OpenCodePluginSessionState {
   readonly sessionId: string;
   scopeResolution: OpenCodeScopeResolution;
   lastEventType?: string;
+  lastMemoryLifecycleStages?: readonly OpenCodePluginMemoryLifecycleStage[];
+  lifecycleDiagnostics: Partial<Record<OpenCodePluginMemoryLifecycleStage, OpenCodePluginMemoryLifecycleDiagnostic>>;
   lastUpdatedAt: string;
   lastMessageId?: string;
   recentConversation?: string;
@@ -62,8 +144,10 @@ export interface OpenCodePluginSessionState {
   lastHandledPrepareHostTurnKey?: string;
   startupBrief?: string;
   capabilities?: OpenCodePluginRuntimeCapabilities;
+  memoryProtocol?: OpenCodePluginMemoryProtocol;
   wakeUp?: WakeUpMemoryResult;
   prepareTurn?: PrepareTurnMemoryResult;
+  prepareHostTurnKey?: string;
   prepareHostTurn?: PrepareHostTurnMemoryResult;
 }
 
@@ -130,6 +214,8 @@ export function syncSessionStateFromEvent(
     sessionId,
     scopeResolution,
     lastEventType: event.type,
+    lastMemoryLifecycleStages: resolveOpenCodePluginMemoryLifecycleStages(event.type),
+    lifecycleDiagnostics: existingState?.lifecycleDiagnostics ?? {},
     lastUpdatedAt: new Date().toISOString(),
     lastMessageId: nextMessageId,
     recentConversation: resolveRecentConversationForEvent(event, existingState, nextMessageId),
@@ -138,13 +224,15 @@ export function syncSessionStateFromEvent(
     hasStartedWakeUp: existingState?.hasStartedWakeUp ?? false,
     pendingMessageDebounce: existingState?.pendingMessageDebounce,
     pendingWakeUp: existingState?.pendingWakeUp,
-    pendingPrepareHostTurnKey: existingState?.pendingPrepareHostTurnKey,
+    pendingPrepareHostTurnKey: isTurnUpdateEvent ? undefined : existingState?.pendingPrepareHostTurnKey,
     lastHandledPrepareHostTurnKey: existingState?.lastHandledPrepareHostTurnKey,
     startupBrief: existingState?.startupBrief,
     capabilities: existingState?.capabilities,
+    memoryProtocol: existingState?.memoryProtocol ?? buildOpenCodePluginMemoryProtocol(),
     wakeUp: existingState?.wakeUp,
     prepareTurn: isTurnUpdateEvent ? undefined : existingState?.prepareTurn,
-    prepareHostTurn: existingState?.prepareHostTurn,
+    prepareHostTurnKey: isTurnUpdateEvent ? undefined : existingState?.prepareHostTurnKey,
+    prepareHostTurn: isTurnUpdateEvent ? undefined : existingState?.prepareHostTurn,
   };
 
   runtimeState.sessions.set(sessionId, nextState);
@@ -180,6 +268,10 @@ export function buildMemoryContextResult(
       sessionId: sessionState.sessionId,
       scopeResolution: sessionState.scopeResolution,
       lastEventType: sessionState.lastEventType,
+      ...(sessionState.lastMemoryLifecycleStages && sessionState.lastMemoryLifecycleStages.length > 0
+        ? { lastMemoryLifecycleStages: sessionState.lastMemoryLifecycleStages }
+        : {}),
+      lifecycleDiagnostics: buildMemoryLifecycleDiagnostics(sessionState),
       lastUpdatedAt: sessionState.lastUpdatedAt,
       lastMessageId: sessionState.lastMessageId,
       coordination: {
@@ -189,6 +281,7 @@ export function buildMemoryContextResult(
       },
       ...(sessionState.startupBrief ? { startupBrief: sessionState.startupBrief } : {}),
       ...(sessionState.capabilities ? { capabilities: sessionState.capabilities } : {}),
+      ...(sessionState.memoryProtocol ? { memoryProtocol: sessionState.memoryProtocol } : {}),
       continuityCache: {
         ...(sessionState.wakeUp ? { wakeUp: sessionState.wakeUp } : {}),
         ...(sessionState.prepareTurn ? { prepareTurn: sessionState.prepareTurn } : {}),
@@ -196,6 +289,48 @@ export function buildMemoryContextResult(
       },
     },
   };
+}
+
+function resolveOpenCodePluginMemoryLifecycleStages(
+  eventType: string,
+): readonly OpenCodePluginMemoryLifecycleStage[] {
+  return memoryLifecycleStagesByEventType[eventType] ?? [];
+}
+
+export function markMemoryLifecycleDiagnostic(
+  sessionState: OpenCodePluginSessionState,
+  stage: OpenCodePluginMemoryLifecycleStage,
+  diagnostic: Omit<OpenCodePluginMemoryLifecycleDiagnostic, "stage" | "lastAttemptedAt"> & {
+    readonly lastAttemptedAt?: string;
+  },
+): void {
+  sessionState.lifecycleDiagnostics = {
+    ...sessionState.lifecycleDiagnostics,
+    [stage]: {
+      stage,
+      lastAttemptedAt: diagnostic.lastAttemptedAt ?? new Date().toISOString(),
+      status: diagnostic.status,
+      ...(diagnostic.reasonCode ? { reasonCode: diagnostic.reasonCode } : {}),
+      ...(diagnostic.scopeUsed ? { scopeUsed: diagnostic.scopeUsed } : {}),
+      ...(diagnostic.summaryCounts ? { summaryCounts: diagnostic.summaryCounts } : {}),
+    },
+  };
+}
+
+function buildMemoryLifecycleDiagnostics(
+  sessionState: OpenCodePluginSessionState,
+): OpenCodePluginMemoryLifecycleDiagnostics {
+  return Object.fromEntries(
+    openCodePluginMemoryLifecycleStages.map((stage) => [
+      stage,
+      sessionState.lifecycleDiagnostics[stage] ?? {
+        stage,
+        status: "not_run" as const,
+        reasonCode: "awaiting_lifecycle_signal" as const,
+        scopeUsed: sessionState.scopeResolution.scope,
+      },
+    ]),
+  ) as OpenCodePluginMemoryLifecycleDiagnostics;
 }
 
 export function resolveSessionIdFromUnknown(value: unknown): string | undefined {

@@ -1,0 +1,7 @@
+Task 2 boundary evidence, 2026-05-04 14:08 +07
+
+Boundary checks:
+- The protocol lives in the memory-facing OpenCode plugin runtime files.
+- No workflow-control, hook-execution, permission-enforcement, or Claude settings behavior was added.
+- Existing memory_context fields stay intact, with memoryProtocol added as an optional additive field.
+- Startup brief text is derived from the structured protocol helper, not treated as the source of truth.

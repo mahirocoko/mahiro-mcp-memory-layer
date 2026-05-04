@@ -1,0 +1,25 @@
+$ git status --short
+ M .agent-state/metrics/heartbeat.json
+ M .agent-state/metrics/project.json
+ M .sisyphus/plans/memory-lifecycle-contract.md
+ M AGENT_NEXT_STEPS.md
+ M ARCHITECTURE_BOUNDARIES.md
+ M CONTINUITY_DEBUGGING.md
+ M MCP_USAGE.md
+ M README.md
+ M package.json
+ M src/features/opencode-plugin/runtime-capabilities.ts
+ M src/features/opencode-plugin/runtime-compaction.ts
+ M src/features/opencode-plugin/runtime-shell.ts
+ M src/features/opencode-plugin/runtime-state.ts
+ M tests/opencode-plugin-package.test.ts
+ M tests/product-memory-plugin.test.ts
+ M tests/retrieval-eval.test.ts
+?? .agent-state/memory/learnings/2026-05-04_scope-identity-is-memory-continuity.md
+?? .agent-state/memory/retrospectives/2026-05/04/13.34_memory-lifecycle-scope-contract.md
+?? .sisyphus/boulder.json
+?? .sisyphus/evidence/
+?? .sisyphus/notepads/
+
+$ git status --short -- data
+(no data/ changes)

@@ -1,0 +1,11 @@
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/opencode-plugin-package.test.ts (3 tests | 1 skipped) 147ms
+ ✓ tests/product-memory-plugin.test.ts (18 tests | 17 skipped) 9ms
+
+ Test Files  2 passed (2)
+      Tests  3 passed | 18 skipped (21)
+   Start at  15:46:24
+   Duration  544ms (transform 198ms, setup 0ms, collect 366ms, tests 156ms, environment 0ms, prepare 226ms)
+

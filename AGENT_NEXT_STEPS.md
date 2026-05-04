@@ -17,6 +17,16 @@ Directionally:
 - memory stays here
 - continuity-cache helpers may stay if they remain memory-facing
 - host-specific workflow control should stay outside this package
+- lifecycle docs should keep the memory vocabulary only: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
+
+## Deferred raw plus derived memory direction
+
+This is future-facing only, not current API or storage behavior.
+
+- Possible future shape, if the product ever needs it: a raw source memory concept that keeps a source pointer, then derived or summarized records that reference it.
+- Required gates before any adoption: privacy review, redaction policy, explicit review flow, source pointer semantics, and scope rules that keep raw and derived records clearly separated.
+- MemPalace drawer language stays inspiration only. Do not expose drawer or level vocabulary as public memory API terms.
+- Until those gates are earned, keep the current vocabulary: local-first memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, and lifecycle continuity.
 
 ## Immediate work queue
 

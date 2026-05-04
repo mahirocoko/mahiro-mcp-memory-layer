@@ -4,6 +4,8 @@ Local-first agent memory and retrieval infrastructure for OpenCode.
 
 This package is memory-only. It provides durable memory writes, retrieval, context assembly, retrieval inspection, memory review flows, and plugin-native continuity helpers such as `memory_context` and `runtime_capabilities`.
 
+Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.
+
 ## What ships today
 
 ### 1. Standard plugin install
@@ -25,6 +27,8 @@ On this path, OpenCode gets the memory tools natively from the in-process backen
 ### 2. Source checkout / standalone MCP path
 
 If OpenCode loads this repo from a source checkout, or if you run the standalone server directly, the standalone MCP server exposes the same memory-focused tool family.
+
+The standalone path is still memory-only. It does not make host lifecycle behavior universal, and it does not turn this repo into a hook runtime.
 
 Local development plugin path:
 
@@ -69,6 +73,23 @@ Plugin-native extras:
 
 - `memory_context`
 - `runtime_capabilities`
+
+## Memory lifecycle
+
+The memory lifecycle vocabulary is:
+
+- `session-start-wake-up`
+- `turn-preflight`
+- `idle-persistence`
+- `compaction-continuity`
+
+These stages describe memory continuity work only. Compaction continuity is a memory checkpoint continuity path, and it is handled fail-open and append-only.
+
+## Diagnostics
+
+`memory_context` exposes the session-scoped continuity cache and memory diagnostics for debugging.
+
+`runtime_capabilities` is plugin-native and reports memory capability flags only, including lifecycle diagnostics and compaction continuity availability.
 
 ## Commands
 

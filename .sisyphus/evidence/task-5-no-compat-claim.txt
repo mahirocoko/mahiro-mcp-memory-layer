@@ -1,0 +1,3 @@
+2026-05-04 14:49:25 +07
+Serialization check output confirmed absence of claudeHooks, hookDispatch, commandHooks, httpHooks, hooksAvailable, workflow, and permission in runtime_capabilities.
+This package remains memory-only and does not claim generic Claude hook/runtime compatibility.

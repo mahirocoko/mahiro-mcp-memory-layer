@@ -1,0 +1,26 @@
+$ tsc -p tsconfig.json --noEmit
+$ vitest run
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/context-builder.test.ts (25 tests) 16ms
+ ✓ tests/opencode-plugin-instructions-config.test.ts (6 tests) 69ms
+ ✓ tests/suggest-memory-candidates.test.ts (7 tests) 4ms
+ ✓ tests/apply-conservative-memory-policy.test.ts (8 tests) 6ms
+ ✓ tests/hybrid-search.test.ts (3 tests) 6ms
+ ✓ tests/opencode-plugin-config.test.ts (3 tests) 16ms
+ ✓ tests/rank.test.ts (4 tests) 3ms
+ ✓ tests/opencode-plugin-package.test.ts (3 tests) 191ms
+ ✓ tests/prepare-host-turn-memory.test.ts (2 tests) 196ms
+ ✓ tests/opencode-plugin-scope-resolution.test.ts (4 tests) 2ms
+ ✓ tests/product-memory-wrappers.test.ts (4 tests) 226ms
+ ✓ tests/product-memory-plugin.test.ts (18 tests) 83ms
+ ✓ tests/retrieval-eval.test.ts (21 tests) 5ms
+ ✓ tests/memory-service.test.ts (25 tests) 291ms
+
+ Test Files  14 passed (14)
+      Tests  133 passed (133)
+   Start at  15:55:43
+   Duration  790ms (transform 701ms, setup 0ms, collect 1.93s, tests 1.11s, environment 2ms, prepare 750ms)
+
+$ tsc -p tsconfig.json

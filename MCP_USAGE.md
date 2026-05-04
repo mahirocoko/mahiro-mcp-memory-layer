@@ -37,7 +37,17 @@ Plugin-path notes:
 
 - `memory_context` exposes session-scoped continuity cache and runtime metadata, separate from durable memory records.
 - `runtime_capabilities` reports the plugin-native memory surface that is currently available.
-- session-start wake-up, turn preflight, and idle persistence are plugin-native memory behaviors.
+- `runtime_capabilities` stays memory-scoped and includes lifecycle diagnostics and compaction continuity flags only.
+- session-start wake-up, turn preflight, idle persistence, and compaction continuity are plugin-native memory behaviors.
+
+Memory lifecycle contract:
+
+- `session-start-wake-up` prepares continuity when a session starts.
+- `turn-preflight` prepares memory before a turn is handled.
+- `idle-persistence` preserves memory when the session goes idle.
+- `compaction-continuity` preserves a memory checkpoint across compaction.
+
+Compaction continuity is append-only and fail-open. It keeps memory continuity moving forward even when a backend write cannot complete.
 
 ### Standalone MCP path
 
@@ -55,6 +65,10 @@ Current shape:
 - `memory.turnPreflightAvailable`
 - `memory.idlePersistenceAvailable`
 - `memory.memoryContextToolAvailable`
+- `memory.lifecycleDiagnosticsAvailable`
+- `memory.compactionContinuityAvailable`
+
+This object is a memory contract, not a hook runtime contract.
 
 ## `memory_context`
 
@@ -73,8 +87,11 @@ Look for:
 
 `memory_context` should stay memory-facing. It is useful for continuity debugging, cache inspection, and understanding what memory preparation already happened for the active session.
 
+The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and lifecycle diagnostics for the memory stages above.
+
 ## Practical safety reminders
 
 - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
 - Use `inspect_memory_retrieval` before guessing why retrieval hit, missed, or degraded.
 - Prefer the stable memory tools over host-specific session cache details when building product behavior.
+- Use host lifecycle details only as memory diagnostics, not as a runtime ownership signal.

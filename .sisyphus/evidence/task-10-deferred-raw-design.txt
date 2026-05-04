@@ -1,0 +1,12 @@
+Task 10 evidence: deferred raw + derived memory design note
+
+Observed note in AGENT_NEXT_STEPS.md:
+This is future-facing only, not current API or storage behavior.
+
+- Possible future shape, if the product ever needs it: a raw source memory concept that keeps a source pointer, then derived or summarized records that reference it.
+- Required gates before any adoption: privacy review, redaction policy, explicit review flow, source pointer semantics, and scope rules that keep raw and derived records clearly separated.
+- MemPalace drawer language stays inspiration only. Do not expose drawer or level vocabulary as public memory API terms.
+- Until those gates are earned, keep the current vocabulary: local-first memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, and lifecycle continuity.
+
+Conclusion:
+The note is explicit, deferred, gate-locked, and not part of the current API.

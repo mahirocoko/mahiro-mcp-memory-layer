@@ -4,6 +4,8 @@ This document defines the intended package boundary for `mahiro-mcp-memory-layer
 
 The package should be understood as local-first memory and retrieval infrastructure for agents.
 
+Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
+
 ## Purpose and scope
 
 `mahiro-mcp-memory-layer` owns:
@@ -15,6 +17,7 @@ The package should be understood as local-first memory and retrieval infrastruct
 - memory review and save policy flows
 - document-shaped memory handling
 - host-facing memory introspection
+- memory lifecycle continuity
 
 The package should not own workflow control, worker routing, task lifecycle state, supervision, or executor ownership rules.
 
@@ -52,11 +55,13 @@ These remain part of the package only because they stay memory-centric:
 
 `memory_context` is for session-scoped continuity cache inspection. `runtime_capabilities` is for plugin-native memory surface inspection.
 
+Both are memory diagnostics only. They report the memory protocol, lifecycle diagnostics, and compaction continuity state, but they do not define host runtime behavior.
+
 ## Ownership rule
 
 Memory owns memory truth.
 
-Hosts may compose memory with their own runtime behavior, but the memory package should not become the source of truth for worker execution or workflow state.
+Hosts may compose memory with their own runtime behavior, but the memory package should not become the source of truth for worker execution, workflow state, or hook dispatch.
 
 ## Verification and drift checks
 

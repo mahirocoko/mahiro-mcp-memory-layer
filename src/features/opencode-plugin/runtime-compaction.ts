@@ -1,5 +1,5 @@
 import type { OpenCodePluginEvent, OpenCodePluginContext } from "./resolve-scope.js";
-import type { OpenCodePluginSessionState } from "./runtime-state.js";
+import { markMemoryLifecycleDiagnostic, type OpenCodePluginSessionState } from "./runtime-state.js";
 import { logCompactionOutcome, toErrorMessage } from "./runtime-logging.js";
 
 export interface OpenCodePluginCompactionInput {
@@ -33,6 +33,7 @@ export async function applyCompactionContinuity(
   context: OpenCodePluginContext,
   sessionState: OpenCodePluginSessionState | undefined,
   output: OpenCodePluginCompactionOutput,
+  options: { readonly preserveExistingDiagnostic?: boolean } = {},
 ): Promise<void> {
   if (!sessionState) {
     await logCompactionOutcome(context, "skipped", {
@@ -44,6 +45,14 @@ export async function applyCompactionContinuity(
   const continuityBlock = buildCompactionContinuityBlock(sessionState);
 
   if (!continuityBlock) {
+    if (!options.preserveExistingDiagnostic) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "missing_cached_session_state",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+    }
     await logCompactionOutcome(context, "skipped", {
       sessionId: sessionState.sessionId,
       reason: "missing_cached_session_state",
@@ -52,6 +61,14 @@ export async function applyCompactionContinuity(
   }
 
   if (toNonEmptyString(output.prompt)) {
+    if (!options.preserveExistingDiagnostic) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "output_prompt_already_set",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+    }
     await logCompactionOutcome(context, "degraded", {
       sessionId: sessionState.sessionId,
       reason: "output_prompt_already_set",
@@ -62,6 +79,14 @@ export async function applyCompactionContinuity(
   const contextAppender = asCompactionContextAppender(output.context);
 
   if (!contextAppender) {
+    if (!options.preserveExistingDiagnostic) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "output_context_not_appendable",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+    }
     await logCompactionOutcome(context, "degraded", {
       sessionId: sessionState.sessionId,
       reason: "output_context_not_appendable",
@@ -71,17 +96,36 @@ export async function applyCompactionContinuity(
 
   try {
     contextAppender.push(continuityBlock);
+    if (!options.preserveExistingDiagnostic) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "succeeded",
+        reasonCode: "cached_session_state_appended",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { retrieved: countCompactionContinuitySections(sessionState) },
+      });
+    }
     await logCompactionOutcome(context, "invoked", {
       sessionId: sessionState.sessionId,
       reason: "cached_session_state_appended",
     });
   } catch (error) {
+    if (!options.preserveExistingDiagnostic) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "failed_open",
+        reasonCode: "context_append_failed",
+        scopeUsed: sessionState.scopeResolution.scope,
+      });
+    }
     await logCompactionOutcome(context, "error", {
       sessionId: sessionState.sessionId,
       reason: "context_append_failed",
       error: toErrorMessage(error),
     });
   }
+}
+
+function countCompactionContinuitySections(sessionState: OpenCodePluginSessionState): number {
+  return [sessionState.wakeUp, sessionState.prepareTurn, sessionState.prepareHostTurn].filter(Boolean).length;
 }
 
 function buildCompactionContinuityBlock(sessionState: OpenCodePluginSessionState): string | undefined {

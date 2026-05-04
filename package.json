@@ -36,7 +36,7 @@
     "reindex": "tsx src/index.ts --reindex",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run tests/product-memory-plugin.test.ts tests/opencode-plugin-package.test.ts tests/opencode-plugin-scope-resolution.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.22.3",

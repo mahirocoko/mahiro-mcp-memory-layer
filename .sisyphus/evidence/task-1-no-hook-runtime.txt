@@ -1,0 +1,12 @@
+Task 1 no hook runtime evidence
+Timestamp: 2026-05-04 13:46:02 +07
+
+Command: rtk python3 -c '<non-mutating scan of src/features/opencode-plugin/*.ts for dispatchHook, PreToolUse, PostToolUse, PreCompact, command hook, http hook, claudeHooks, hookDispatch>'
+Result: PASS
+Output summary:
+- Checked 13 plugin runtime files; no forbidden hook runtime surface terms found.
+
+Test-backed boundary assertion:
+- rtk bunx vitest run tests/product-memory-plugin.test.ts passed.
+- runtime_capabilities JSON is asserted not to contain dispatchHook, PreToolUse, PostToolUse, PreCompact, command hook, http hook, claudeHooks, or hookDispatch.
+- memory_context lifecycle diagnostics are asserted not to contain those hook runtime terms.

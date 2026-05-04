@@ -112,7 +112,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 > Implementation + Test = ONE task. Never separate.
 > EVERY task MUST have: Agent Profile + Parallelization + QA Scenarios.
 
-- [ ] 1. Establish Lifecycle Contract Baseline
+- [x] 1. Establish Lifecycle Contract Baseline
 
   **What to do**: Inspect current lifecycle/runtime contract and create a small internal mapping in code/tests/docs that names only memory-facing lifecycle stages: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, `compaction-continuity`. Use existing constants or a small type if needed; keep it internal to the plugin runtime unless already exposed via memory diagnostics. Verify existing handlers in `runtime-shell.ts` still route `session.created`, `message.updated`, `message.part.updated`, `session.idle`, and `experimental.session.compacting` exactly as memory signals.
   **Must NOT do**: Do not add Claude hook names as runtime API. Do not add `PreToolUse`, `PostToolUse`, `Stop`, or `PreCompact` as public package concepts except in docs that explicitly say they are external adapter concepts.
@@ -154,7 +154,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `fix(memory): establish lifecycle contract baseline` | Files: [runtime/tests touched by executor]
 
-- [ ] 2. Add Memory Protocol Text to Startup/Context Surfaces
+- [x] 2. Add Memory Protocol Text to Startup/Context Surfaces
 
   **What to do**: Add a concise memory protocol contract for agents and expose it through existing memory-facing startup/context surfaces. Prefer a stable additive `memoryProtocol` field with `version` and `guidelines` (or an equivalently tested helper-generated field) over prose-only startup text; startup brief may include the same text as a human-readable rendering. Protocol must say: search before answering about prior work; inspect retrieval trace when recall is empty; save/propose durable decisions/preferences/tasks through existing tools; use review/invalidation flow for contradictions; preserve current decisions/tasks before compaction.
   **Must NOT do**: Do not instruct agents to execute hooks, read Claude settings, or control workflow. Do not add user-interactive requirements.
@@ -196,7 +196,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `docs(memory): expose memory protocol` | Files: [`src/features/opencode-plugin/runtime-capabilities.ts`, `src/features/opencode-plugin/runtime-state.ts`, tests]
 
-- [ ] 3. Define Additive Lifecycle Diagnostics Shape
+- [x] 3. Define Additive Lifecycle Diagnostics Shape
 
   **What to do**: Extend `memory_context` with additive lifecycle diagnostics for each memory-facing lifecycle stage: last attempted at, status (`not_run`, `skipped`, `succeeded`, `failed_open`), reason code, scope used, and summary counts where available (`retrieved`, `candidates`, `autoSaved`, `reviewOnly`, `skipped`). Define types in `runtime-state.ts` or a nearby runtime file. Keep existing `continuityCache` fields intact. For events without a resolvable session, do not invent session-scoped diagnostics; instead expose latest global/plugin-level memory diagnostic only if a safe plugin-level cache already exists or is added as memory introspection, otherwise document that sessionless events are diagnosable only through lifecycle logs/retrieval traces.
   **Must NOT do**: Do not expose workflow-control state, task executor state, worker routing, or hook handler configuration.
@@ -242,7 +242,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `feat(memory): add lifecycle diagnostics shape` | Files: [`src/features/opencode-plugin/runtime-state.ts`, tests]
 
-- [ ] 4. Wire Lifecycle Diagnostics into Runtime Shell
+- [x] 4. Wire Lifecycle Diagnostics into Runtime Shell
 
   **What to do**: Update `runtime-shell.ts` to populate diagnostics from actual lifecycle paths: session wake-up start/success/fail-open, turn preflight skipped/success/fail-open, idle persistence skipped/deduped/success/fail-open. Record reason codes at each early return path. Include scope and message/turn key where memory-facing. Preserve current fail-open behavior.
   **Must NOT do**: Do not make lifecycle failures fatal. Do not block user operations. Do not add hook dispatch.
@@ -289,7 +289,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `feat(memory): record lifecycle diagnostics` | Files: [`src/features/opencode-plugin/runtime-shell.ts`, tests]
 
-- [ ] 5. Keep Runtime Capabilities Memory-Only and Additive
+- [x] 5. Keep Runtime Capabilities Memory-Only and Additive
 
   **What to do**: If capability additions are needed, add only memory-scoped fields such as `memory.lifecycleDiagnosticsAvailable`, `memory.compactionContinuityAvailable`, or `memory.memoryProtocolAvailable`. Update tests and docs. Do not add generic `hooksAvailable` or Claude compatibility fields.
   **Must NOT do**: Do not expose adapter/hook dispatch capability flags in this package.
@@ -328,7 +328,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `feat(memory): advertise memory lifecycle capabilities` | Files: [`src/features/opencode-plugin/runtime-capabilities.ts`, tests, docs]
 
-- [ ] 6. Implement PreCompact as Memory Checkpoint Continuity
+- [x] 6. Implement PreCompact as Memory Checkpoint Continuity
 
   **What to do**: Upgrade `experimental.session.compacting` handling so compaction becomes an explicit memory checkpoint. Before appending cached continuity, attempt memory-facing checkpoint preparation using existing helper paths where safe. The preferred first implementation: use cached `prepareTurn`/`prepareHostTurn` if present; if recent conversation exists and scope is complete, run `prepareHostTurnMemory` with provenance phase `compaction-checkpoint` and record diagnostics. Because `prepareHostTurnMemory` can apply conservative persistence, share an idempotency key with idle persistence (for example message ID / turn key + phase-safe write guard) so `message.updated` + `session.idle` + compaction cannot duplicate durable writes for the same turn. Append only memory continuity text to compaction output through existing `runtime-compaction.ts` behavior. Keep this fail-open.
   **Must NOT do**: Do not execute hooks. Do not dispatch commands/http. Do not block compaction on memory failure. Do not store raw verbatim content automatically.
@@ -384,7 +384,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `feat(memory): add compaction checkpoint continuity` | Files: [`src/features/opencode-plugin/runtime-shell.ts`, `src/features/opencode-plugin/runtime-compaction.ts`, tests]
 
-- [ ] 7. Harden Idle and Session Persistence Reason Codes
+- [x] 7. Harden Idle and Session Persistence Reason Codes
 
   **What to do**: Make idle/session persistence explain all no-write outcomes: `likely_skip`, `no_candidates`, `review_only`, `auto_saved`, `auto_save_skipped_incomplete_scope`, `deduped_turn`, `small_talk`, `empty_recent_conversation`, `missing_turn_key`, `incomplete_scope`, `backend_failed_open`. Store summaries in lifecycle diagnostics; preserve detailed policy output in `continuityCache.prepareHostTurn` where already available. Coordinate idempotency keys with Task 6 so idle persistence and compaction checkpoint cannot both persist the same turn.
   **Must NOT do**: Do not weaken conservative policy. Do not save every idle turn. Do not enqueue review records for `likely_skip` unless a separate explicit policy task is added later.
@@ -424,7 +424,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `feat(memory): explain idle persistence outcomes` | Files: [`src/features/opencode-plugin/runtime-shell.ts`, tests]
 
-- [ ] 8. Update Memory-Facing Documentation
+- [x] 8. Update Memory-Facing Documentation
 
   **What to do**: Update `README.md`, `MCP_USAGE.md`, `CONTINUITY_DEBUGGING.md`, `ARCHITECTURE_BOUNDARIES.md`, and/or `AGENT_NEXT_STEPS.md` only as needed to document the memory lifecycle contract. State that this package consumes host lifecycle events for memory continuity and does not execute hooks. Document protocol, diagnostics, lifecycle stages, and troubleshooting flow.
   **Must NOT do**: Do not document unimplemented behavior. Do not promise Claude Code hooks compatibility. Do not present OpenCode runtime behavior as universal beyond plugin-native path.
@@ -465,7 +465,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `docs(memory): document lifecycle contract` | Files: [docs/README files updated by executor]
 
-- [ ] 9. Add Boundary Guard Tests
+- [x] 9. Add Boundary Guard Tests
 
   **What to do**: Add tests that protect the memory-only boundary. Tests should assert plugin tool names remain memory tools plus `memory_context`/`runtime_capabilities`, runtime capabilities do not expose hook-runtime features, and exported source/runtime capability surfaces do not add command/http dispatch APIs. Prefer tests in existing plugin package/product test files or a focused boundary test file.
   **Must NOT do**: Do not run broad source/doc keyword tests that fail on legitimate research notes or comments. Limit boundary tests to exported tool names, runtime capability outputs, public package exports, and narrowly scoped runtime API objects.
@@ -505,7 +505,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `test(memory): guard lifecycle boundary` | Files: [tests updated by executor]
 
-- [ ] 10. Add Deferred Raw + Derived Memory Design Note
+- [x] 10. Add Deferred Raw + Derived Memory Design Note
 
   **What to do**: Create or update a memory-facing docs section that records the future raw + derived/verbatim-first direction without implementing it. The note must say raw/verbatim capture is deferred until privacy, review policy, redaction, source pointer, and scope semantics are defined. Map MemPalace “drawers” to a possible future raw source memory concept but do not expose that vocabulary as current API.
   **Must NOT do**: Do not implement raw transcript storage. Do not add migrations. Do not edit data files.
@@ -545,7 +545,7 @@ Wave 5: Task 11 (full integration/verification consolidation)
 
   **Commit**: NO | Message: `docs(memory): record raw memory direction` | Files: [docs updated by executor]
 
-- [ ] 11. Consolidate Integration Verification
+- [x] 11. Consolidate Integration Verification
 
   **What to do**: Ensure all new tests are included in `package.json` `test` script or otherwise covered by default `rtk bun run test`. Run full verification in repo order. Collect evidence files under `.sisyphus/evidence/`. Confirm no unrelated files under `data/` changed.
   **Must NOT do**: Do not commit. Do not reset unrelated user changes. Do not modify memory data.
@@ -590,10 +590,10 @@ Wave 5: Task 11 (full integration/verification consolidation)
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — unspecified-high
-- [ ] F3. Real Manual QA — unspecified-high
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F1. Plan Compliance Audit — oracle
+- [x] F2. Code Quality Review — unspecified-high
+- [x] F3. Real Manual QA — unspecified-high
+- [x] F4. Scope Fidelity Check — deep
 
 ## Commit Strategy
 - Do not commit unless the user explicitly asks.

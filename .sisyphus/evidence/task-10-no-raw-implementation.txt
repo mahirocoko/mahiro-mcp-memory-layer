@@ -1,0 +1,15 @@
+Task 10 evidence: no raw implementation slipped in
+
+Checked paths:
+- AGENT_NEXT_STEPS.md
+- .sisyphus/notepads/memory-lifecycle-contract/learnings.md
+
+Boundary check:
+- git diff --name-only -- src data returned no output
+
+Word check:
+- grep -nE 'raw|verbatim' AGENT_NEXT_STEPS.md ARCHITECTURE_BOUNDARIES.md
+- Matches were only inside the deferred future note in AGENT_NEXT_STEPS.md
+
+Conclusion:
+No source, schema, storage, or data files were changed, and raw or verbatim wording stays deferred in docs only.

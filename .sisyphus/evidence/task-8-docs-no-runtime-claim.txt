@@ -1,0 +1,44 @@
+## README.md
+7: Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.
+31: The standalone path is still memory-only. It does not make host lifecycle behavior universal, and it does not turn this repo into a hook runtime.
+114: - `docs/oh-my-openagent/claude-hooks-compatibility.md` — research notes on Claude hooks compatibility patterns observed in `oh-my-openagent`
+
+## MCP_USAGE.md
+71: This object is a memory contract, not a hook runtime contract.
+
+## CONTINUITY_DEBUGGING.md
+
+## ARCHITECTURE_BOUNDARIES.md
+7: Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
+64: Hosts may compose memory with their own runtime behavior, but the memory package should not become the source of truth for worker execution, workflow state, or hook dispatch.
+
+## AGENT_NEXT_STEPS.md
+
+## docs/oh-my-openagent/claude-hooks-compatibility.md
+1: # Claude Hooks Compatibility Notes from oh-my-openagent
+3: This note records what we learned from studying `code-yeongyu/oh-my-openagent` and the official Claude Code / OpenCode docs. It is research context only: this package remains a memory layer and should not claim ownership of hook execution or workflow-control features.
+7: `oh-my-openagent` does not run Claude Code to get hook behavior. It implements a Claude Code hooks compatibility layer on top of OpenCode plugin events.
+11: | Claude Code hook | OpenCode primitive |
+19: In `oh-my-openagent`, the main files are under `src/hooks/claude-code-hooks/`, especially:
+21: - `claude-code-hooks-hook.ts`
+28: - `dispatch-hook.ts`
+30: Plugin assembly happens through `src/plugin/hooks/create-transform-hooks.ts`, where the `claude-code-hooks` hook is enabled or disabled as part of the OpenCode plugin hook set.
+34: The compatibility layer reads Claude-style hook configuration from:
+44:   "hooks": {
+48:         "hooks": [
+51:             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/check.sh"
+64: The bridge translates OpenCode events into Claude-shaped hook input, then dispatches the hook:
+68: - `$CLAUDE_PROJECT_DIR` is expanded and exported for command hooks.
+73: For policy behavior, `PreToolUse` can block by throwing through the OpenCode `tool.execute.before` path. It can also mutate tool input through Claude-style `hookSpecificOutput.updatedInput`.
+77: The observed runtime subset is intentionally much smaller than the current Claude Code hooks reference.
+87: Not observed as implemented runtime hooks in the bridge:
+99: - other newer Claude hook lifecycle events
+113: What OpenCode does not provide as a first-class documented equivalent is Claude's complete hook DSL: event matcher groups, handler types such as prompt/agent/MCP-tool hooks, and a universal structured hook decision schema.
+119: 3. Read Claude-style hook settings.
+121: 5. Execute command/HTTP hooks.
+130: - Claude Code hook execution
+132: - command/HTTP hook dispatch
+134: - a Claude hooks compatibility runtime
+142: - Treat full Claude hooks parity as a later compatibility project, not the default target.
+143: - Keep memory-facing helpers separate from hook execution. Memory can consume lifecycle context, but should not become the lifecycle runtime.
+

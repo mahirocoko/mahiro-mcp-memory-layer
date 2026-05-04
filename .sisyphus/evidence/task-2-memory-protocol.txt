@@ -1,0 +1,14 @@
+Task 2 evidence, 2026-05-04 14:08 +07
+
+Checks passed:
+- `lsp_diagnostics` on `src/features/opencode-plugin/runtime-capabilities.ts`
+- `lsp_diagnostics` on `src/features/opencode-plugin/runtime-state.ts`
+- `lsp_diagnostics` on `src/features/opencode-plugin/runtime-shell.ts`
+- `lsp_diagnostics` on `tests/product-memory-plugin.test.ts`
+- `lsp_diagnostics` on `tests/opencode-plugin-package.test.ts`
+- `rtk bunx vitest run tests/product-memory-plugin.test.ts tests/opencode-plugin-package.test.ts`
+
+Result:
+- 2 test files passed, 7 tests passed total.
+- `memoryProtocol` is now present on runtime capabilities and memory_context session output.
+- Forbidden hook and Claude settings phrases were not found in the opencode plugin source or tests.

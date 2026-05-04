@@ -29,10 +29,13 @@ import {
   clearOpenCodePluginRuntimeState,
   extractRecentConversation,
   getOrCreateSingletonRuntimeState,
+  markMemoryLifecycleDiagnostic,
   resetOpenCodePluginRuntimeStateForTests,
   resolveSessionIdFromUnknown,
   syncSessionStateFromEvent,
   type OpenCodePluginMemoryContextResult,
+  type OpenCodePluginMemoryLifecycleDiagnosticReasonCode,
+  type OpenCodePluginMemoryLifecycleSummaryCounts,
   type OpenCodePluginSessionState,
 } from "./runtime-state.js";
 
@@ -132,7 +135,17 @@ export function createOpenCodePluginRuntime(
   };
 
   const startSessionWakeUp = (sessionState: OpenCodePluginSessionState | undefined): void => {
-    if (!sessionState || sessionState.hasStartedWakeUp || sessionState.wakeUp) {
+    if (!sessionState) {
+      return;
+    }
+
+    if (sessionState.hasStartedWakeUp || sessionState.wakeUp) {
+      markMemoryLifecycleDiagnostic(sessionState, "session-start-wake-up", {
+        status: "skipped",
+        reasonCode: "already_started_or_cached",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -176,6 +189,7 @@ export function createOpenCodePluginRuntime(
 
         const startupBrief = buildOpenCodePluginStartupBrief(capabilities);
         latestSessionState.capabilities = capabilities;
+        latestSessionState.memoryProtocol = capabilities.memory.memoryProtocol;
         latestSessionState.startupBrief = startupBrief;
         if (latestSessionState.wakeUp) {
           latestSessionState.wakeUp = {
@@ -218,6 +232,14 @@ export function createOpenCodePluginRuntime(
           ...wakeUp,
           wakeUpContext: prependStartupBrief(wakeUp.wakeUpContext, latestSessionState.startupBrief),
         };
+        markMemoryLifecycleDiagnostic(latestSessionState, "session-start-wake-up", {
+          status: "succeeded",
+          reasonCode: "cache_write_completed",
+          scopeUsed: wakeUpScope,
+          summaryCounts: {
+            retrieved: wakeUp.profile.items.length + wakeUp.recent.items.length,
+          },
+        });
 
         void logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
@@ -231,8 +253,18 @@ export function createOpenCodePluginRuntime(
           },
         });
       })
-      .catch((error) =>
-        logPluginLifecycle(context, {
+      .catch((error) => {
+        const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+        if (latestSessionState) {
+          markMemoryLifecycleDiagnostic(latestSessionState, "session-start-wake-up", {
+            status: "failed_open",
+            reasonCode: "backend_error",
+            scopeUsed: wakeUpScope,
+          });
+        }
+
+        return logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
           level: "warn",
           message: "OpenCode plugin session-start wake-up failed open.",
@@ -240,8 +272,8 @@ export function createOpenCodePluginRuntime(
             sessionId: sessionState.sessionId,
             error: toErrorMessage(error),
           },
-        }),
-      )
+        });
+      })
       .finally(() => {
         const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
 
@@ -272,7 +304,17 @@ export function createOpenCodePluginRuntime(
   ): Promise<void> => {
     const currentSessionState = runtimeState.sessions.get(sessionId);
 
-    if (!currentSessionState || currentSessionState.pendingMessageDebounce !== timer) {
+    if (!currentSessionState) {
+      return;
+    }
+
+    if (currentSessionState.pendingMessageDebounce !== timer) {
+      markMemoryLifecycleDiagnostic(currentSessionState, "turn-preflight", {
+        status: "skipped",
+        reasonCode: "stale_lifecycle_result",
+        scopeUsed: currentSessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -282,6 +324,12 @@ export function createOpenCodePluginRuntime(
     const routing = resolveMemoryPreflightRouting(recentConversation);
 
     if (!routing.shouldRun) {
+      markMemoryLifecycleDiagnostic(currentSessionState, "turn-preflight", {
+        status: "skipped",
+        reasonCode: "preflight_not_needed",
+        scopeUsed: scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -303,12 +351,38 @@ export function createOpenCodePluginRuntime(
       );
       const latestSessionState = runtimeState.sessions.get(sessionId);
 
-      if (!latestSessionState || latestSessionState.messageVersion !== scheduledVersion) {
+      if (!latestSessionState) {
+        return;
+      }
+
+      if (latestSessionState.messageVersion !== scheduledVersion) {
+        markMemoryLifecycleDiagnostic(latestSessionState, "turn-preflight", {
+          status: "skipped",
+          reasonCode: "stale_lifecycle_result",
+          scopeUsed: latestSessionState.scopeResolution.scope,
+          summaryCounts: { skipped: 1 },
+        });
         return;
       }
 
       latestSessionState.prepareTurn = prepareTurn;
+      markMemoryLifecycleDiagnostic(latestSessionState, "turn-preflight", {
+        status: "succeeded",
+        reasonCode: "cache_write_completed",
+        scopeUsed: scope,
+        summaryCounts: summarizePrepareTurnResult(prepareTurn),
+      });
     } catch (error) {
+      const latestSessionState = runtimeState.sessions.get(sessionId);
+
+      if (latestSessionState) {
+        markMemoryLifecycleDiagnostic(latestSessionState, "turn-preflight", {
+          status: "failed_open",
+          reasonCode: "backend_error",
+          scopeUsed: scope,
+        });
+      }
+
       await logPluginLifecycle(context, {
         service: "opencode-memory-plugin",
         level: "warn",
@@ -338,6 +412,12 @@ export function createOpenCodePluginRuntime(
     const recentConversation = extractRecentConversation(event);
 
     if (!recentConversation) {
+      markMemoryLifecycleDiagnostic(sessionState, "turn-preflight", {
+        status: "skipped",
+        reasonCode: "empty_recent_conversation",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -376,6 +456,12 @@ export function createOpenCodePluginRuntime(
     const turnKey = buildPrepareHostTurnKey(sessionState);
 
     if (!turnKey) {
+      markMemoryLifecycleDiagnostic(sessionState, "idle-persistence", {
+        status: "skipped",
+        reasonCode: "missing_turn_key",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -383,18 +469,46 @@ export function createOpenCodePluginRuntime(
       sessionState.pendingPrepareHostTurnKey === turnKey ||
       sessionState.lastHandledPrepareHostTurnKey === turnKey
     ) {
+      markMemoryLifecycleDiagnostic(sessionState, "idle-persistence", {
+        status: "skipped",
+        reasonCode: "deduped_turn",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
     const recentConversation = sessionState.recentConversation;
 
     if (!recentConversation) {
+      markMemoryLifecycleDiagnostic(sessionState, "idle-persistence", {
+        status: "skipped",
+        reasonCode: "empty_recent_conversation",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
     const routing = resolveMemoryPreflightRouting(recentConversation);
 
     if (!routing.shouldRun) {
+      markMemoryLifecycleDiagnostic(sessionState, "idle-persistence", {
+        status: "skipped",
+        reasonCode: routing.skipReason ?? "preflight_not_needed",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return;
+    }
+
+    if (sessionState.scopeResolution.status !== "complete") {
+      markMemoryLifecycleDiagnostic(sessionState, "idle-persistence", {
+        status: "skipped",
+        reasonCode: "incomplete_scope",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
       return;
     }
 
@@ -421,15 +535,46 @@ export function createOpenCodePluginRuntime(
       .then((prepareHostTurn) => {
         const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
 
-        if (!latestSessionState || latestSessionState.pendingPrepareHostTurnKey !== turnKey) {
+        if (!latestSessionState) {
+          return;
+        }
+
+        if (
+          latestSessionState.pendingPrepareHostTurnKey !== turnKey ||
+          buildPrepareHostTurnKey(latestSessionState) !== turnKey
+        ) {
+          markMemoryLifecycleDiagnostic(latestSessionState, "idle-persistence", {
+            status: "skipped",
+            reasonCode: "stale_lifecycle_result",
+            scopeUsed: latestSessionState.scopeResolution.scope,
+            summaryCounts: { skipped: 1 },
+          });
           return;
         }
 
         latestSessionState.prepareHostTurn = prepareHostTurn;
+        latestSessionState.prepareHostTurnKey = turnKey;
         latestSessionState.lastHandledPrepareHostTurnKey = turnKey;
+        const persistenceDiagnostic = summarizePrepareHostTurnPersistenceResult(prepareHostTurn);
+        markMemoryLifecycleDiagnostic(latestSessionState, "idle-persistence", {
+          status: persistenceDiagnostic.status,
+          reasonCode: persistenceDiagnostic.reasonCode,
+          scopeUsed: scope,
+          summaryCounts: persistenceDiagnostic.summaryCounts,
+        });
       })
-      .catch((error) =>
-        logPluginLifecycle(context, {
+      .catch((error) => {
+        const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+        if (latestSessionState) {
+          markMemoryLifecycleDiagnostic(latestSessionState, "idle-persistence", {
+            status: "failed_open",
+            reasonCode: "backend_failed_open",
+            scopeUsed: scope,
+          });
+        }
+
+        return logPluginLifecycle(context, {
           service: "opencode-memory-plugin",
           level: "warn",
           message: "OpenCode plugin session.idle persistence failed open.",
@@ -438,8 +583,8 @@ export function createOpenCodePluginRuntime(
             turnKey,
             error: toErrorMessage(error),
           },
-        }),
-      )
+        });
+      })
       .finally(() => {
         const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
 
@@ -449,6 +594,172 @@ export function createOpenCodePluginRuntime(
 
         latestSessionState.pendingPrepareHostTurnKey = undefined;
       });
+  };
+
+  const prepareCompactionCheckpoint = async (
+    sessionState: OpenCodePluginSessionState | undefined,
+  ): Promise<{ readonly preserveAppendDiagnostic: boolean }> => {
+    if (!sessionState) {
+      return { preserveAppendDiagnostic: false };
+    }
+
+    if (sessionState.scopeResolution.status !== "complete") {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "incomplete_scope",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return { preserveAppendDiagnostic: true };
+    }
+
+    const turnKey = buildPrepareHostTurnKey(sessionState);
+
+    if (!turnKey) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "missing_turn_key",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return { preserveAppendDiagnostic: true };
+    }
+
+    if (sessionState.prepareHostTurn && sessionState.prepareHostTurnKey === turnKey) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "succeeded",
+        reasonCode: "cached_checkpoint_reused",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: summarizePrepareTurnResult(sessionState.prepareHostTurn),
+      });
+      return { preserveAppendDiagnostic: false };
+    }
+
+    if (sessionState.prepareTurn) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "succeeded",
+        reasonCode: "cached_checkpoint_reused",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: summarizePrepareTurnResult(sessionState.prepareTurn),
+      });
+      return { preserveAppendDiagnostic: false };
+    }
+
+    if (
+      sessionState.pendingPrepareHostTurnKey === turnKey ||
+      sessionState.lastHandledPrepareHostTurnKey === turnKey
+    ) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "deduped_turn",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return { preserveAppendDiagnostic: true };
+    }
+
+    const recentConversation = sessionState.recentConversation;
+
+    if (!recentConversation) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: "empty_recent_conversation",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return { preserveAppendDiagnostic: true };
+    }
+
+    const routing = resolveMemoryPreflightRouting(recentConversation);
+
+    if (!routing.shouldRun) {
+      markMemoryLifecycleDiagnostic(sessionState, "compaction-continuity", {
+        status: "skipped",
+        reasonCode: routing.skipReason ?? "preflight_not_needed",
+        scopeUsed: sessionState.scopeResolution.scope,
+        summaryCounts: { skipped: 1 },
+      });
+      return { preserveAppendDiagnostic: true };
+    }
+
+    const scope = sessionState.scopeResolution.scope;
+    sessionState.pendingPrepareHostTurnKey = turnKey;
+
+    try {
+      const backend = await getOpenCodePluginMemoryBackend(options.__test);
+      const prepareHostTurn = await backend.prepareHostTurnMemory(
+        {
+          task: routing.task,
+          mode: "query",
+          recentConversation,
+          projectId: scope.projectId,
+          containerId: scope.containerId,
+        },
+        {
+          surface: "opencode-plugin",
+          trigger: "experimental.session.compacting",
+          phase: "compaction-checkpoint",
+        },
+      );
+      const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+      if (!latestSessionState) {
+        return { preserveAppendDiagnostic: false };
+      }
+
+      if (
+        latestSessionState.pendingPrepareHostTurnKey !== turnKey ||
+        buildPrepareHostTurnKey(latestSessionState) !== turnKey
+      ) {
+        markMemoryLifecycleDiagnostic(latestSessionState, "compaction-continuity", {
+          status: "skipped",
+          reasonCode: "stale_lifecycle_result",
+          scopeUsed: latestSessionState.scopeResolution.scope,
+          summaryCounts: { skipped: 1 },
+        });
+        return { preserveAppendDiagnostic: true };
+      }
+
+      latestSessionState.prepareHostTurn = prepareHostTurn;
+      latestSessionState.prepareHostTurnKey = turnKey;
+      latestSessionState.lastHandledPrepareHostTurnKey = turnKey;
+      const persistenceDiagnostic = summarizePrepareHostTurnPersistenceResult(prepareHostTurn);
+      markMemoryLifecycleDiagnostic(latestSessionState, "compaction-continuity", {
+        status: persistenceDiagnostic.status,
+        reasonCode: persistenceDiagnostic.reasonCode,
+        scopeUsed: scope,
+        summaryCounts: persistenceDiagnostic.summaryCounts,
+      });
+      return { preserveAppendDiagnostic: false };
+    } catch (error) {
+      const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+      if (latestSessionState) {
+        markMemoryLifecycleDiagnostic(latestSessionState, "compaction-continuity", {
+          status: "failed_open",
+          reasonCode: "backend_failed_open",
+          scopeUsed: latestSessionState.scopeResolution.scope,
+        });
+      }
+
+      await logPluginLifecycle(context, {
+        service: "opencode-memory-plugin",
+        level: "warn",
+        message: "OpenCode plugin compaction checkpoint failed open.",
+        extra: {
+          sessionId: sessionState.sessionId,
+          turnKey,
+          error: toErrorMessage(error),
+        },
+      });
+      return { preserveAppendDiagnostic: true };
+    } finally {
+      const latestSessionState = runtimeState.sessions.get(sessionState.sessionId);
+
+      if (latestSessionState?.pendingPrepareHostTurnKey === turnKey) {
+        latestSessionState.pendingPrepareHostTurnKey = undefined;
+      }
+    }
   };
 
   return {
@@ -491,7 +802,13 @@ export function createOpenCodePluginRuntime(
     handleExperimentalSessionCompacting: async (input, output) => {
       const event = createCompactionEvent(input);
       const sessionState = await routeEvent(event, "experimental.session.compacting");
-      await applyCompactionContinuity(context, sessionState, output);
+      const checkpoint = await prepareCompactionCheckpoint(sessionState);
+      const latestSessionState = sessionState
+        ? runtimeState.sessions.get(sessionState.sessionId) ?? sessionState
+        : undefined;
+      await applyCompactionContinuity(context, latestSessionState, output, {
+        preserveExistingDiagnostic: checkpoint.preserveAppendDiagnostic,
+      });
     },
     readMemoryContext: async (toolContext) => {
       const sessionId =
@@ -541,6 +858,56 @@ export function createOpenCodePluginRuntime(
   };
 }
 
+
+function summarizePrepareTurnResult(
+  result: Awaited<ReturnType<OpenCodePluginMemoryBackend["prepareTurnMemory"]>>,
+): OpenCodePluginMemoryLifecycleSummaryCounts {
+  return {
+    retrieved: result.items.length,
+    candidates: result.memorySuggestions.candidates.length,
+    autoSaved: result.conservativePolicy.autoSaved.length,
+    reviewOnly: result.conservativePolicy.reviewOnlySuggestions.length,
+    skipped: result.conservativePolicy.autoSaveSkipped.length,
+  };
+}
+
+function summarizePrepareHostTurnPersistenceResult(
+  result: Awaited<ReturnType<OpenCodePluginMemoryBackend["prepareHostTurnMemory"]>>,
+): {
+  readonly status: "skipped" | "succeeded";
+  readonly reasonCode: OpenCodePluginMemoryLifecycleDiagnosticReasonCode;
+  readonly summaryCounts: OpenCodePluginMemoryLifecycleSummaryCounts;
+} {
+  const summaryCounts = summarizePrepareTurnResult(result);
+  const policy = result.conservativePolicy;
+
+  if (policy.autoSaved.length > 0) {
+    return { status: "succeeded", reasonCode: "auto_saved", summaryCounts };
+  }
+
+  if (policy.autoSaveSkipped.length > 0) {
+    return { status: "skipped", reasonCode: "auto_save_skipped_incomplete_scope", summaryCounts };
+  }
+
+  if (policy.reviewOnlySuggestions.length > 0) {
+    return { status: "skipped", reasonCode: "review_only", summaryCounts };
+  }
+
+  if (policy.recommendation === "likely_skip") {
+    return {
+      status: "skipped",
+      reasonCode: policy.candidates.length > 0 ? "likely_skip" : "no_candidates",
+      summaryCounts,
+    };
+  }
+
+  if (policy.candidates.length === 0) {
+    return { status: "skipped", reasonCode: "no_candidates", summaryCounts };
+  }
+
+  return { status: "skipped", reasonCode: "likely_skip", summaryCounts };
+}
+
 function prependStartupBrief(wakeUpContext: string, startupBrief: string | undefined): string {
   if (!startupBrief) {
     return wakeUpContext;
@@ -556,6 +923,7 @@ function prependStartupBrief(wakeUpContext: string, startupBrief: string | undef
 interface MemoryPreflightRouting {
   readonly shouldRun: boolean;
   readonly task: string;
+  readonly skipReason?: OpenCodePluginMemoryLifecycleDiagnosticReasonCode;
 }
 
 const defaultMemoryPreflightTask =
@@ -579,6 +947,7 @@ function resolveMemoryPreflightRouting(recentConversation: string): MemoryPrefli
     return {
       shouldRun: false,
       task: defaultMemoryPreflightTask,
+      skipReason: "empty_recent_conversation",
     };
   }
 
@@ -586,6 +955,7 @@ function resolveMemoryPreflightRouting(recentConversation: string): MemoryPrefli
     return {
       shouldRun: false,
       task: defaultMemoryPreflightTask,
+      skipReason: "small_talk",
     };
   }
 
@@ -600,6 +970,7 @@ function resolveMemoryPreflightRouting(recentConversation: string): MemoryPrefli
     return {
       shouldRun: false,
       task: defaultMemoryPreflightTask,
+      skipReason: "preflight_not_needed",
     };
   }
 

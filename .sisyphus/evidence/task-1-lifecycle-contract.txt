@@ -1,0 +1,16 @@
+Task 1 lifecycle contract evidence
+Timestamp: 2026-05-04 13:46:02 +07
+
+Command: rtk bunx vitest run tests/product-memory-plugin.test.ts
+Result: PASS
+Summary:
+- tests/product-memory-plugin.test.ts passed.
+- 1 test file passed.
+- 5 tests passed.
+- New assertions cover the internal memory-facing lifecycle stage values through `memory_context`, event-to-stage routing, runtime handler phases/triggers for session.created, message.updated, message.part.updated, session.idle, and experimental.session.compacting, and compaction continuity cache append behavior.
+
+Additional verification:
+- lsp_diagnostics on src/features/opencode-plugin/runtime-state.ts: no diagnostics.
+- lsp_diagnostics on tests/product-memory-plugin.test.ts: no diagnostics.
+- rtk bun run typecheck: PASS (tsc -p tsconfig.json --noEmit).
+- rtk bun run build: PASS (tsc -p tsconfig.json).

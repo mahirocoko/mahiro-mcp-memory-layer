@@ -1,0 +1,80 @@
+## README.md
+[lifecycle]
+7: Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.
+31: The standalone path is still memory-only. It does not make host lifecycle behavior universal, and it does not turn this repo into a hook runtime.
+77: ## Memory lifecycle
+79: The memory lifecycle vocabulary is:
+92: `runtime_capabilities` is plugin-native and reports memory capability flags only, including lifecycle diagnostics and compaction continuity availability.
+[memory_context]
+5: This package is memory-only. It provides durable memory writes, retrieval, context assembly, retrieval inspection, memory review flows, and plugin-native continuity helpers such as `memory_context` and `runtime_capabilities`.
+24: - `memory_context`
+74: - `memory_context`
+90: `memory_context` exposes the session-scoped continuity cache and memory diagnostics for debugging.
+[compaction]
+84: - `compaction-continuity`
+92: `runtime_capabilities` is plugin-native and reports memory capability flags only, including lifecycle diagnostics and compaction continuity availability.
+[hook]
+7: Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.
+31: The standalone path is still memory-only. It does not make host lifecycle behavior universal, and it does not turn this repo into a hook runtime.
+114: - `docs/oh-my-openagent/claude-hooks-compatibility.md` — research notes on Claude hooks compatibility patterns observed in `oh-my-openagent`
+
+## MCP_USAGE.md
+[lifecycle]
+40: - `runtime_capabilities` stays memory-scoped and includes lifecycle diagnostics and compaction continuity flags only.
+43: Memory lifecycle contract:
+68: - `memory.lifecycleDiagnosticsAvailable`
+90: The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and lifecycle diagnostics for the memory stages above.
+97: - Use host lifecycle details only as memory diagnostics, not as a runtime ownership signal.
+[memory_context]
+33: - `memory_context`
+38: - `memory_context` exposes session-scoped continuity cache and runtime metadata, separate from durable memory records.
+73: ## `memory_context`
+88: `memory_context` should stay memory-facing. It is useful for continuity debugging, cache inspection, and understanding what memory preparation already happened for the active session.
+94: - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
+[compaction]
+40: - `runtime_capabilities` stays memory-scoped and includes lifecycle diagnostics and compaction continuity flags only.
+41: - session-start wake-up, turn preflight, idle persistence, and compaction continuity are plugin-native memory behaviors.
+48: - `compaction-continuity` preserves a memory checkpoint across compaction.
+69: - `memory.compactionContinuityAvailable`
+[hook]
+71: This object is a memory contract, not a hook runtime contract.
+
+## CONTINUITY_DEBUGGING.md
+[lifecycle]
+21: - lifecycle diagnostics for `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
+26: If continuity feels stale, missing, or inconsistent, confirm whether the expected memory preparation already ran, whether the cached scope matches the active session, and whether the lifecycle diagnostics show a skipped, failed-open, or not-run stage.
+37: Then check `runtime_capabilities` when you need to confirm whether lifecycle diagnostics and compaction continuity are currently exposed by the plugin-native path.
+41: When the issue is “why didn’t the session continue the way I expected?”, do not jump straight to broad search. First determine whether the plugin-native memory cache, retrieval path, and lifecycle diagnostics already contain the context you expected to see.
+[memory_context]
+9: 1. `memory_context`
+14: ## What to inspect in `memory_context`
+[compaction]
+21: - lifecycle diagnostics for `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
+37: Then check `runtime_capabilities` when you need to confirm whether lifecycle diagnostics and compaction continuity are currently exposed by the plugin-native path.
+[hook]
+
+## ARCHITECTURE_BOUNDARIES.md
+[lifecycle]
+7: Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
+20: - memory lifecycle continuity
+22: The package should not own workflow control, worker routing, task lifecycle state, supervision, or executor ownership rules.
+58: Both are memory diagnostics only. They report the memory protocol, lifecycle diagnostics, and compaction continuity state, but they do not define host runtime behavior.
+[memory_context]
+53: - `memory_context`
+56: `memory_context` is for session-scoped continuity cache inspection. `runtime_capabilities` is for plugin-native memory surface inspection.
+[compaction]
+58: Both are memory diagnostics only. They report the memory protocol, lifecycle diagnostics, and compaction continuity state, but they do not define host runtime behavior.
+[hook]
+7: Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
+64: Hosts may compose memory with their own runtime behavior, but the memory package should not become the source of truth for worker execution, workflow state, or hook dispatch.
+
+## AGENT_NEXT_STEPS.md
+[lifecycle]
+20: - lifecycle docs should keep the memory vocabulary only: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
+29: - Until those gates are earned, keep the current vocabulary: local-first memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, and lifecycle continuity.
+[memory_context]
+34: 2. Preserve plugin-native wake-up, turn preflight, idle persistence, `memory_context`, and `runtime_capabilities` as memory helpers.
+[compaction]
+20: - lifecycle docs should keep the memory vocabulary only: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
+[hook]
+

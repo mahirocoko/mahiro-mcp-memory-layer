@@ -1,0 +1,5 @@
+2026-05-04 14:49:25 +07
+Command: rtk bunx vitest run tests/product-memory-plugin.test.ts tests/opencode-plugin-package.test.ts
+Result: 2 files passed, 11 tests passed. Runtime capability assertions now include memory.lifecycleDiagnosticsAvailable and memory.compactionContinuityAvailable.
+Command: rtk bun -e runtime_capabilities serialization check
+Result: serialized runtime_capabilities reported mode=plugin-native and only memory-scoped additions; no generic hook/runtime ownership fields were present.

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/product-memory-plugin.test.ts (18 tests | 17 skipped) 22ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 17 skipped (18)
+   Start at  15:41:43
+   Duration  423ms (transform 136ms, setup 0ms, collect 224ms, tests 22ms, environment 0ms, prepare 28ms)
+
