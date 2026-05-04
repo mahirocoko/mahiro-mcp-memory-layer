@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { resolveOpenCodeScope } from "../src/features/opencode-plugin/resolve-scope.js";
 
 describe("resolveOpenCodeScope", () => {
-  it("resolves a complete scope deterministically from project, container, and session", () => {
+  it("prefers stable project names over volatile project ids", () => {
     expect(
       resolveOpenCodeScope({
         context: {
@@ -28,14 +28,49 @@ describe("resolveOpenCodeScope", () => {
     ).toEqual({
       status: "complete",
       scope: {
-        projectId: "project-1",
+        projectId: "project-name",
         containerId: `worktree:${path.resolve("/workspace/project/./")}`,
         sessionId: "session-1",
       },
       missing: [],
       resolvedFrom: {
-        projectId: "context.project.id",
+        projectId: "context.project.name",
         containerId: "context.worktree",
+        sessionId: "event.properties.sessionID",
+      },
+    });
+  });
+
+  it("falls back to project ids when project names are blank", () => {
+    expect(
+      resolveOpenCodeScope({
+        context: {
+          project: {
+            id: "project-id-fallback",
+            name: "   ",
+            directory: "/workspace/project",
+          },
+          directory: "/workspace/project",
+        },
+        event: {
+          type: "message.updated",
+          properties: {
+            sessionID: "session-1",
+            messageID: "message-1",
+          },
+        },
+      }),
+    ).toEqual({
+      status: "complete",
+      scope: {
+        projectId: "project-id-fallback",
+        containerId: `directory:${path.resolve("/workspace/project")}`,
+        sessionId: "session-1",
+      },
+      missing: [],
+      resolvedFrom: {
+        projectId: "context.project.id",
+        containerId: "context.directory",
         sessionId: "event.properties.sessionID",
       },
     });

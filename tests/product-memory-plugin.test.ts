@@ -112,6 +112,11 @@ async function createHarness(options?: { readonly messageDebounceMs?: number }) 
   const backend = createMemoryBackend();
   const pluginModule = await importPluginModule();
   const pluginInput = {
+    project: {
+      id: "60b045c93ff3cd0bf6899ddc83256eb0daed10a2",
+      name: "mahiro-mcp-memory-layer",
+      directory: repoRoot,
+    },
     directory: repoRoot,
     client: {},
   } as PluginInput;
@@ -188,6 +193,24 @@ describe("product memory plugin", () => {
               wakeUp: expect.any(Object),
             }),
           }),
+        }),
+      );
+      expect(harness.backend.wakeUpMemory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "mahiro-mcp-memory-layer",
+          containerId: `directory:${repoRoot}`,
+        }),
+        expect.objectContaining({
+          phase: "wake-up",
+        }),
+      );
+      expect(harness.backend.prepareHostTurnMemory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "mahiro-mcp-memory-layer",
+          containerId: `directory:${repoRoot}`,
+        }),
+        expect.objectContaining({
+          phase: "host-turn-persistence",
         }),
       );
     } finally {

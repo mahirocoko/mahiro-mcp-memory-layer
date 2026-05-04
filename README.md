@@ -90,3 +90,4 @@ bun run reindex
 - `ARCHITECTURE_BOUNDARIES.md` — memory-only package boundary
 - `AGENT_NEXT_STEPS.md` — current direction and follow-up work
 - `AGENTS.md` — thin entrypoint for agents
+- `docs/oh-my-openagent/claude-hooks-compatibility.md` — research notes on Claude hooks compatibility patterns observed in `oh-my-openagent`

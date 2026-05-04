@@ -90,18 +90,18 @@ export function resolveOpenCodeScope(input: ResolveOpenCodeScopeInput): OpenCode
 }
 
 function resolveProjectId(context: OpenCodePluginContext): string | undefined {
-  return toNonEmptyString(context.project?.id) ?? toNonEmptyString(context.project?.name);
+  return toNonEmptyString(context.project?.name) ?? toNonEmptyString(context.project?.id);
 }
 
 function resolveProjectSource(
   context: OpenCodePluginContext,
 ): Partial<Record<"projectId", OpenCodeScopeSource>> {
-  if (toNonEmptyString(context.project?.id)) {
-    return { projectId: "context.project.id" };
-  }
-
   if (toNonEmptyString(context.project?.name)) {
     return { projectId: "context.project.name" };
+  }
+
+  if (toNonEmptyString(context.project?.id)) {
+    return { projectId: "context.project.id" };
   }
 
   return {};
