@@ -1,0 +1,11 @@
+grep -F "## Empty vs degraded retrieval" CONTINUITY_DEBUGGING.md
+## Empty vs degraded retrieval
+
+grep -F "returnedMemoryIds: []" CONTINUITY_DEBUGGING.md
+| Trace found, empty success | `returnedMemoryIds: []` | `contextSize: 0`, `degraded: false` | Retrieval completed, but no matching or scoped context was returned. This can happen when `projectId` or `containerId` is wrong or missing, records exist globally but not in the current project scope, storage was reset, or storage was never seeded. |
+`returnedMemoryIds: []`, `contextSize: 0`, and `degraded: false` means the retrieval finished cleanly, but no scoped context was returned. That is a durable memory result, not proof that the continuity cache is empty.
+
+grep -F "degraded: false" CONTINUITY_DEBUGGING.md
+| Trace found, empty success | `returnedMemoryIds: []` | `contextSize: 0`, `degraded: false` | Retrieval completed, but no matching or scoped context was returned. This can happen when `projectId` or `containerId` is wrong or missing, records exist globally but not in the current project scope, storage was reset, or storage was never seeded. |
+| Trace found, normal hit | one or more IDs | `returnedMemoryIds: [...], degraded: false` | Retrieval completed and returned matching scoped context; use returned IDs as the hit signal. |
+`returnedMemoryIds: []`, `contextSize: 0`, and `degraded: false` means the retrieval finished cleanly, but no scoped context was returned. That is a durable memory result, not proof that the continuity cache is empty.

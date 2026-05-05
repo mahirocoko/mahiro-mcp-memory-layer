@@ -1,0 +1,3 @@
+Command: grep -F "returnedMemoryIds: []" MCP_USAGE.md && grep -F "degraded: false" MCP_USAGE.md
+Result: passed
+Notes: `MCP_USAGE.md` now includes the empty-vs-degraded reminder with both exact strings.

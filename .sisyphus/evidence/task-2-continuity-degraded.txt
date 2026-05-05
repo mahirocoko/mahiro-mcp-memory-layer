@@ -1,0 +1,11 @@
+grep -F "degraded: true" CONTINUITY_DEBUGGING.md
+| Trace found, degraded retrieval | any IDs or none | `degraded: true` | Retrieval ran in degraded or fail-open mode. Treat this separately from empty success, because degraded retrieval is not the same condition as `returnedMemoryIds: []` with `degraded: false`. |
+`degraded: true` means the retrieval path fell back into degraded or fail-open behavior. It may still return IDs, and it is not the same as an empty successful retrieval.
+
+grep -Ei "fail-open|degraded" CONTINUITY_DEBUGGING.md
+## Empty vs degraded retrieval
+Use this matrix to separate empty success from degraded retrieval:
+| Trace found, empty success | `returnedMemoryIds: []` | `contextSize: 0`, `degraded: false` | Retrieval completed, but no matching or scoped context was returned. This can happen when `projectId` or `containerId` is wrong or missing, records exist globally but not in the current project scope, storage was reset, or storage was never seeded. |
+| Trace found, normal hit | one or more IDs | `returnedMemoryIds: [...], degraded: false` | Retrieval completed and returned matching scoped context; use returned IDs as the hit signal. |
+| Trace found, degraded retrieval | any IDs or none | `degraded: true` | Retrieval ran in degraded or fail-open mode. Treat this separately from empty success, because degraded retrieval is not the same condition as `returnedMemoryIds: []` with `degraded: false`. |
+`degraded: true` means the retrieval path fell back into degraded or fail-open behavior. It may still return IDs, and it is not the same as an empty successful retrieval.

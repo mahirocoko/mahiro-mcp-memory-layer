@@ -1,0 +1,23 @@
+Task 1 source-of-truth evidence
+
+1) Empty vs found retrieval trace
+- `src/features/memory/memory-service.ts:443-469` shows `inspectMemoryRetrieval` returns `status: "empty"` only when `traceStore.readByRequestId(...)`, `readLatestMatching(...)`, or `readLatest()` yields no trace.
+- The same block shows a found trace returns `status: "found"` with `trace` plus `summary.hit`, `summary.returnedCount`, and `summary.degraded`.
+
+2) Empty lookup semantics in tests
+- `tests/memory-service.test.ts:1195-1208` verifies a missing `requestId` lookup resolves to `status: "empty"` and includes the missing `requestId`.
+- `tests/memory-service.test.ts:1048-1061` verifies a found trace is summarized from trace data, including `returnedCount` and `degraded`.
+
+3) Returned IDs vs degraded flag
+- `src/features/memory/types.ts:92-95` defines `SearchMemoriesResult.degraded` as a separate field from `items`.
+- `src/features/memory/types.ts:386-432` defines `RetrievalTraceEntry.returnedMemoryIds`, `contextSize`, and `degraded`, and the inspect result summary mirrors trace-derived data.
+- `src/features/memory/retrieval/hybrid-search.ts:28-35,145-164` sets `degraded` from embedding availability and records `returnedMemoryIds` independently of that flag.
+- `tests/hybrid-search.test.ts:65-84` and `tests/memory-service.test.ts:972-1017` show degraded search can still return keyword matches; zero returned items is a different condition than degraded.
+- `tests/retrieval-eval.test.ts:125-143` and `src/features/memory/eval/retrieval-eval.ts:597-620` show `expectEmpty` only passes when no IDs are returned, while `expectDegraded` is validated separately.
+
+4) `contextSize: 0` wording
+- `src/features/memory/retrieval/hybrid-search.ts:145-153` hardcodes `contextSize: 0` in the retrieval trace.
+- This should be described as no rendered context returned by that trace/context assembly, not as proof that storage is empty unless `list_memories` separately confirms storage state.
+
+5) Scope of this docs plan
+- No behavior changes, no schema changes, and no tool-output shape changes are needed for this documentation-only task.

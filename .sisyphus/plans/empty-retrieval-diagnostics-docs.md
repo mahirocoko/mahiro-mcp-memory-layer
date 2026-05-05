@@ -98,7 +98,7 @@ Wave 3: Task 4 regression tests/verification.
 > Implementation + Test = ONE task. Never separate.
 > EVERY task MUST have: Agent Profile + Parallelization + QA Scenarios.
 
-- [ ] 1. Verify source-of-truth retrieval semantics
+- [x] 1. Verify source-of-truth retrieval semantics
 
   **What to do**: Read the existing source/tests and write `.sisyphus/evidence/task-1-source-truth.txt` summarizing the exact semantics to document. Confirm:
   - `inspectMemoryRetrieval` returns `status: "empty"` only when no trace is found for the lookup.
@@ -143,7 +143,7 @@ Wave 3: Task 4 regression tests/verification.
 
   **Commit**: NO | Message: `docs: clarify empty retrieval diagnostics` | Files: [`.sisyphus/evidence/task-1-source-truth.txt`]
 
-- [ ] 2. Update `CONTINUITY_DEBUGGING.md` with the primary troubleshooting matrix
+- [x] 2. Update `CONTINUITY_DEBUGGING.md` with the primary troubleshooting matrix
 
   **What to do**: Add a new section after `## What to inspect in inspect_memory_retrieval` or before `## Routing rule`. The section title must be `## Empty vs degraded retrieval`. Include a compact matrix with these rows:
   - No trace found: `inspect_memory_retrieval` returns `status: "empty"`; next action is confirm requestId/latest-scope lookup.
@@ -195,7 +195,7 @@ Wave 3: Task 4 regression tests/verification.
 
   **Commit**: NO | Message: `docs: clarify empty retrieval diagnostics` | Files: [`CONTINUITY_DEBUGGING.md`]
 
-- [ ] 3. Update `MCP_USAGE.md` and only add a README pointer if needed
+- [x] 3. Update `MCP_USAGE.md` and only add a README pointer if needed
 
   **What to do**: In `MCP_USAGE.md`, under `## Practical safety reminders`, expand the `inspect_memory_retrieval` bullet into 2-4 bullets that say:
   - use it before guessing why recall is empty/unclear,
@@ -243,7 +243,7 @@ Wave 3: Task 4 regression tests/verification.
 
   **Commit**: NO | Message: `docs: clarify empty retrieval diagnostics` | Files: [`MCP_USAGE.md`, optional `README.md`]
 
-- [ ] 4. Add docs regression tests and run targeted/full verification
+- [x] 4. Add docs regression tests and run targeted/full verification
 
   **What to do**: Add a new test file `tests/continuity-debugging-docs.test.ts` that reads `CONTINUITY_DEBUGGING.md` and `MCP_USAGE.md` and asserts:
   - `CONTINUITY_DEBUGGING.md` contains `## Empty vs degraded retrieval`.
@@ -295,10 +295,10 @@ Wave 3: Task 4 regression tests/verification.
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — unspecified-high
-- [ ] F3. Real Manual QA — unspecified-high
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F1. Plan Compliance Audit — oracle
+- [x] F2. Code Quality Review — unspecified-high
+- [x] F3. Real Manual QA — unspecified-high
+- [x] F4. Scope Fidelity Check — deep
 
 ## Commit Strategy
 - Single implementation commit after Task 4 and before final handoff only if all verification passes.

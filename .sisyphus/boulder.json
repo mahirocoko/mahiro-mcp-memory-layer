@@ -1,97 +1,56 @@
 {
-  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/memory-lifecycle-contract.md",
-  "started_at": "2026-05-04T06:35:42.723Z",
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/empty-retrieval-diagnostics-docs.md",
+  "started_at": "2026-05-05T14:37:58.850Z",
   "session_ids": [
-    "ses_20e4cdb50ffe4enRGvtv67EixT",
-    "ses_20e4bf033fferivPMOisso4pay"
+    "ses_2076cf783ffeUSvoexHSr3vYxf",
+    "ses_2076b7609ffeTb2DmzAdCZEgIL",
+    "ses_2076b75d6ffdnF16QcMJZoB4Or",
+    "ses_2076b75d0ffeCSiTMH8iWxThoZ"
   ],
   "session_origins": {
-    "ses_20e4cdb50ffe4enRGvtv67EixT": "direct",
-    "ses_20e4bf033fferivPMOisso4pay": "appended"
+    "ses_2076cf783ffeUSvoexHSr3vYxf": "direct",
+    "ses_2076b7609ffeTb2DmzAdCZEgIL": "appended",
+    "ses_2076b75d6ffdnF16QcMJZoB4Or": "appended",
+    "ses_2076b75d0ffeCSiTMH8iWxThoZ": "appended"
   },
-  "plan_name": "memory-lifecycle-contract",
+  "plan_name": "empty-retrieval-diagnostics-docs",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Establish Lifecycle Contract Baseline",
-      "session_id": "ses_20e47a2c7ffeSYAq4oOIilp9Ej",
+      "task_title": "Verify source-of-truth retrieval semantics",
+      "session_id": "ses_207691f2effeOybwwgOvgDSSt4",
       "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-04T06:48:47.144Z"
+      "category": "quick",
+      "updated_at": "2026-05-05T14:43:17.367Z"
     },
     "todo:2": {
       "task_key": "todo:2",
       "task_label": "2",
-      "task_title": "Add Memory Protocol Text to Startup/Context Surfaces",
-      "session_id": "ses_20e31ceaeffeh3exk7tLVGFAVb",
+      "task_title": "Update `CONTINUITY_DEBUGGING.md` with the primary troubleshooting matrix",
+      "session_id": "ses_2075960ffffe7DiBZ7mxydCRk7",
       "agent": "Sisyphus-Junior",
       "category": "writing",
-      "updated_at": "2026-05-04T07:07:53.511Z"
+      "updated_at": "2026-05-05T15:00:52.291Z"
     },
     "todo:4": {
       "task_key": "todo:4",
       "task_label": "4",
-      "task_title": "Wire Lifecycle Diagnostics into Runtime Shell",
-      "session_id": "ses_20e1d5715ffejqttk1x41DRzxW",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-04T07:32:37.924Z"
-    },
-    "todo:5": {
-      "task_key": "todo:5",
-      "task_label": "5",
-      "task_title": "Keep Runtime Capabilities Memory-Only and Additive",
-      "session_id": "ses_20e0b6270ffesmsrl7jXCFr4Rm",
+      "task_title": "Add docs regression tests and run targeted/full verification",
+      "session_id": "ses_20746ce34ffev1Z1OeqG1qtWhU",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-05-04T07:50:09.710Z"
-    },
-    "todo:6": {
-      "task_key": "todo:6",
-      "task_label": "6",
-      "task_title": "Implement PreCompact as Memory Checkpoint Continuity",
-      "session_id": "ses_20df841baffeAjUt0K3h6h6Q6l",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-05-04T08:14:11.222Z"
-    },
-    "todo:7": {
-      "task_key": "todo:7",
-      "task_label": "7",
-      "task_title": "Harden Idle and Session Persistence Reason Codes",
-      "session_id": "ses_20de521ceffeN0TS22tPEO8dVl",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-04T08:37:14.337Z"
-    },
-    "todo:8": {
-      "task_key": "todo:8",
-      "task_label": "8",
-      "task_title": "Update Memory-Facing Documentation",
-      "session_id": "ses_20dd2f25affeyAxL89yqhEnJhI",
-      "agent": "Sisyphus-Junior",
-      "category": "writing",
-      "updated_at": "2026-05-04T08:50:48.966Z"
-    },
-    "todo:11": {
-      "task_key": "todo:11",
-      "task_label": "11",
-      "task_title": "Consolidate Integration Verification",
-      "session_id": "ses_20dcffdd4ffetHHV3xhePZX5Jk",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-04T08:57:08.772Z"
+      "updated_at": "2026-05-05T15:21:32.486Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
       "task_title": "Plan Compliance Audit — oracle",
-      "session_id": "ses_20dc97cc4ffemuNHPEccE5Ho0m",
-      "agent": "oracle",
-      "category": "",
-      "updated_at": "2026-05-04T09:01:57.169Z"
+      "session_id": "ses_2073e2e81ffeeiwtFjbFqi5cm5",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-05T15:31:40.799Z"
     }
   }
 }
