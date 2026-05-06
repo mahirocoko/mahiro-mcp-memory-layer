@@ -56,7 +56,7 @@ flowchart LR
 - `memory_context`
 - `runtime_capabilities`
 
-`runtime_capabilities` อยู่ในขอบเขตของ memory เท่านั้น และรายงานเฉพาะ current plugin-native memory contract กับ lifecycle flags.
+`runtime_capabilities` อยู่ในขอบเขตของ memory เท่านั้น และรายงาน current plugin-native memory contract: tool names, lifecycle flags, และ memory protocol guidelines.
 
 ### เส้นทาง standalone หรือ source-checkout MCP
 
@@ -115,7 +115,7 @@ sequenceDiagram
 
 - `memory_context` ใช้ inspect session-scoped continuity cache และ memory diagnostics.
 - `inspect_memory_retrieval` อธิบายข้อมูล hit, miss, degraded, query, และ provenance.
-- `runtime_capabilities` รายงาน current plugin-native memory contract.
+- `runtime_capabilities` รายงาน current plugin-native memory contract รวมถึง tool names, lifecycle flags, และ memory protocol guidelines.
 
 เมื่อ retrieval ส่งกลับ `returnedMemoryIds: []`, `contextSize: 0`, และ `degraded: false` นั่นคือ empty success ไม่ใช่ degraded retrieval.
 

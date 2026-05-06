@@ -89,7 +89,7 @@ These stages describe memory continuity work only. Compaction continuity is a me
 
 `memory_context` exposes the session-scoped continuity cache and memory diagnostics for debugging.
 
-`runtime_capabilities` is plugin-native and reports memory capability flags only, including lifecycle diagnostics and compaction continuity availability.
+`runtime_capabilities` is plugin-native and reports the active memory capability contract: tool names, lifecycle availability flags, and the memory protocol guidelines exposed in startup context.
 
 ## Commands
 
@@ -106,6 +106,7 @@ bun run reindex
 ## Docs map
 
 - `README.md` — package overview and human-facing reference
+- `ARCHITECTURE.md` — current architecture, lifecycle diagrams, and MemPalace-inspired adaptation boundary
 - `MCP_USAGE.md` — AI-facing runtime/tool guide
 - `CONTINUITY_DEBUGGING.md` — continuity and memory debugging guide
 - `ARCHITECTURE_BOUNDARIES.md` — memory-only package boundary

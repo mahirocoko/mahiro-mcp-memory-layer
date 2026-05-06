@@ -25,6 +25,7 @@
     "src/memory-viewer.ts",
     "README.md",
     "AGENTS.md",
+    "ARCHITECTURE.md",
     "MCP_USAGE.md",
     "CONTINUITY_DEBUGGING.md",
     "ARCHITECTURE_BOUNDARIES.md",

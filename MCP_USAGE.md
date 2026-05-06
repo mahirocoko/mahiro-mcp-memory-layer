@@ -37,7 +37,7 @@ Plugin-path notes:
 
 - `memory_context` exposes session-scoped continuity cache and runtime metadata, separate from durable memory records.
 - `runtime_capabilities` reports the plugin-native memory surface that is currently available.
-- `runtime_capabilities` stays memory-scoped and includes lifecycle diagnostics and compaction continuity flags only.
+- `runtime_capabilities` stays memory-scoped and includes tool names, lifecycle diagnostics, compaction continuity flags, and memory protocol guidelines.
 - session-start wake-up, turn preflight, idle persistence, and compaction continuity are plugin-native memory behaviors.
 
 Memory lifecycle contract:
@@ -67,8 +67,10 @@ Current shape:
 - `memory.memoryContextToolAvailable`
 - `memory.lifecycleDiagnosticsAvailable`
 - `memory.compactionContinuityAvailable`
+- `memory.memoryProtocol.version`
+- `memory.memoryProtocol.guidelines`
 
-This object is a memory contract, not a hook runtime contract.
+This object is a memory contract, not a hook runtime contract. The protocol guidelines are startup/orientation guidance for memory use; they do not create workflow ownership.
 
 ## `memory_context`
 

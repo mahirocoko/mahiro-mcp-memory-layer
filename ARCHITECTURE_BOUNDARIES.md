@@ -55,7 +55,7 @@ These remain part of the package only because they stay memory-centric:
 
 `memory_context` is for session-scoped continuity cache inspection. `runtime_capabilities` is for plugin-native memory surface inspection.
 
-Both are memory diagnostics only. They report the memory protocol, lifecycle diagnostics, and compaction continuity state, but they do not define host runtime behavior.
+Both are memory diagnostics only. They report tool names, the memory protocol, lifecycle diagnostics, and compaction continuity state, but they do not define host runtime behavior.
 
 ## Ownership rule
 

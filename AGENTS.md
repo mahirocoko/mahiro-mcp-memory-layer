@@ -3,6 +3,7 @@
 Start here, then load the narrower doc that matches your task.
 
 - Use `README.md` for package overview, install, and human-facing command/reference material.
+- Use `ARCHITECTURE.md` for the current system shape, lifecycle diagrams, storage/retrieval model, and MemPalace-inspired adaptation boundary.
 - Use `ARCHITECTURE_BOUNDARIES.md` when the task is about long-term package scope or the intended memory boundary.
 - Use `AGENT_NEXT_STEPS.md` when the task is about current direction or follow-up work.
 - Use `MCP_USAGE.md` for the practical runtime/tool surface.
