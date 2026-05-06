@@ -1,0 +1,17 @@
+Task 6 full verification evidence
+Date: 2026-05-06T16:54+07:00
+
+Commands run:
+- rtk bun run typecheck: exit 0 (tsc -p tsconfig.json --noEmit)
+- rtk bun run test: exit 0 (18 files passed, 149 tests passed)
+- rtk bun run build: exit 0 (tsc -p tsconfig.json)
+
+Scoped diff/status review:
+- Required native command run: git diff -- ARCHITECTURE.md MCP_USAGE.md src/features/memory/types.ts src/features/memory/memory-service.ts tests/memory-service.test.ts
+- Diff output covered src/features/memory/types.ts, src/features/memory/memory-service.ts, and tests/memory-service.test.ts.
+- ARCHITECTURE.md is currently untracked, so it was reviewed by direct file read instead of diff output.
+- MCP_USAGE.md had no scoped diff.
+- Status before evidence write showed expected plan source/doc changes: ARCHITECTURE.md untracked; memory-service/types/tests modified.
+- Also present before evidence write: .sisyphus/boulder.json modified, .sisyphus/plans/mempalace-review-hints-adaptation.md untracked, and notepad directory untracked as orchestration/notepad artifacts; plan file was not modified.
+
+No commits were created. bun run reindex was not run.

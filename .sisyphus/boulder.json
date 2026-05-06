@@ -1,56 +1,74 @@
 {
-  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/empty-retrieval-diagnostics-docs.md",
-  "started_at": "2026-05-05T14:37:58.850Z",
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/mempalace-review-hints-adaptation.md",
+  "started_at": "2026-05-06T09:23:45.101Z",
   "session_ids": [
-    "ses_2076cf783ffeUSvoexHSr3vYxf",
-    "ses_2076b7609ffeTb2DmzAdCZEgIL",
-    "ses_2076b75d6ffdnF16QcMJZoB4Or",
-    "ses_2076b75d0ffeCSiTMH8iWxThoZ"
+    "ses_203664b03ffe8kQ5KjS6pFhAaB",
+    "ses_203658a19ffeA2AeZklmLBfdZK",
+    "ses_2036589f2ffeabOdxqjaOU9x1I",
+    "ses_2036589edffelc5a5v2w1gMBNI"
   ],
   "session_origins": {
-    "ses_2076cf783ffeUSvoexHSr3vYxf": "direct",
-    "ses_2076b7609ffeTb2DmzAdCZEgIL": "appended",
-    "ses_2076b75d6ffdnF16QcMJZoB4Or": "appended",
-    "ses_2076b75d0ffeCSiTMH8iWxThoZ": "appended"
+    "ses_203664b03ffe8kQ5KjS6pFhAaB": "direct",
+    "ses_203658a19ffeA2AeZklmLBfdZK": "appended",
+    "ses_2036589f2ffeabOdxqjaOU9x1I": "appended",
+    "ses_2036589edffelc5a5v2w1gMBNI": "appended"
   },
-  "plan_name": "empty-retrieval-diagnostics-docs",
+  "plan_name": "mempalace-review-hints-adaptation",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Verify source-of-truth retrieval semantics",
-      "session_id": "ses_207691f2effeOybwwgOvgDSSt4",
+      "task_title": "Update architecture adaptation matrix",
+      "session_id": "ses_20360180fffexv0DzOOJsLH5Hv",
       "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-05-05T14:43:17.367Z"
+      "category": "writing",
+      "updated_at": "2026-05-06T09:32:08.146Z"
     },
     "todo:2": {
       "task_key": "todo:2",
       "task_label": "2",
-      "task_title": "Update `CONTINUITY_DEBUGGING.md` with the primary troubleshooting matrix",
-      "session_id": "ses_2075960ffffe7DiBZ7mxydCRk7",
+      "task_title": "Add review-hint contract tests first",
+      "session_id": "ses_203596139ffeA3wBFyw49MiCww",
       "agent": "Sisyphus-Junior",
-      "category": "writing",
-      "updated_at": "2026-05-05T15:00:52.291Z"
+      "category": "deep",
+      "updated_at": "2026-05-06T09:44:32.527Z"
     },
     "todo:4": {
       "task_key": "todo:4",
       "task_label": "4",
-      "task_title": "Add docs regression tests and run targeted/full verification",
-      "session_id": "ses_20746ce34ffev1Z1OeqG1qtWhU",
+      "task_title": "Improve review assist suggestions for contradiction and supersession",
+      "session_id": "ses_20351e681ffeX9DisZZjIuL2MZ",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-05-05T15:21:32.486Z"
+      "updated_at": "2026-05-06T09:47:51.585Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Document actor-attributed memory convention",
+      "session_id": "ses_2034f02bcffeJqkGIqAoxxpkvl",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-06T09:50:26.537Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Full verification and boundary review",
+      "session_id": "ses_2034cc951ffeMRjT3mQkueXG5t",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-06T09:57:01.442Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
       "task_title": "Plan Compliance Audit — oracle",
-      "session_id": "ses_2073e2e81ffeeiwtFjbFqi5cm5",
-      "agent": "Sisyphus-Junior",
-      "category": "writing",
-      "updated_at": "2026-05-05T15:31:40.799Z"
+      "session_id": "ses_2034653ddffew9tFMkN2Hrg7X8",
+      "agent": "oracle",
+      "category": "",
+      "updated_at": "2026-05-06T10:01:42.898Z"
     }
   }
 }

@@ -520,15 +520,15 @@ describe("memory service core", () => {
     ]);
 
     const contradictionAssist = await service.getReviewAssist({ id: contradiction.id });
-    expect(contradictionAssist.suggestions).toEqual([
-      {
-        kind: "resolve_contradiction",
-        rationale: "Shares topic words with verified memory but flips policy-style polarity.",
-        relatedMemoryIds: [verified.id],
-        draftContent: `Review conflict between verified memory: "Always run smoke tests before deploy." and proposed memory: "Never run smoke tests before deploy.".`,
-        suggestedAction: "edit_then_promote",
-      },
-    ]);
+      expect(contradictionAssist.suggestions).toEqual([
+        {
+          kind: "resolve_contradiction",
+          rationale: "Shares topic words with verified memory but flips policy-style polarity.",
+          relatedMemoryIds: [verified.id],
+          draftContent: `Compare verified memory: "Always run smoke tests before deploy." against proposed memory: "Never run smoke tests before deploy." before deciding whether to edit/promote, defer, or reject.`,
+          suggestedAction: "edit_then_promote",
+        },
+      ]);
 
     const duplicateAssist = await service.getReviewAssist({ id: overview.find((item) => item.content === "Always run smoke tests before deploy.")!.id });
     expect(duplicateAssist.suggestions).toEqual([
@@ -540,6 +540,366 @@ describe("memory service core", () => {
         suggestedAction: "edit_then_promote",
       },
     ]);
+  });
+
+  it("emits possible_supersession for newer same-scope updates and keeps verified records unchanged", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      const verified = await service.remember({
+        content: "We run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-22T00:00:00.000Z",
+        verificationEvidence: [{ type: "human", value: "release-review" }],
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      const supersession = await service.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      const beforeReview = await fixture.logStore.readAll();
+      const verifiedBefore = beforeReview.find((record) => record.id === verified.id);
+
+      const overview = await service.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(overview.find((item) => item.id === supersession.id)?.hints).toEqual([
+        {
+          type: "possible_supersession",
+          relatedMemoryIds: [verified.id],
+          note: "May supersede an existing verified memory; review newer evidence before changing memory status.",
+        },
+      ]);
+
+      const assist = await service.getReviewAssist({ id: supersession.id });
+      expect(assist.suggestions).toEqual([
+        {
+          kind: "gather_evidence",
+          rationale: "May supersede an existing verified memory; review newer evidence before changing memory status.",
+          relatedMemoryIds: [verified.id],
+          draftContent: "Compare proposed memory against existing verified memory before deciding whether to edit/promote, defer, or reject.",
+          suggestedAction: "collect_evidence",
+        },
+      ]);
+
+      const afterReview = await fixture.logStore.readAll();
+      const verifiedAfter = afterReview.find((record) => record.id === verified.id);
+
+      expect(verifiedAfter).toEqual(verifiedBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not emit possible_supersession across scopes", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      await service.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "project-a",
+        containerId: "workspace:project-a",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-22T00:00:00.000Z",
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      const pending = await service.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "project-b",
+        containerId: "workspace:project-b",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      const overview = await service.listReviewQueueOverview({
+        projectId: "project-b",
+        containerId: "workspace:project-b",
+      });
+
+      expect(overview.find((item) => item.id === pending.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not emit possible_supersession without a verified comparison memory or explicit update signal", async () => {
+    const fixtureNoVerified = await createFixture();
+    const serviceNoVerified = new MemoryService(
+      fixtureNoVerified.logStore,
+      fixtureNoVerified.table,
+      fixtureNoVerified.embeddingProvider,
+      fixtureNoVerified.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      const pendingNoVerified = await serviceNoVerified.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      const overviewNoVerified = await serviceNoVerified.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(overviewNoVerified.find((item) => item.id === pendingNoVerified.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const fixtureNoSignal = await createFixture();
+    const serviceNoSignal = new MemoryService(
+      fixtureNoSignal.logStore,
+      fixtureNoSignal.table,
+      fixtureNoSignal.embeddingProvider,
+      fixtureNoSignal.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      await serviceNoSignal.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-22T00:00:00.000Z",
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      const pendingNoSignal = await serviceNoSignal.remember({
+        content: "We run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high"],
+        importance: 0.8,
+      });
+
+      const overviewNoSignal = await serviceNoSignal.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(overviewNoSignal.find((item) => item.id === pendingNoSignal.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not emit possible_supersession for older or same-timestamp evidence", async () => {
+    const olderFixture = await createFixture();
+    const olderService = new MemoryService(
+      olderFixture.logStore,
+      olderFixture.table,
+      olderFixture.embeddingProvider,
+      olderFixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      const olderPending = await olderService.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      await olderService.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-23T00:00:00.000Z",
+      });
+
+      const olderOverview = await olderService.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(olderOverview.find((item) => item.id === olderPending.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const sameTimeFixture = await createFixture();
+    const sameTimeService = new MemoryService(
+      sameTimeFixture.logStore,
+      sameTimeFixture.table,
+      sameTimeFixture.embeddingProvider,
+      sameTimeFixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      await sameTimeService.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-22T00:00:00.000Z",
+      });
+
+      const sameTimePending = await sameTimeService.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      const sameTimeOverview = await sameTimeService.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(sameTimeOverview.find((item) => item.id === sameTimePending.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not treat review workflow updatedAt as supersession evidence freshness", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      const pending = await service.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      await service.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+        verifiedAt: "2026-04-23T00:00:00.000Z",
+      });
+
+      vi.setSystemTime(new Date("2026-04-24T00:00:00.000Z"));
+      await service.reviewMemory({
+        id: pending.id,
+        action: "defer",
+        note: "Needs reviewer follow-up, not newer evidence.",
+      });
+
+      const overview = await service.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(overview.find((item) => item.id === pending.id)?.updatedAt).toBe("2026-04-24T00:00:00.000Z");
+      expect(overview.find((item) => item.id === pending.id)?.hints).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("enqueues memory proposals from conversation into the review queue", async () => {

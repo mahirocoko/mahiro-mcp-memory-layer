@@ -161,7 +161,7 @@ export interface ListReviewQueueInput {
   readonly limit?: number;
 }
 
-export type MemoryReviewHintType = "likely_duplicate" | "possible_contradiction";
+export type MemoryReviewHintType = "likely_duplicate" | "possible_contradiction" | "possible_supersession";
 export type MemoryReviewAssistKind = "merge_duplicate" | "resolve_contradiction" | "gather_evidence";
 
 export interface MemoryReviewHint {
@@ -199,6 +199,7 @@ export interface ReviewAssistSuggestion {
   readonly kind: MemoryReviewAssistKind;
   readonly rationale: string;
   readonly relatedMemoryIds: readonly string[];
+  /** Reviewer-facing guidance only; do not treat as truth replacement. */
   readonly draftContent?: string;
   readonly suggestedAction: MemoryReviewAction | "collect_evidence";
 }

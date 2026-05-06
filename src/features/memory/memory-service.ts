@@ -511,6 +511,10 @@ function toReviewQueueOverviewItem(
     priorityScore += 8;
     priorityReasons.push("likely_duplicate");
   }
+  if (hints.some((hint) => hint.type === "possible_supersession")) {
+    priorityScore += 6;
+    priorityReasons.push("possible_supersession");
+  }
 
   return {
     id: record.id,
@@ -554,6 +558,10 @@ function collectReviewHints(
     })
     .map((verified) => verified.id);
 
+  const supersessionIds = verifiedRecords
+    .filter((verified) => isPossibleSupersession(record, verified, recordNorm, recordTokens))
+    .map((verified) => verified.id);
+
   const hints: Array<ReviewQueueOverviewItem["hints"][number]> = [];
 
   if (duplicateIds.length > 0) {
@@ -572,7 +580,53 @@ function collectReviewHints(
     });
   }
 
+  if (supersessionIds.length > 0) {
+    hints.push({
+      type: "possible_supersession",
+      relatedMemoryIds: supersessionIds,
+      note: "May supersede an existing verified memory; review newer evidence before changing memory status.",
+    });
+  }
+
   return hints;
+}
+
+function isPossibleSupersession(
+  record: MemoryRecord,
+  verified: MemoryRecord,
+  recordNorm: string,
+  recordTokens: Set<string>,
+): boolean {
+  return (record.verificationStatus ?? "hypothesis") !== "verified"
+    && verified.verificationStatus === "verified"
+    && isSameMemoryScope(record, verified)
+    && normalizeMemoryText(verified.content) !== recordNorm
+    && intersectTokenCount(recordTokens, tokenizeMemoryText(verified.content)) >= 3
+    && hasExplicitUpdateSignal(record)
+    && getEvidenceTime(record) > getEvidenceTime(verified);
+}
+
+function isSameMemoryScope(left: MemoryRecord, right: MemoryRecord): boolean {
+  return left.scope === right.scope
+    && left.projectId === right.projectId
+    && left.containerId === right.containerId;
+}
+
+function getEvidenceTime(record: MemoryRecord): number {
+  const parsed = Date.parse(record.verifiedAt ?? record.createdAt);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function hasExplicitUpdateSignal(record: MemoryRecord): boolean {
+  const searchable = [
+    record.content,
+    ...record.tags,
+    record.source.type,
+    record.source.title ?? "",
+    record.source.uri ?? "",
+  ].join("\n");
+
+  return /\b(?:supersedes|replaces|instead|changed|now|current|updated)\b|\bno\s+longer\b|(?:เปลี่ยน|แทน|ปัจจุบัน|ไม่ใช้แล้ว|ยกเลิก)/iu.test(searchable);
 }
 
 function normalizeMemoryText(value: string): string {
@@ -628,8 +682,21 @@ function buildReviewAssistSuggestions(
         kind: "resolve_contradiction",
         rationale: hint.note,
         relatedMemoryIds: hint.relatedMemoryIds,
-        draftContent: related ? `Review conflict between verified memory: "${related.content}" and proposed memory: "${record.content}".` : record.content,
+        draftContent: related
+          ? `Compare verified memory: "${related.content}" against proposed memory: "${record.content}" before deciding whether to edit/promote, defer, or reject.`
+          : record.content,
         suggestedAction: "edit_then_promote",
+      });
+      continue;
+    }
+
+    if (hint.type === "possible_supersession") {
+      suggestions.push({
+        kind: "gather_evidence",
+        rationale: hint.note,
+        relatedMemoryIds: hint.relatedMemoryIds,
+        draftContent: "Compare proposed memory against existing verified memory before deciding whether to edit/promote, defer, or reject.",
+        suggestedAction: "collect_evidence",
       });
     }
   }
