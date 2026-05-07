@@ -150,7 +150,7 @@ export async function runHybridSearch(input: {
     ...(input.traceProvenance ? { provenance: input.traceProvenance } : {}),
     returnedMemoryIds: items.map((item) => item.id),
     rankingReasonsById: Object.fromEntries(items.map((item) => [item.id, item.reasons])),
-    contextSize: 0,
+    contextSize: contextSizeForItems(items),
     embeddingVersion: input.embeddingProvider.version,
     indexVersion: "v0",
     degraded,
@@ -164,6 +164,10 @@ export async function runHybridSearch(input: {
     },
     trace,
   };
+}
+
+function contextSizeForItems(items: readonly { readonly content: string; readonly summary?: string }[]): number {
+  return items.reduce((total, item) => total + item.content.length + (item.summary?.length ?? 0), 0);
 }
 
 function mergeRetrievalRowsById(primary: readonly RetrievalRow[], secondary: readonly RetrievalRow[]): RetrievalRow[] {

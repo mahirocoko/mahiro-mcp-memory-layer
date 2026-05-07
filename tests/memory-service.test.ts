@@ -1419,6 +1419,7 @@ describe("memory service core", () => {
         degraded: latestTrace.degraded,
       },
     });
+    expect(latestTrace.contextSize).toBeGreaterThan(0);
     expect(latestTrace.provenance).toEqual({
       surface: "tool",
       trigger: "search_memories",
