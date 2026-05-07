@@ -392,6 +392,10 @@ export interface RetrievalTraceEntry {
   readonly provenance?: RetrievalTraceProvenance;
   readonly returnedMemoryIds: readonly string[];
   readonly rankingReasonsById: Record<string, readonly string[]>;
+  /**
+   * `contextSize` is the sum of returned item text payload lengths:
+   * `content.length` plus `summary.length` when present. It is not rendered context length.
+   */
   readonly contextSize: number;
   readonly embeddingVersion: string;
   readonly indexVersion: string;
@@ -411,15 +415,24 @@ export interface InspectMemoryRetrievalInput {
   };
 }
 
+export type InspectMemoryRetrievalSummaryClassification =
+  | "no_trace_found"
+  | "empty_success"
+  | "normal_hit"
+  | "degraded_retrieval";
+
+export interface InspectMemoryRetrievalSummary {
+  readonly classification: InspectMemoryRetrievalSummaryClassification;
+  readonly hit: boolean;
+  readonly returnedCount: number;
+  readonly degraded: boolean;
+}
+
 export interface InspectMemoryRetrievalFoundResult {
   readonly status: "found";
   readonly lookup: "latest" | "request_id";
   readonly trace: RetrievalTraceEntry;
-  readonly summary: {
-    readonly hit: boolean;
-    readonly returnedCount: number;
-    readonly degraded: boolean;
-  };
+  readonly summary: InspectMemoryRetrievalSummary;
 }
 
 export interface InspectMemoryRetrievalEmptyResult {
@@ -430,6 +443,7 @@ export interface InspectMemoryRetrievalEmptyResult {
     readonly projectId?: string;
     readonly containerId?: string;
   };
+  readonly summary?: InspectMemoryRetrievalSummary;
 }
 
 export type InspectMemoryRetrievalResult =

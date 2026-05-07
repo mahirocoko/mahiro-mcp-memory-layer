@@ -1,74 +1,81 @@
 {
-  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/mempalace-review-hints-adaptation.md",
-  "started_at": "2026-05-06T09:23:45.101Z",
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/trusted-memory-diagnostics.md",
+  "started_at": "2026-05-07T14:20:19.434Z",
   "session_ids": [
-    "ses_203664b03ffe8kQ5KjS6pFhAaB",
-    "ses_203658a19ffeA2AeZklmLBfdZK",
-    "ses_2036589f2ffeabOdxqjaOU9x1I",
-    "ses_2036589edffelc5a5v2w1gMBNI"
+    "ses_1fd3069b3ffePOCMY61P95bPz0",
+    "ses_1fd1b452cffe6hp8arkV3Jlz1f",
+    "ses_1fd1b44aeffeNUOVcLaOcF22Kd"
   ],
   "session_origins": {
-    "ses_203664b03ffe8kQ5KjS6pFhAaB": "direct",
-    "ses_203658a19ffeA2AeZklmLBfdZK": "appended",
-    "ses_2036589f2ffeabOdxqjaOU9x1I": "appended",
-    "ses_2036589edffelc5a5v2w1gMBNI": "appended"
+    "ses_1fd3069b3ffePOCMY61P95bPz0": "direct",
+    "ses_1fd1b452cffe6hp8arkV3Jlz1f": "appended",
+    "ses_1fd1b44aeffeNUOVcLaOcF22Kd": "appended"
   },
-  "plan_name": "mempalace-review-hints-adaptation",
+  "plan_name": "trusted-memory-diagnostics",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Update architecture adaptation matrix",
-      "session_id": "ses_20360180fffexv0DzOOJsLH5Hv",
+      "task_title": "Freeze Trusted Diagnostics Contract",
+      "session_id": "ses_1fd190a0dffebsgSuHXbbwsaXM",
       "agent": "Sisyphus-Junior",
-      "category": "writing",
-      "updated_at": "2026-05-06T09:32:08.146Z"
+      "category": "unspecified-high",
+      "updated_at": "2026-05-07T14:49:00.630Z"
     },
     "todo:2": {
       "task_key": "todo:2",
       "task_label": "2",
-      "task_title": "Add review-hint contract tests first",
-      "session_id": "ses_203596139ffeA3wBFyw49MiCww",
+      "task_title": "Harden `contextSize` and Trace Payload Semantics",
+      "session_id": "ses_1fd1538c9ffevj1IlEzS2AD2JU",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-07T14:54:12.339Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Improve `inspectMemoryRetrieval` Summary Classification",
+      "session_id": "ses_1fd103edaffet39jI634BB1q9y",
       "agent": "Sisyphus-Junior",
       "category": "deep",
-      "updated_at": "2026-05-06T09:44:32.527Z"
+      "updated_at": "2026-05-07T14:58:01.789Z"
     },
     "todo:4": {
       "task_key": "todo:4",
       "task_label": "4",
-      "task_title": "Improve review assist suggestions for contradiction and supersession",
-      "session_id": "ses_20351e681ffeX9DisZZjIuL2MZ",
+      "task_title": "Pin Scoped Lookup, Request ID, Provenance, and Ranking Reason Boundaries",
+      "session_id": "ses_1fd0cdbc3ffe4HpMSFpXn909Hj",
       "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-05-06T09:47:51.585Z"
+      "category": "unspecified-high",
+      "updated_at": "2026-05-07T15:03:22.459Z"
     },
     "todo:5": {
       "task_key": "todo:5",
       "task_label": "5",
-      "task_title": "Document actor-attributed memory convention",
-      "session_id": "ses_2034f02bcffeJqkGIqAoxxpkvl",
+      "task_title": "Align Diagnostics Documentation and Optional Trace-Store Resilience",
+      "session_id": "ses_1fd076d84ffebQ7H2be5kCQFku",
       "agent": "Sisyphus-Junior",
       "category": "writing",
-      "updated_at": "2026-05-06T09:50:26.537Z"
+      "updated_at": "2026-05-07T15:08:57.140Z"
     },
     "todo:6": {
       "task_key": "todo:6",
       "task_label": "6",
-      "task_title": "Full verification and boundary review",
-      "session_id": "ses_2034cc951ffeMRjT3mQkueXG5t",
+      "task_title": "Full Verification and Evidence Packaging",
+      "session_id": "ses_1fd02cbdfffeQaPOGrCVNmetwX",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-05-06T09:57:01.442Z"
+      "updated_at": "2026-05-07T15:13:30.630Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
       "task_title": "Plan Compliance Audit — oracle",
-      "session_id": "ses_2034653ddffew9tFMkN2Hrg7X8",
+      "session_id": "ses_1fcfc9defffeD0jOzkSBsI5Lia",
       "agent": "oracle",
       "category": "",
-      "updated_at": "2026-05-06T10:01:42.898Z"
+      "updated_at": "2026-05-07T15:17:42.432Z"
     }
   }
 }

@@ -1,0 +1,40 @@
+# Task 6 Full Verification and Evidence Packaging
+
+## Verification result summary
+
+- Focused Task 2-5 tests passed before full verification:
+  - `rtk bun test tests/memory-service.test.ts -t contextSize`
+  - `rtk bun test tests/memory-service.test.ts -t "classifies inspect retrieval summary"`
+  - `rtk bun test tests/memory-service.test.ts -t "degraded empty retrieval"`
+  - `rtk bun test tests/memory-service.test.ts -t "latest retrieval trace for a matching project scope"`
+  - `rtk bun test tests/product-memory-plugin.test.ts -t "inspect_memory_retrieval scopes latest lookup"`
+  - `rtk bun test tests/continuity-debugging-docs.test.ts`
+- Full repo verification passed in AGENTS.md order:
+  - `rtk bun run typecheck` exited 0.
+  - `rtk bun run test` exited 0.
+  - `rtk bun run build` exited 0.
+- Combined focused and full verification output is saved in `.sisyphus/evidence/task-6-full-verification.txt`.
+- Final git status is saved in `.sisyphus/evidence/task-6-git-status.txt`.
+- Evidence existence check is saved in `.sisyphus/evidence/task-6-evidence-check.txt`.
+
+## Evidence index for Tasks 1-6
+
+- `.sisyphus/evidence/task-1-contract.txt`
+- `.sisyphus/evidence/task-1-latest-scope-schema.txt`
+- `.sisyphus/evidence/task-2-context-size.txt`
+- `.sisyphus/evidence/task-2-context-size-docs.txt`
+- `.sisyphus/evidence/task-3-summary-classification.txt`
+- `.sisyphus/evidence/task-3-degraded-empty.txt`
+- `.sisyphus/evidence/task-4-plugin-scope.txt`
+- `.sisyphus/evidence/task-4-schema-boundary.txt`
+- `.sisyphus/evidence/task-5-docs-test.txt`
+- `.sisyphus/evidence/task-5-latest-scope-docs.txt`
+- `.sisyphus/evidence/task-6-typecheck.txt`
+- `.sisyphus/evidence/task-6-test.txt`
+- `.sisyphus/evidence/task-6-build.txt`
+- `.sisyphus/evidence/task-6-git-status.txt`
+- `.sisyphus/evidence/task-6-summary.txt`
+- `.sisyphus/evidence/task-6-full-verification.txt`
+- `.sisyphus/evidence/task-6-evidence-check.txt`
+
+Generated: 2026-05-07T22:12:00

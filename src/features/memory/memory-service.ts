@@ -455,16 +455,30 @@ export class MemoryService {
         lookup: payload.requestId ? "request_id" : "latest",
         ...(payload.requestId ? { requestId: payload.requestId } : {}),
         ...(!payload.requestId && payload.latestScopeFilter ? { latestScopeFilter: payload.latestScopeFilter } : {}),
+        summary: {
+          classification: "no_trace_found",
+          hit: false,
+          returnedCount: 0,
+          degraded: false,
+        },
       };
     }
+
+    const returnedCount = trace.returnedMemoryIds.length;
+    const classification = trace.degraded
+      ? "degraded_retrieval"
+      : returnedCount > 0
+        ? "normal_hit"
+        : "empty_success";
 
     return {
       status: "found",
       lookup: payload.requestId ? "request_id" : "latest",
       trace,
       summary: {
-        hit: trace.returnedMemoryIds.length > 0,
-        returnedCount: trace.returnedMemoryIds.length,
+        classification,
+        hit: returnedCount > 0,
+        returnedCount,
         degraded: trace.degraded,
       },
     };

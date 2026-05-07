@@ -1,0 +1,22 @@
+# Task 6 evidence existence check
+
+OK .sisyphus/evidence/task-1-contract.txt
+OK .sisyphus/evidence/task-1-latest-scope-schema.txt
+OK .sisyphus/evidence/task-2-context-size.txt
+OK .sisyphus/evidence/task-2-context-size-docs.txt
+OK .sisyphus/evidence/task-3-summary-classification.txt
+OK .sisyphus/evidence/task-3-degraded-empty.txt
+OK .sisyphus/evidence/task-4-plugin-scope.txt
+OK .sisyphus/evidence/task-4-schema-boundary.txt
+OK .sisyphus/evidence/task-5-docs-test.txt
+OK .sisyphus/evidence/task-5-latest-scope-docs.txt
+OK .sisyphus/evidence/task-6-typecheck.txt
+OK .sisyphus/evidence/task-6-test.txt
+OK .sisyphus/evidence/task-6-build.txt
+OK .sisyphus/evidence/task-6-git-status.txt
+OK .sisyphus/evidence/task-6-summary.txt
+OK .sisyphus/evidence/task-6-full-verification.txt
+OK .sisyphus/evidence/task-6-evidence-check.txt
+
+Required files checked: 17
+Missing files: 0

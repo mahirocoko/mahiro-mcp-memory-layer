@@ -1,0 +1,18 @@
+src/features/memory/types.ts:396:   * `contextSize` is the sum of returned item text payload lengths:
+src/features/memory/types.ts:399:  readonly contextSize: number;
+src/features/memory/retrieval/hybrid-search.ts:153:    contextSize: contextSizeForItems(items),
+src/features/memory/retrieval/hybrid-search.ts:169:function contextSizeForItems(items: readonly { readonly content: string; readonly summary?: string }[]): number {
+tests/memory-service.test.ts:1476:    expect(latestTrace.contextSize).toBeGreaterThan(0);
+tests/memory-service.test.ts:1485:  it("records contextSize as the returned item text payload size for mem-001", async () => {
+tests/memory-service.test.ts:1493:    const content = "mem-001 deterministic trace payload content for contextSize.";
+tests/memory-service.test.ts:1519:      query: "deterministic trace payload contextSize",
+tests/memory-service.test.ts:1535:    expect(audit.trace.contextSize).toBe(expectedContextSize);
+tests/memory-service.test.ts:1536:    expect(audit.trace.contextSize).toBeGreaterThan(0);
+tests/memory-service.test.ts:1539:  it("keeps contextSize independent from rendered context truncation length", async () => {
+tests/memory-service.test.ts:1547:    const content = "mem-001 long deterministic trace payload content for contextSize that cannot fit inside the tiny rendered context budget.";
+tests/memory-service.test.ts:1573:      task: "deterministic trace payload contextSize",
+tests/memory-service.test.ts:1590:    expect(audit.trace.contextSize).toBe(expectedContextSize);
+tests/memory-service.test.ts:1591:    expect(audit.trace.contextSize).not.toBe(contextResult.context.length);
+tests/memory-service.test.ts:1592:    expect(audit.trace.contextSize).toBeGreaterThan(contextResult.context.length);
+CONTINUITY_DEBUGGING.md:46:| Trace found, empty success | `returnedMemoryIds: []` | `contextSize: 0`, `degraded: false` | Retrieval completed, but no matching or scoped context was returned. This can happen when `projectId` or `containerId` is wrong or missing, records exist globally but not in the current project scope, storage was reset, or storage was never seeded. |
+CONTINUITY_DEBUGGING.md:50:`returnedMemoryIds: []`, `contextSize: 0`, and `degraded: false` means the retrieval finished cleanly, but no scoped context was returned. That is a durable memory result, not proof that the continuity cache is empty.

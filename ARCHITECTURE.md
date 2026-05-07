@@ -117,7 +117,9 @@ sequenceDiagram
 - `inspect_memory_retrieval` อธิบายข้อมูล hit, miss, degraded, query, และ provenance.
 - `runtime_capabilities` รายงาน current plugin-native memory contract รวมถึง tool names, lifecycle flags, และ memory protocol guidelines.
 
-เมื่อ retrieval ส่งกลับ `returnedMemoryIds: []`, `contextSize: 0`, และ `degraded: false` นั่นคือ empty success ไม่ใช่ degraded retrieval.
+เมื่อ retrieval ส่งกลับ `returnedMemoryIds: []`, `contextSize: 0`, และ `degraded: false` นั่นคือ `empty_success` ไม่ใช่ `degraded_retrieval`. `contextSize` คือ returned item payload size, `content.length` บวก `summary.length` เมื่อมี summary, ไม่ใช่ rendered context length และไม่ใช่ continuity-cache size.
+
+`inspect_memory_retrieval` รับ public input เป็น `requestId` เท่านั้น. ถ้า plugin path เรียกแบบไม่มี `requestId`, runtime อาจ inject latest scoped lookup metadata ภายในและส่ง `latestScopeFilter` ออกมาเป็น diagnostic metadata เมื่อ scoped latest lookup empty. `latestScopeFilter` จึงไม่ใช่ public input contract.
 
 ## นโยบาย review และ save
 

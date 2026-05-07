@@ -1,0 +1,3 @@
+== Full verification: typecheck ==
+Command: rtk bun run typecheck
+$ tsc -p tsconfig.json --noEmit

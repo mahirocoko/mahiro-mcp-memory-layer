@@ -1,0 +1,11 @@
+$ vitest run tests/memory-service.test.ts -t contextSize
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/memory-service.test.ts (34 tests | 32 skipped) 30ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 32 skipped (34)
+   Start at  21:53:32
+   Duration  456ms (transform 113ms, setup 0ms, collect 213ms, tests 30ms, environment 0ms, prepare 38ms)
+

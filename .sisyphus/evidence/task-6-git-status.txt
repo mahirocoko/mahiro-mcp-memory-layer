@@ -1,0 +1,28 @@
+ M .sisyphus/boulder.json
+ M .sisyphus/evidence/task-6-full-verification.txt
+ M ARCHITECTURE.md
+ M CONTINUITY_DEBUGGING.md
+ M MCP_USAGE.md
+ M src/features/memory/memory-service.ts
+ M src/features/memory/types.ts
+ M tests/continuity-debugging-docs.test.ts
+ M tests/memory-service.test.ts
+ M tests/product-memory-plugin.test.ts
+?? .sisyphus/evidence/task-1-contract.txt
+?? .sisyphus/evidence/task-1-latest-scope-schema.txt
+?? .sisyphus/evidence/task-2-context-size-docs.txt
+?? .sisyphus/evidence/task-2-context-size.txt
+?? .sisyphus/evidence/task-3-degraded-empty.txt
+?? .sisyphus/evidence/task-3-summary-classification.txt
+?? .sisyphus/evidence/task-4-plugin-scope.txt
+?? .sisyphus/evidence/task-4-schema-boundary.txt
+?? .sisyphus/evidence/task-5-docs-test.txt
+?? .sisyphus/evidence/task-5-latest-scope-docs.txt
+?? .sisyphus/evidence/task-6-build.txt
+?? .sisyphus/evidence/task-6-evidence-check.txt
+?? .sisyphus/evidence/task-6-git-status.txt
+?? .sisyphus/evidence/task-6-summary.txt
+?? .sisyphus/evidence/task-6-test.txt
+?? .sisyphus/evidence/task-6-typecheck.txt
+?? .sisyphus/notepads/trusted-memory-diagnostics/
+?? .sisyphus/plans/trusted-memory-diagnostics.md

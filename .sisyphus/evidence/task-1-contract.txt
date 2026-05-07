@@ -1,0 +1,36 @@
+- Scope: `inspect_memory_retrieval`, retrieval trace entries, scoped latest lookup behavior, request-id lookup behavior, provenance, ranking reasons, `contextSize`, and explicit diagnostics classification.
+- `latestScopeFilter` must not be exposed as a public MCP input parameter. It is plugin/runtime-injected internal diagnostic metadata used when no `requestId` is supplied.
+- `src/features/memory/memory-service.ts` implements lookup order: `requestId` first, then `latestScopeFilter`, then global latest.
+- `src/features/memory/retrieval/hybrid-search.ts` emits retrieval traces and currently computes `contextSize` from returned item `content.length + summary.length` for every returned item.
+- `src/features/memory/observability/retrieval-trace.ts` reads JSONL traces, returns missing-file as empty, and currently throws on malformed non-empty JSONL lines.
+- `src/features/memory/schemas.ts` exposes public `inspect_memory_retrieval` input with `requestId` only.
+- `src/features/opencode-plugin/runtime-shell.ts` injects `latestScopeFilter` from active session scope when the plugin tool is called without `requestId`; explicit `requestId` lookup remains unscoped.
+- `requestId`: generated trace id for exact lookup.
+- `provenance`: optional origin metadata with `surface`, `trigger`, `phase`, and `searchScope`.
+- `contextSize`: current computed size from returned item content plus summary lengths.
+## `contextSize`
+- `contextSize` is the sum of every returned item's `content.length` plus `summary.length` when a summary exists.
+- Empty retrieval with no returned ids should produce `contextSize: 0` when a trace exists.
+- `contextSize` is not currently the rendered prompt length and is not the continuity-cache size.
+## summary classification
+| Empty success | `status: "found"`, `returnedMemoryIds: []`, `contextSize: 0`, `degraded: false` | Retrieval completed cleanly but returned no scoped memories. |
+## Latest scoped lookup and `latestScopeFilter`
+- When no `requestId` is supplied through the plugin tool and an active session scope exists, the plugin runtime injects `latestScopeFilter` with `projectId` and `containerId` from session scope.
+- `latestScopeFilter` is internal/plugin-side input to the memory backend, not public MCP input.
+- The backend uses `latestScopeFilter` to scan traces from newest to oldest and return the latest trace whose `enforcedFilters.projectId` and `enforcedFilters.containerId` match supplied filter fields.
+- If the scoped latest lookup misses, the empty result includes the attempted `latestScopeFilter`. This is output/internal diagnostic metadata, not a public input contract.
+## `requestId` lookup
+- `requestId` lookup takes precedence over all latest lookup behavior.
+- Public `inspect_memory_retrieval` input exposes `requestId` only.
+- Missing request id returns `status: "empty"`, `lookup: "request_id"`, and echoes `requestId`.
+## provenance
+- `provenance` is optional trace metadata, not an authorization boundary.
+- Tool calls should use memory-service/tool provenance such as `surface: "tool"`, `trigger: "search_memories"`, and `phase: "search"` when emitted by the stable tool path.
+## malformed JSONL include/defer
+- Runtime behavior changes for malformed JSONL are deferred from Task 1.
+- Current source inspection shows `RetrievalTraceStore.readAll()` parses each non-empty JSONL line and throws on malformed JSON, while missing trace files return an empty list.
+- Until downstream implementation changes this, malformed JSONL must not be documented as empty success or degraded retrieval.
+- Future handling should distinguish malformed trace storage from no-match lookup and degraded retrieval; this contract intentionally does not choose a breaking public rename.
+Downstream tests may introduce these names to cover scoped hit, scoped miss, request-id hit, request-id miss, empty success, degraded empty retrieval, and ranking/provenance boundaries.
+- Preserve public compatibility for `inspect_memory_retrieval` by keeping `requestId` as the public input.
+- Do not expose `latestScopeFilter` through `src/features/memory/schemas.ts` public MCP input.

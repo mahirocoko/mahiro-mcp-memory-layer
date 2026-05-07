@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getMemoryToolDefinitions, type MemoryToolBackend } from "../src/features/memory/lib/tool-definitions.js";
 import type { PrepareHostTurnMemoryResult } from "../src/features/memory/types.js";
 import { resetOpenCodePluginMemoryBackendSingletonForTests } from "../src/features/opencode-plugin/runtime-shell.js";
+import { getOrCreateSingletonRuntimeState } from "../src/features/opencode-plugin/runtime-state.js";
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
@@ -196,6 +197,30 @@ function expectNoForbiddenPublicRuntimeFieldNames(value: unknown) {
   expectNoForbiddenPublicRuntimeSurfaceNames(collectObjectFieldNames(value));
 }
 
+function pinSessionScopeForInspection(sessionId: string): void {
+  const sessionState = getOrCreateSingletonRuntimeState().sessions.get(sessionId);
+
+  expect(sessionState).toBeDefined();
+  if (!sessionState) {
+    throw new Error(`Expected session state for ${sessionId}`);
+  }
+
+  sessionState.scopeResolution = {
+    status: "complete",
+    scope: {
+      projectId: "project-alpha",
+      containerId: "container-main",
+      sessionId,
+    },
+    missing: [],
+    resolvedFrom: {
+      projectId: "context.project.name",
+      containerId: "context.directory",
+      sessionId: "event.properties.sessionID",
+    },
+  };
+}
+
 function collectObjectFieldNames(value: unknown, fieldNames = new Set<string>()): string[] {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -354,31 +379,32 @@ describe("product memory plugin", () => {
     expectNoForbiddenPublicRuntimeFieldNames(result);
   });
 
-  it("scopes latest retrieval inspection to the active session when no requestId is supplied", async () => {
+  it("inspect_memory_retrieval scopes latest lookup to the active session when no requestId is supplied", async () => {
     const sessionId = "inspect-scoped-session";
     const harness = await createHarness();
 
     await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent(sessionId) });
+    pinSessionScopeForInspection(sessionId);
 
     await harness.hooks.tool?.inspect_memory_retrieval.execute({}, { sessionID: sessionId });
 
     expect(harness.backend.inspectMemoryRetrieval).toHaveBeenLastCalledWith({
       latestScopeFilter: {
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: `directory:${repoRoot}`,
+        projectId: "project-alpha",
+        containerId: "container-main",
       },
     });
   });
 
-  it("keeps requestId retrieval inspection unscoped", async () => {
+  it("inspect_memory_retrieval keeps requestId lookup unscoped", async () => {
     const sessionId = "inspect-request-id-session";
     const harness = await createHarness();
 
     await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent(sessionId) });
 
-    await harness.hooks.tool?.inspect_memory_retrieval.execute({ requestId: "req_123" }, { sessionID: sessionId });
+    await harness.hooks.tool?.inspect_memory_retrieval.execute({ requestId: "req-hit-001" }, { sessionID: sessionId });
 
-    expect(harness.backend.inspectMemoryRetrieval).toHaveBeenLastCalledWith({ requestId: "req_123" });
+    expect(harness.backend.inspectMemoryRetrieval).toHaveBeenLastCalledWith({ requestId: "req-hit-001" });
   });
 
   it("routes OpenCode lifecycle events as memory signals", async () => {

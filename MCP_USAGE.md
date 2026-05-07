@@ -93,9 +93,11 @@ The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and
 
 ## Practical safety reminders
 
+- `inspect_memory_retrieval` exposes `requestId` as the public input. The plugin path may inject scoped latest lookup state internally when no `requestId` is supplied, but `latestScopeFilter` is not a user-facing input.
+- `contextSize` is the returned item text payload size, meaning returned `content.length` plus `summary.length` when a summary exists. It is not rendered context length and it is not the continuity-cache size.
 - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
 - Use `inspect_memory_retrieval` before guessing why retrieval hit, missed, or degraded.
-- When `inspect_memory_retrieval` returns an empty latest lookup with `latestScopeFilter`, the scoped trace lookup missed for that `projectId`/`containerId`; it does not prove the global trace store is empty.
+- When the plugin path returns an empty scoped latest lookup with `latestScopeFilter`, the scoped trace lookup missed for that `projectId`/`containerId`; it does not prove the global trace store is empty.
 - `returnedMemoryIds: []` with `degraded: false` means no scoped matches and no rendered context, not degraded retrieval.
 - Check `projectId` and `containerId`, durable memory records or counts, and `memory_context` continuity cache separately.
 - Prefer the stable memory tools over host-specific session cache details when building product behavior.

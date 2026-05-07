@@ -43,6 +43,29 @@ async function createFixture() {
   };
 }
 
+function retrievalTraceFixture(overrides: Partial<RetrievalTraceEntry>): RetrievalTraceEntry {
+  return {
+    requestId: "req-hit-001",
+    query: "inspect retrieval classification",
+    retrievalMode: "query",
+    enforcedFilters: {
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "container-main",
+    },
+    returnedMemoryIds: ["mem-001"],
+    rankingReasonsById: {
+      "mem-001": ["scope_match", "keyword_match"],
+    },
+    contextSize: 42,
+    embeddingVersion: "test-embedding-v1",
+    indexVersion: "test-index-v1",
+    degraded: false,
+    createdAt: "2026-04-24T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("memory service core", () => {
   it("stores a memory and retrieves it within the same scope", async () => {
     const fixture = await createFixture();
@@ -1468,6 +1491,7 @@ describe("memory service core", () => {
       lookup: "latest",
       trace: latestTrace,
       summary: {
+        classification: "normal_hit",
         hit: true,
         returnedCount: latestTrace.returnedMemoryIds.length,
         degraded: latestTrace.degraded,
@@ -1480,6 +1504,261 @@ describe("memory service core", () => {
       phase: "search",
       searchScope: "project",
     });
+  });
+
+  it("classifies inspect retrieval summary as normal hit for req-hit-001", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const trace = retrievalTraceFixture({ requestId: "req-hit-001" });
+
+    await fixture.traceStore.append(trace);
+
+    const audit = await service.inspectMemoryRetrieval({ requestId: "req-hit-001" });
+
+    expect(audit).toEqual({
+      status: "found",
+      lookup: "request_id",
+      trace,
+      summary: {
+        classification: "normal_hit",
+        hit: true,
+        returnedCount: 1,
+        degraded: false,
+      },
+    });
+  });
+
+  it("classifies inspect retrieval summary as empty success for req-empty-001", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const trace = retrievalTraceFixture({
+      requestId: "req-empty-001",
+      returnedMemoryIds: [],
+      rankingReasonsById: {},
+      contextSize: 0,
+    });
+
+    await fixture.traceStore.append(trace);
+
+    const audit = await service.inspectMemoryRetrieval({ requestId: "req-empty-001" });
+
+    expect(audit).toEqual({
+      status: "found",
+      lookup: "request_id",
+      trace,
+      summary: {
+        classification: "empty_success",
+        hit: false,
+        returnedCount: 0,
+        degraded: false,
+      },
+    });
+  });
+
+  it("classifies inspect retrieval summary as degraded empty retrieval for req-degraded-empty-001", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const trace = retrievalTraceFixture({
+      requestId: "req-degraded-empty-001",
+      returnedMemoryIds: [],
+      rankingReasonsById: {},
+      contextSize: 0,
+      degraded: true,
+    });
+
+    await fixture.traceStore.append(trace);
+
+    const audit = await service.inspectMemoryRetrieval({ requestId: "req-degraded-empty-001" });
+
+    expect(audit).toEqual({
+      status: "found",
+      lookup: "request_id",
+      trace,
+      summary: {
+        classification: "degraded_retrieval",
+        hit: false,
+        returnedCount: 0,
+        degraded: true,
+      },
+    });
+  });
+
+  it("records contextSize as the returned item text payload size for mem-001", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const content = "mem-001 deterministic trace payload content for contextSize.";
+    const summary = "mem-001 deterministic trace summary.";
+    const expectedContextSize = content.length + summary.length;
+
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        {
+          id: "mem-001",
+          kind: "fact",
+          scope: "project",
+          projectId: "project-alpha",
+          containerId: "container-main",
+          source: { type: "manual" },
+          content,
+          summary,
+          tags: [],
+          importance: 0.8,
+          createdAt: "2026-04-24T00:00:00.000Z",
+          updatedAt: "2026-04-24T00:00:00.000Z",
+        },
+        await fixture.embeddingProvider.embedText(`${content}\n${summary}`),
+        fixture.embeddingProvider.version,
+      ),
+    ]);
+
+    const searchResult = await service.search({
+      query: "deterministic trace payload contextSize",
+      mode: "query",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "container-main",
+      limit: 1,
+    });
+
+    const audit = await service.inspectMemoryRetrieval({});
+
+    expect(searchResult.items.map((item) => item.id)).toEqual(["mem-001"]);
+    expect(audit.status).toBe("found");
+    if (audit.status !== "found") {
+      throw new Error("expected retrieval trace to be found");
+    }
+    expect(audit.trace.returnedMemoryIds).toEqual(["mem-001"]);
+    expect(audit.trace.contextSize).toBe(expectedContextSize);
+    expect(audit.trace.contextSize).toBeGreaterThan(0);
+  });
+
+  it("limits rankingReasonsById to coarse diagnostics for returned memory ids", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const coarseReasonLabels = ["scope_match", "keyword_match", "semantic_match"];
+
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        {
+          id: "mem-001",
+          kind: "fact",
+          scope: "project",
+          projectId: "project-alpha",
+          containerId: "container-main",
+          source: { type: "manual" },
+          content: "mem-001 coarse ranking reason boundary keyword payload.",
+          summary: "coarse ranking reason boundary summary.",
+          tags: [],
+          importance: 0.8,
+          createdAt: "2026-04-24T00:00:00.000Z",
+          updatedAt: "2026-04-24T00:00:00.000Z",
+        },
+        await fixture.embeddingProvider.embedText("mem-001 coarse ranking reason boundary keyword payload."),
+        fixture.embeddingProvider.version,
+      ),
+    ]);
+
+    await service.search({
+      query: "coarse ranking reason boundary keyword",
+      mode: "query",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "container-main",
+      limit: 1,
+    });
+
+    const audit = await service.inspectMemoryRetrieval({});
+
+    expect(audit.status).toBe("found");
+    if (audit.status !== "found") {
+      throw new Error("expected retrieval trace to be found");
+    }
+    expect(Object.keys(audit.trace.rankingReasonsById)).toEqual(["mem-001"]);
+    expect(audit.trace.returnedMemoryIds).toEqual(["mem-001"]);
+    expect(audit.trace.rankingReasonsById["mem-001"]).toEqual(expect.arrayContaining(["scope_match", "keyword_match"]));
+    expect(audit.trace.rankingReasonsById["mem-001"]?.every((reason) => coarseReasonLabels.includes(reason))).toBe(true);
+    expect(audit.trace.rankingReasonsById["mem-001"]?.some((reason) => /\d/.test(reason))).toBe(false);
+  });
+
+  it("keeps contextSize independent from rendered context truncation length", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const content = "mem-001 long deterministic trace payload content for contextSize that cannot fit inside the tiny rendered context budget.";
+    const summary = "mem-001 summary still counts toward trace payload size even when the rendered context is truncated.";
+    const expectedContextSize = content.length + summary.length;
+
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        {
+          id: "mem-001",
+          kind: "fact",
+          scope: "project",
+          projectId: "project-alpha",
+          containerId: "container-main",
+          source: { type: "manual" },
+          content,
+          summary,
+          tags: [],
+          importance: 0.8,
+          createdAt: "2026-04-24T00:00:00.000Z",
+          updatedAt: "2026-04-24T00:00:00.000Z",
+        },
+        await fixture.embeddingProvider.embedText(`${content}\n${summary}`),
+        fixture.embeddingProvider.version,
+      ),
+    ]);
+
+    const contextResult = await service.buildContext({
+      task: "deterministic trace payload contextSize",
+      mode: "full",
+      projectId: "project-alpha",
+      containerId: "container-main",
+      maxItems: 1,
+      maxChars: 80,
+    });
+
+    const audit = await service.inspectMemoryRetrieval({});
+
+    expect(contextResult.truncated).toBe(true);
+    expect(contextResult.items).toEqual([]);
+    expect(audit.status).toBe("found");
+    if (audit.status !== "found") {
+      throw new Error("expected retrieval trace to be found");
+    }
+    expect(audit.trace.returnedMemoryIds).toEqual(["mem-001"]);
+    expect(audit.trace.contextSize).toBe(expectedContextSize);
+    expect(audit.trace.contextSize).not.toBe(contextResult.context.length);
+    expect(audit.trace.contextSize).toBeGreaterThan(contextResult.context.length);
   });
 
   it("threads explicit provenance through prepareHostTurnMemory traces", async () => {
@@ -1524,8 +1803,8 @@ describe("memory service core", () => {
         provenance: {
           surface: "opencode-plugin",
           trigger: "message.part.updated",
-          phase: expect.stringMatching(/turn-preflight|prepare-host-turn/),
-          searchScope: expect.any(String),
+          phase: "turn-preflight",
+          searchScope: "project",
         },
       },
     });
@@ -1620,6 +1899,12 @@ describe("memory service core", () => {
       status: "empty",
       lookup: "request_id",
       requestId: "req_missing",
+      summary: {
+        classification: "no_trace_found",
+        hit: false,
+        returnedCount: 0,
+        degraded: false,
+      },
     });
   });
 
@@ -1634,15 +1919,21 @@ describe("memory service core", () => {
 
     await expect(service.inspectMemoryRetrieval({
       latestScopeFilter: {
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: "worktree:/repo-a",
+        projectId: "project-alpha",
+        containerId: "container-main",
       },
     })).resolves.toEqual({
       status: "empty",
       lookup: "latest",
       latestScopeFilter: {
-        projectId: "mahiro-mcp-memory-layer",
-        containerId: "worktree:/repo-a",
+        projectId: "project-alpha",
+        containerId: "container-main",
+      },
+      summary: {
+        classification: "no_trace_found",
+        hit: false,
+        returnedCount: 0,
+        degraded: false,
       },
     });
   });

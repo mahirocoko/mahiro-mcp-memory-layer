@@ -18,13 +18,17 @@ describe("continuity debugging docs", () => {
     ]);
 
     expect(continuityDebugging).toContain("## Empty vs degraded retrieval");
-    expect(continuityDebugging).toContain("returnedMemoryIds: []");
-    expect(continuityDebugging).toContain("degraded: false");
-    expect(continuityDebugging).toContain("degraded: true");
-    expect(continuityDebugging).toContain("projectId");
-    expect(continuityDebugging).toContain("containerId");
+    expect(continuityDebugging).toContain("no_trace_found");
+    expect(continuityDebugging).toContain("empty_success");
+    expect(continuityDebugging).toContain("normal_hit");
+    expect(continuityDebugging).toContain("degraded_retrieval");
+    expect(continuityDebugging).toContain("`contextSize` is the returned item payload size");
+    expect(continuityDebugging).toContain("`requestId` only as public input");
+    expect(continuityDebugging).toContain("latestScopeFilter");
 
+    expect(mcpUsage).toContain("`requestId` as the public input");
+    expect(mcpUsage).toContain("`contextSize` is the returned item text payload size");
+    expect(mcpUsage).toContain("`latestScopeFilter` is not a user-facing input");
     expect(mcpUsage).toContain("returnedMemoryIds: []");
-    expect(mcpUsage).toContain("degraded: false");
   });
 });
