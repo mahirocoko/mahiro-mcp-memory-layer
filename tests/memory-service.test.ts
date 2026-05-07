@@ -902,6 +902,60 @@ describe("memory service core", () => {
     }
   });
 
+  it("uses createdAt as evidence freshness when a verified comparison memory has no verifiedAt", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      const verified = await service.remember({
+        content: "Run smoke tests before deploy.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual" },
+        verificationStatus: "verified",
+      });
+
+      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      const pending = await service.remember({
+        content: "We now run smoke tests before deploy instead of skipping them.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "tool", title: "enqueue_memory_proposal" },
+        verificationStatus: "hypothesis",
+        reviewStatus: "pending",
+        tags: ["review_queue_candidate", "candidate_confidence:high", "supersedes"],
+        importance: 0.8,
+      });
+
+      const overview = await service.listReviewQueueOverview({
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      });
+
+      expect(overview.find((item) => item.id === pending.id)?.hints).toEqual([
+        {
+          type: "possible_supersession",
+          relatedMemoryIds: [verified.id],
+          note: "May supersede an existing verified memory; review newer evidence before changing memory status.",
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("enqueues memory proposals from conversation into the review queue", async () => {
     const fixture = await createFixture();
     const service = new MemoryService(

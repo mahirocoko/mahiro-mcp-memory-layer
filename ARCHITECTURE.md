@@ -130,6 +130,16 @@ memory writes สามารถถูกเสนอ, review, และ promote
 
 Save policy ยังคงอยู่ใน memory boundary และไม่กลายเป็น workflow control.
 
+### Review freshness semantics
+
+Advisory review hints use evidence freshness, not operational recency. For `possible_supersession`, freshness is based on `verifiedAt ?? createdAt`:
+
+- `verifiedAt` is the evidence-origin time for verified records.
+- `createdAt` is the proposal or ingestion evidence fallback when a verified record has no `verifiedAt`, or when a pending hypothesis has not been verified yet.
+- `updatedAt` is bookkeeping time for review actions, reindexing, queue ordering, or other workflow mutations. It must not make a record look like newer evidence.
+
+This keeps supersession hints reviewer-facing and advisory. They identify memories that may need evidence review; they do not decide truth or automatically replace verified memory.
+
 ## อิทธิพลจาก MemPalace โดยไม่คัดลอก
 
 แนวคิดจาก memory-system ก่อนหน้ามีอิทธิพลต่อวินัยของที่นี่ โดยเฉพาะการแยก durable records, derived retrieval data, และ continuity handling. แต่ repo นี้ไม่ได้คัดลอก public vocabulary หรือภาษาของ hierarchy จากระบบนั้นมาใช้ตรง ๆ. เราใช้คำเรียกที่เป็น memory-native ของตัวเอง เช่น memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, และ lifecycle continuity.

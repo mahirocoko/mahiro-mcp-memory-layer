@@ -91,6 +91,8 @@ These stages describe memory continuity work only. Compaction continuity is a me
 
 `runtime_capabilities` is plugin-native and reports the active memory capability contract: tool names, lifecycle availability flags, and the memory protocol guidelines exposed in startup context.
 
+Review hints are advisory. Supersession freshness uses evidence-origin time (`verifiedAt ?? createdAt`), not `updatedAt` bookkeeping time.
+
 ## Commands
 
 ```bash
