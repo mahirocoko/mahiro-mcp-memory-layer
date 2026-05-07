@@ -49,6 +49,8 @@ Use this matrix to separate empty success from degraded retrieval:
 
 `returnedMemoryIds: []`, `contextSize: 0`, and `degraded: false` means the retrieval finished cleanly, but no scoped context was returned. That is a durable memory result, not proof that the continuity cache is empty.
 
+When a latest scoped lookup is empty, `inspect_memory_retrieval` can include `latestScopeFilter` with the attempted `projectId` and `containerId`. Treat that as proof that no matching trace was found for that scope, not proof that no global traces exist.
+
 `degraded: true` means the retrieval path fell back into degraded or fail-open behavior. It may still return IDs, and it is not the same as an empty successful retrieval.
 
 Keep the boundary clear between durable memory records and the `memory_context` continuity cache. The cache can still hold wake-up or turn-preflight state even when durable memory retrieval returns nothing.

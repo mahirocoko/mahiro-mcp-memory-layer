@@ -95,6 +95,7 @@ The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and
 
 - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
 - Use `inspect_memory_retrieval` before guessing why retrieval hit, missed, or degraded.
+- When `inspect_memory_retrieval` returns an empty latest lookup with `latestScopeFilter`, the scoped trace lookup missed for that `projectId`/`containerId`; it does not prove the global trace store is empty.
 - `returnedMemoryIds: []` with `degraded: false` means no scoped matches and no rendered context, not degraded retrieval.
 - Check `projectId` and `containerId`, durable memory records or counts, and `memory_context` continuity cache separately.
 - Prefer the stable memory tools over host-specific session cache details when building product behavior.

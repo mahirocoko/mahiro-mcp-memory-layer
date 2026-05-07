@@ -1567,4 +1567,28 @@ describe("memory service core", () => {
       requestId: "req_missing",
     });
   });
+
+  it("returns the attempted scope filter when scoped latest lookup is empty", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await expect(service.inspectMemoryRetrieval({
+      latestScopeFilter: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "worktree:/repo-a",
+      },
+    })).resolves.toEqual({
+      status: "empty",
+      lookup: "latest",
+      latestScopeFilter: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "worktree:/repo-a",
+      },
+    });
+  });
 });

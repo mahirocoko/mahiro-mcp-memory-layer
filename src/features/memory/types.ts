@@ -426,6 +426,10 @@ export interface InspectMemoryRetrievalEmptyResult {
   readonly status: "empty";
   readonly lookup: "latest" | "request_id";
   readonly requestId?: string;
+  readonly latestScopeFilter?: {
+    readonly projectId?: string;
+    readonly containerId?: string;
+  };
 }
 
 export type InspectMemoryRetrievalResult =

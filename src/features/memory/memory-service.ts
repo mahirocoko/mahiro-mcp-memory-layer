@@ -454,6 +454,7 @@ export class MemoryService {
         status: "empty",
         lookup: payload.requestId ? "request_id" : "latest",
         ...(payload.requestId ? { requestId: payload.requestId } : {}),
+        ...(!payload.requestId && payload.latestScopeFilter ? { latestScopeFilter: payload.latestScopeFilter } : {}),
       };
     }
 

@@ -354,6 +354,33 @@ describe("product memory plugin", () => {
     expectNoForbiddenPublicRuntimeFieldNames(result);
   });
 
+  it("scopes latest retrieval inspection to the active session when no requestId is supplied", async () => {
+    const sessionId = "inspect-scoped-session";
+    const harness = await createHarness();
+
+    await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent(sessionId) });
+
+    await harness.hooks.tool?.inspect_memory_retrieval.execute({}, { sessionID: sessionId });
+
+    expect(harness.backend.inspectMemoryRetrieval).toHaveBeenLastCalledWith({
+      latestScopeFilter: {
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: `directory:${repoRoot}`,
+      },
+    });
+  });
+
+  it("keeps requestId retrieval inspection unscoped", async () => {
+    const sessionId = "inspect-request-id-session";
+    const harness = await createHarness();
+
+    await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent(sessionId) });
+
+    await harness.hooks.tool?.inspect_memory_retrieval.execute({ requestId: "req_123" }, { sessionID: sessionId });
+
+    expect(harness.backend.inspectMemoryRetrieval).toHaveBeenLastCalledWith({ requestId: "req_123" });
+  });
+
   it("routes OpenCode lifecycle events as memory signals", async () => {
     vi.useFakeTimers();
 
