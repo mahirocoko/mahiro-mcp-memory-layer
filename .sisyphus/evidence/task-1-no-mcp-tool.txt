@@ -1,0 +1,9 @@
+## 2026-05-08 - wiki materializer no-MCP surface evidence
+
+- Production MCP/tool surface files were inspected and left unchanged:
+  - `src/features/memory/lib/tool-definitions.ts`
+  - `src/features/memory/mcp/register-tools.ts`
+  - `src/features/opencode-plugin/tool-adapter.ts`
+- Targeted test: `tests/wiki-materializer-contract.test.ts` imports `getMemoryToolDefinitions()` and fails if any tool name or description matches `/wiki|materializ/i`.
+- `rtk bun run test tests/wiki-materializer-contract.test.ts`: PASS, including the no-MCP exposure assertion.
+- The materializer contract is internal and CLI-oriented only; no MCP tool definition, plugin lifecycle hook, or runtime capability surface was added.
