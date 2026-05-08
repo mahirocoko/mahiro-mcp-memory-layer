@@ -1,0 +1,16 @@
+Task 4 QA Scenario: No inference on minimal-field records
+
+- Command: `rtk bun run test tests/wiki-materializer-renderers.test.ts`
+- Result: PASS
+- Covered assertions:
+  - minimal-field record renders explicit `(missing)` labels for absent source URI/title, review status, verifiedAt, updatedAt, and summary
+  - empty tags/evidence render as `(none)`
+  - output stays within provided record fields and does not synthesize inferred narrative text
+  - repeated render calls with reordered identical input produce identical page output
+
+- Command: `rtk bun run typecheck`
+- Result: PASS
+
+Summary:
+- Renderer does not infer or synthesize new facts beyond the selected record fields.
+- Stable ordering follows the existing selector/source-slug boundaries for deterministic output.

@@ -1,0 +1,15 @@
+Task 4 QA Scenario: Verified record page provenance
+
+- Command: `rtk bun run test tests/wiki-materializer-renderers.test.ts`
+- Result: PASS
+- Covered assertions:
+  - every rendered markdown page starts with the generated projection warning
+  - verified record page includes memory ID, kind, scope, project/container IDs, verification status, explicit review status label, source URI/title/type, verification evidence, and content block
+  - index/source pages use relative links and stable source grouping
+
+- Command: `rtk bun run typecheck`
+- Result: PASS
+
+Summary:
+- Renderer output is deterministic and provenance-only for the tested verified doc record.
+- Markdown pages clearly state they are generated projections and not canonical source of truth.
