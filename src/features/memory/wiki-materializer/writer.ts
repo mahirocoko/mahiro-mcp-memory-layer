@@ -32,6 +32,13 @@ const canonicalMemoryDirectories = [
   paths.canonicalLogFilePath,
   paths.retrievalTraceFilePath,
 ] as const;
+const unsafeExplicitRepoPathSegments = [
+  ".sisyphus",
+  "src",
+  "tests",
+  "docs",
+  "data",
+] as const;
 
 export async function writeWikiMaterialization(input: WriteWikiMaterializationInput): Promise<WikiMaterializationWriteResult> {
   const layout = resolveWikiOutputLayout(input.layoutOptions);
@@ -116,10 +123,32 @@ function assertSafeWikiOutputDirectory(scopeDirectory: string, outputDirProvided
     if (!isPathInsideOrEqual(resolvedScopeDirectory, defaultRootDirectory)) {
       throw new Error(`Unsafe wiki output directory: ${resolvedScopeDirectory}`);
     }
+  } else {
+    assertSafeExplicitWikiOutputDirectory(resolvedScopeDirectory);
   }
 
   for (const unsafeDirectory of canonicalMemoryDirectories) {
     if (pathsOverlap(resolvedScopeDirectory, path.resolve(unsafeDirectory))) {
+      throw new Error(`Unsafe wiki output directory: ${resolvedScopeDirectory}`);
+    }
+  }
+}
+
+function assertSafeExplicitWikiOutputDirectory(resolvedScopeDirectory: string): void {
+  const appRoot = path.resolve(paths.appRoot);
+  const defaultRootDirectory = resolveDefaultWikiRootDirectory();
+
+  if (isPathInsideOrEqual(appRoot, resolvedScopeDirectory)) {
+    throw new Error(`Unsafe wiki output directory: ${resolvedScopeDirectory}`);
+  }
+
+  if (isPathInsideOrEqual(resolvedScopeDirectory, appRoot)
+    && !isPathInsideOrEqual(resolvedScopeDirectory, defaultRootDirectory)) {
+    throw new Error(`Unsafe wiki output directory: ${resolvedScopeDirectory}`);
+  }
+
+  for (const segment of unsafeExplicitRepoPathSegments) {
+    if (pathsOverlap(resolvedScopeDirectory, path.join(appRoot, segment))) {
       throw new Error(`Unsafe wiki output directory: ${resolvedScopeDirectory}`);
     }
   }

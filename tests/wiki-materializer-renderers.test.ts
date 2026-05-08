@@ -75,10 +75,12 @@ describe("wiki materializer renderers", () => {
     const groupedSources = groupRecordsBySource([third, second, first]);
     const guideGroup = groupedSources.find((group) => group.records.map((record) => record.id).includes("mem-doc-001"));
     const guideSlug = slugifyWikiMaterializerSource({ id: first.id, source: first.source });
+    const secondGuideSlug = slugifyWikiMaterializerSource({ id: second.id, source: second.source });
     const guideSourcePage = projection.find((page) => page.relativePath === `sources/${guideSlug}.md`);
 
     expect(groupedSources).toHaveLength(2);
     expect(guideGroup?.slug).toBe(guideSlug);
+    expect(secondGuideSlug).toBe(guideSlug);
     expect(indexPage?.content).toContain("- [Materialization log](log.md)");
     expect(indexPage?.content).toContain("- [`mem-doc-001`](records/mem-doc-001.md) — `doc` · `verified`");
     expect(indexPage?.content).toContain(`- [\`Guide\`](sources/${guideSlug}.md) — 2 record(s)`);

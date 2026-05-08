@@ -8,7 +8,7 @@ import {
   type WikiSelectedRecord,
   wikiMaterializerSchemaVersion,
 } from "./contracts.js";
-import { slugifyWikiMaterializerSource } from "./utils.js";
+import { buildWikiMaterializerSourceSlugMap, wikiMaterializerSourceSlugForRecord } from "./source-groups.js";
 
 export interface BuildWikiMaterializerManifestInput {
   readonly records: readonly WikiSelectedRecord[];
@@ -23,6 +23,8 @@ export interface BuildWikiMaterializerManifestInput {
 }
 
 export function buildWikiMaterializerManifest(input: BuildWikiMaterializerManifestInput): WikiMaterializerManifest {
+  const sourceSlugMap = buildWikiMaterializerSourceSlugMap(input.records);
+
   return {
     schemaVersion: wikiMaterializerSchemaVersion,
     materializerVersion: input.materializerVersion,
@@ -30,15 +32,15 @@ export function buildWikiMaterializerManifest(input: BuildWikiMaterializerManife
     containerId: input.containerId,
     generatedAt: input.generatedAt,
     filters: input.filters,
-    records: input.records.map((record) => toManifestRecord(record)),
+    records: input.records.map((record) => toManifestRecord(record, sourceSlugMap)),
     includedCount: input.includedCount,
     excludedCount: input.excludedCount,
     ...(Object.keys(input.excludedByReason).length > 0 ? { excludedByReason: input.excludedByReason } : {}),
   };
 }
 
-function toManifestRecord(record: WikiSelectedRecord): WikiMaterializerManifestRecord {
-  const sourceSlug = slugifyWikiMaterializerSource({ id: record.id, source: record.source });
+function toManifestRecord(record: WikiSelectedRecord, sourceSlugMap: ReadonlyMap<string, string>): WikiMaterializerManifestRecord {
+  const sourceSlug = wikiMaterializerSourceSlugForRecord(record, sourceSlugMap);
 
   return {
     id: record.id,

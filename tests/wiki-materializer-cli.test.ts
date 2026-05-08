@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { paths } from "../src/config/paths.js";
 import { hashWikiMaterializerRecord } from "../src/features/memory/wiki-materializer/utils.js";
 import { runWikiMaterializerCli, parseWikiMaterializerCliArgs, formatWikiMaterializerCliOutput } from "../src/features/memory/wiki-materializer/cli.js";
 import type { MemoryRecord } from "../src/features/memory/types.js";
@@ -109,6 +110,24 @@ describe("wiki materializer cli", () => {
 
     expect(result.exitCode).toBe(1);
     expect(captured.stderrText).toContain("Unsafe wiki output directory");
+  });
+
+  it("fails clearly before replacing explicit protected repo output directories", async () => {
+    for (const unsafeOutputDir of [".", paths.appRoot, path.join(paths.appRoot, ".sisyphus"), path.join(paths.appRoot, "tests")]) {
+      const captured = captureWrites();
+      const result = await runWikiMaterializerCli([
+        "--project-id", "project-alpha",
+        "--container-id", "container-main",
+        "--output-dir", unsafeOutputDir,
+      ], {
+        logStore: { readAll: vi.fn(async () => [createRecord({ id: "mem-1" })]) },
+        stdout: captured.stdout,
+        stderr: captured.stderr,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(captured.stderrText).toContain("Unsafe wiki output directory");
+    }
   });
 
   it("formats the final status output deterministically", () => {

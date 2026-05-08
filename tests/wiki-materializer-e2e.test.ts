@@ -11,6 +11,7 @@ import { JsonlLogStore } from "../src/features/memory/log/jsonl-log-store.js";
 import type { MemoryRecord } from "../src/features/memory/types.js";
 import {
   wikiE2eCanonicalRecords,
+  wikiE2eRecord,
   wikiE2eScope,
 } from "./fixtures/wiki-materializer-e2e-fixtures.js";
 
@@ -153,6 +154,49 @@ describe("wiki materializer e2e", () => {
     expect(firstSnapshot["records/mem-non-ascii-title.md"]).toContain("Café 東京/研究");
 
     expect(normalizeSnapshotForAllowedTimestamps(secondSnapshot)).toEqual(normalizeSnapshotForAllowedTimestamps(firstSnapshot));
+  });
+
+  it("keeps manifest source slugs aligned with emitted source pages for identical source records", async () => {
+    const workspace = await createTempDirectory();
+    const canonicalLogPath = path.join(workspace, "canonical", "memory.jsonl");
+    const outputDir = path.join(workspace, "wiki", "identical-source");
+    const logStore = new JsonlLogStore(canonicalLogPath);
+    const sharedSource = { type: "document", uri: "file:///docs/shared.md", title: "Shared source" } as const;
+
+    await seedCanonicalLog(logStore, [
+      wikiE2eRecord({
+        id: "mem-shared-a",
+        source: sharedSource,
+        createdAt: "2026-05-08T01:00:00.000Z",
+      }),
+      wikiE2eRecord({
+        id: "mem-shared-b",
+        source: sharedSource,
+        createdAt: "2026-05-08T01:01:00.000Z",
+      }),
+    ]);
+
+    const result = await runWikiMaterializerCli([
+      "--project-id", wikiE2eScope.projectId,
+      "--container-id", wikiE2eScope.containerId,
+      "--output-dir", outputDir,
+    ], {
+      logStore,
+      materializerVersion: "0.0.0-test",
+      stdout: sinkWriter(),
+      stderr: sinkWriter(),
+    });
+    const snapshot = await readGeneratedWikiSnapshot(outputDir);
+    const manifest = await readManifest(outputDir);
+    const sourceSlugs = manifest.records.map((record) => record.sourceSlug);
+    const emittedSourcePaths = Object.keys(snapshot).filter((relativePath) => relativePath.startsWith("sources/"));
+
+    expect(result.exitCode).toBe(0);
+    expect(manifest.records.map((record) => record.id)).toEqual(["mem-shared-a", "mem-shared-b"]);
+    expect(new Set(sourceSlugs).size).toBe(1);
+    expect(emittedSourcePaths).toEqual([`sources/${sourceSlugs[0]}.md`]);
+    expect(snapshot[`sources/${sourceSlugs[0]}.md`]).toContain("mem-shared-a");
+    expect(snapshot[`sources/${sourceSlugs[0]}.md`]).toContain("mem-shared-b");
   });
 });
 

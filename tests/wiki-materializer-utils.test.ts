@@ -49,7 +49,7 @@ describe("wiki materializer utilities", () => {
     expect(slug).not.toContain(":");
   });
 
-  it("produces deterministic suffixes for duplicate-looking source slugs", () => {
+  it("produces deterministic identity-based suffixes for source slugs", () => {
     const first = slugifyWikiMaterializerSource({
       id: "mem-001",
       source: { type: "document", title: "Duplicate title", uri: "file:///docs/a.md" },
@@ -58,23 +58,29 @@ describe("wiki materializer utilities", () => {
       id: "mem-002",
       source: { type: "document", title: "Duplicate title", uri: "file:///docs/a.md" },
     });
+    const third = slugifyWikiMaterializerSource({
+      id: "mem-003",
+      source: { type: "document", title: "Duplicate title", uri: "file:///docs/b.md" },
+    });
 
     expect(first).toBe(slugifyWikiMaterializerSource({
       id: "mem-001",
       source: { type: "document", title: "Duplicate title", uri: "file:///docs/a.md" },
     }));
-    expect(first).not.toBe(second);
+    expect(first).toBe(second);
+    expect(first).not.toBe(third);
     expect(first).toMatch(/^duplicate-title-[a-f0-9]{12}$/);
     expect(second).toMatch(/^duplicate-title-[a-f0-9]{12}$/);
+    expect(third).toMatch(/^duplicate-title-[a-f0-9]{12}$/);
   });
 
-  it("falls back to the stable memory id when source metadata is missing", () => {
+  it("falls back to the source identity when source URI and title are missing", () => {
     const slug = slugifyWikiMaterializerSource({
       id: "mem-ømega 42",
       source: { type: "manual" },
     });
 
-    expect(slug).toBe("mem-ømega-42");
+    expect(slug).toMatch(/^manual-source-[a-f0-9]{12}$/);
   });
 
   it("accepts non-ASCII source titles and still returns a filesystem-safe slug", () => {

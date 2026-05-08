@@ -97,14 +97,8 @@ function shortHash(value: string): string {
 export function slugifyWikiMaterializerSource(input: WikiMaterializerSourceSlugInput): string {
   const title = input.source.title?.trim() ?? "";
   const uri = input.source.uri?.trim() ?? "";
-
-  if (!title && !uri) {
-    return normalizeSlugBase(input.id.trim());
-  }
-
-  const slugBase = normalizeSlugBase(title || uri);
+  const slugBase = normalizeSlugBase(title || uri || `${input.source.type} source`);
   const collisionSeed = stableJsonStringify({
-    id: input.id,
     source: {
       type: input.source.type,
       title: input.source.title ?? null,

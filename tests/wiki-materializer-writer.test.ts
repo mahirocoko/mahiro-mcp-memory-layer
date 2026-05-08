@@ -96,6 +96,20 @@ describe("wiki materializer writer", () => {
       pages: [createIndexPage(), createLogPage()],
     })).rejects.toThrow("Unsafe wiki output directory");
   });
+
+  it("refuses explicit output directories that would replace protected repo paths", async () => {
+    for (const outputDir of [paths.appRoot, path.join(paths.appRoot, ".sisyphus"), path.join(paths.appRoot, "src"), path.dirname(paths.appRoot)]) {
+      await expect(writeWikiMaterialization({
+        layoutOptions: {
+          projectSlug: "project-alpha",
+          containerSlug: "container-main",
+          outputDir,
+        },
+        manifest: createManifest(),
+        pages: [createIndexPage(), createLogPage()],
+      })).rejects.toThrow("Unsafe wiki output directory");
+    }
+  });
 });
 
 function createManifest(): WikiMaterializerManifest {

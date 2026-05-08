@@ -4,7 +4,12 @@ import type {
   WikiMaterializerFilters,
   WikiSelectedRecord,
 } from "./contracts.js";
-import { slugifyWikiMaterializerSource } from "./utils.js";
+import {
+  buildWikiMaterializerSourceGroups,
+  sortWikiMaterializerRecords,
+  type WikiMaterializerSourceGroup,
+  type WikiMaterializerSourceIdentity,
+} from "./source-groups.js";
 
 export const wikiGeneratedProjectionWarning = "> **Generated projection — not source of truth.** This Markdown is a deterministic, read-only projection of canonical memory records in `mahiro-mcp-memory-layer`. Durable memory records remain canonical; `memory_context`, retrieval traces, and continuity caches are diagnostics, not durable wiki content.";
 
@@ -19,23 +24,11 @@ export interface WikiMarkdownProjectionInput {
   readonly excludedByReason?: Partial<Record<WikiMaterializerExclusionReason, number>>;
 }
 
-interface SourceGroup {
-  readonly slug: string;
-  readonly identity: SourceIdentity;
-  readonly records: readonly WikiSelectedRecord[];
-}
-
-interface SourceIdentity {
-  readonly type: string;
-  readonly uri?: string;
-  readonly title?: string;
-}
-
 const noneLabel = "(none)";
 const missingLabel = "(missing)";
 
 export function renderWikiMarkdownProjection(input: WikiMarkdownProjectionInput): readonly WikiGeneratedPage[] {
-  const records = sortRecords(input.records);
+  const records = sortWikiMaterializerRecords(input.records);
   const sourceGroups = groupRecordsBySource(records);
   const pages: WikiGeneratedPage[] = [
     renderWikiIndexPage({ ...input, records }, sourceGroups),
@@ -55,9 +48,9 @@ export function renderWikiMarkdownProjection(input: WikiMarkdownProjectionInput)
 
 export function renderWikiIndexPage(
   input: WikiMarkdownProjectionInput,
-  sourceGroups = groupRecordsBySource(sortRecords(input.records)),
+  sourceGroups = groupRecordsBySource(sortWikiMaterializerRecords(input.records)),
 ): WikiGeneratedPage {
-  const records = sortRecords(input.records);
+  const records = sortWikiMaterializerRecords(input.records);
   const recordLinks = records.length > 0
     ? records.map((record) => `- [${formatInline(record.id)}](${recordPagePath(record)}) — ${formatInline(record.kind)} · ${formatInline(record.verificationStatus)}`).join("\n")
     : `- ${noneLabel}`;
@@ -98,7 +91,7 @@ export function renderWikiIndexPage(
 }
 
 export function renderWikiLogPage(input: WikiMarkdownProjectionInput): WikiGeneratedPage {
-  const records = sortRecords(input.records);
+  const records = sortWikiMaterializerRecords(input.records);
 
   return page({
     kind: "log",
@@ -168,8 +161,8 @@ export function renderWikiRecordPage(record: WikiSelectedRecord): WikiGeneratedP
   });
 }
 
-export function renderWikiSourcePage(group: SourceGroup): WikiGeneratedPage {
-  const records = sortRecords(group.records);
+export function renderWikiSourcePage(group: WikiMaterializerSourceGroup): WikiGeneratedPage {
+  const records = sortWikiMaterializerRecords(group.records);
 
   return page({
     kind: "source",
@@ -191,30 +184,8 @@ export function renderWikiSourcePage(group: SourceGroup): WikiGeneratedPage {
   });
 }
 
-export function groupRecordsBySource(records: readonly WikiSelectedRecord[]): readonly SourceGroup[] {
-  const groups = new Map<string, WikiSelectedRecord[]>();
-
-  for (const record of records) {
-    const key = sourceIdentityKey(toSourceIdentity(record));
-    groups.set(key, [...(groups.get(key) ?? []), record]);
-  }
-
-  return Array.from(groups.values())
-    .map((groupRecords) => {
-      const sortedGroupRecords = sortRecords(groupRecords);
-      const firstRecord = sortedGroupRecords[0];
-
-      if (!firstRecord) {
-        throw new Error("Source group unexpectedly had no records");
-      }
-
-      return {
-        slug: slugifyWikiMaterializerSource({ id: firstRecord.id, source: firstRecord.source }),
-        identity: toSourceIdentity(firstRecord),
-        records: sortedGroupRecords,
-      };
-    })
-    .sort((left, right) => compareText(left.slug, right.slug));
+export function groupRecordsBySource(records: readonly WikiSelectedRecord[]): readonly WikiMaterializerSourceGroup[] {
+  return buildWikiMaterializerSourceGroups(records);
 }
 
 function page(input: Omit<WikiGeneratedPage, "content"> & { readonly body: readonly string[] }): WikiGeneratedPage {
@@ -249,32 +220,7 @@ function renderEvidenceList(evidence: WikiSelectedRecord["verificationEvidence"]
     .join("\n");
 }
 
-function sortRecords(records: readonly WikiSelectedRecord[]): readonly WikiSelectedRecord[] {
-  return [...records].sort((left, right) => compareText(left.kind, right.kind)
-    || compareText(left.source.uri ?? "", right.source.uri ?? "")
-    || compareText(left.source.title ?? "", right.source.title ?? "")
-    || compareText(left.createdAt, right.createdAt)
-    || compareText(left.updatedAt ?? "", right.updatedAt ?? "")
-    || compareText(left.id, right.id));
-}
-
-function toSourceIdentity(record: WikiSelectedRecord): SourceIdentity {
-  return {
-    type: record.source.type,
-    uri: record.source.uri,
-    title: record.source.title,
-  };
-}
-
-function sourceIdentityKey(identity: SourceIdentity): string {
-  return JSON.stringify({
-    title: identity.title ?? null,
-    type: identity.type,
-    uri: identity.uri ?? null,
-  });
-}
-
-function sourceDisplayName(identity: SourceIdentity): string {
+function sourceDisplayName(identity: WikiMaterializerSourceIdentity): string {
   return identity.title ?? identity.uri ?? `${identity.type} source`;
 }
 
