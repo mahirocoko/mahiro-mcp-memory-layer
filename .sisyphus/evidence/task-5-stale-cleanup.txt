@@ -1,0 +1,4 @@
+Command: rtk bun run test tests/wiki-materializer-writer.test.ts
+Outcome: passed.
+
+Scenario: an existing final wiki scope with stale files was replaced through a sibling staging directory and whole-directory rename. The final tree kept the generated files and removed stale files such as `obsolete.md` and `records/stale.md`.

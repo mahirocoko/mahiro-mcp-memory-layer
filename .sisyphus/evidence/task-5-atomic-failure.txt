@@ -1,0 +1,4 @@
+Command: rtk bun run test tests/wiki-materializer-writer.test.ts && rtk bun run typecheck
+Outcome: passed.
+
+Scenario: a missing required page (`log.md`) failed validation before replacement, and the previous final directory stayed unchanged (`keep.txt` remained intact). The writer also rejected canonical memory output paths.
