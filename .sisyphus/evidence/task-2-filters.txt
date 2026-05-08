@@ -1,0 +1,20 @@
+Task 2 filter/sort evidence - 2026-05-08
+
+Selector filter behavior verified by `tests/wiki-materializer-selector.test.ts`:
+- default filters include only `verificationStatus === "verified"`
+- default filters exclude `pending`, `deferred`, and `rejected` review statuses
+- hypotheses can be included only through `includeHypotheses: true`
+- selected durable kinds include `doc` and other memory kinds when scope/status rules pass
+- exclusion counts report included count, excluded count, and `excludedByReason`
+- deterministic sorting is by `kind`, source URI/title, `createdAt`, `updatedAt`, then stable `id`
+
+Command results:
+- `rtk bun test tests/wiki-materializer-selector.test.ts` -> 5 pass, 0 fail
+- `rtk bun run typecheck` -> passed (`tsc -p tsconfig.json --noEmit`)
+
+Verification-failure fix - 2026-05-08:
+- `src/features/memory/wiki-materializer/selector.ts` now imports and uses `hashWikiMaterializerRecord()` from `./utils.js` for `WikiSelectedRecord.recordHash`.
+- Removed the selector-local `createHash` import and `hashSelectedRecord()` implementation so selector hashes share Task 3 projected-field semantics.
+- Targeted grep for `createHash|hashSelectedRecord|hashWikiMaterializerRecord` in `selector.ts` shows only the canonical utility import and call.
+- `rtk bun run test tests/wiki-materializer-selector.test.ts tests/wiki-materializer-utils.test.ts` -> 2 files passed, 11 tests passed.
+- `rtk bun run typecheck` -> passed (`tsc -p tsconfig.json --noEmit`).

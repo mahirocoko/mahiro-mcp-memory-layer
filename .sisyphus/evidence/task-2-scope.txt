@@ -1,0 +1,13 @@
+Task 2 scoped selector evidence - 2026-05-08
+
+Implemented `src/features/memory/wiki-materializer/selector.ts` with a read-only `readAll()` selector input.
+
+Scope behavior verified by `rtk bun test tests/wiki-materializer-selector.test.ts`:
+- exact `projectId` and `containerId` matches are included only when `scope === "project"`
+- wrong project, wrong container, and global records are excluded as `scope_mismatch`
+- incomplete project scope rejects via `assertValidScope`
+- read-only mutation trap proves selector does not call append, replaceRecordById, readById, list, or listReviewQueue
+
+Command results:
+- `rtk bun test tests/wiki-materializer-selector.test.ts` -> 5 pass, 0 fail
+- `rtk bun run typecheck` -> passed (`tsc -p tsconfig.json --noEmit`)
