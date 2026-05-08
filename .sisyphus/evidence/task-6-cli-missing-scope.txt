@@ -1,0 +1,3 @@
+Validated wiki materializer CLI missing-scope failures.
+Cases: missing --project-id returns a non-zero exit code with clear stderr; missing --container-id returns a non-zero exit code with clear stderr.
+Additional guard: unsafe output directory overlapping canonical data/log memory paths also returns a non-zero exit code.

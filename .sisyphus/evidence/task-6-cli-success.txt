@@ -1,0 +1,3 @@
+Validated wiki materializer CLI success path with explicit project/container IDs, temporary output directory, and targeted vitest coverage.
+Commands: bun run test -- tests/wiki-materializer-cli.test.ts tests/wiki-materializer-contract.test.ts tests/wiki-materializer-renderers.test.ts tests/wiki-materializer-selector.test.ts tests/wiki-materializer-utils.test.ts; bun run typecheck; bun run build.
+Result: success output reported scope directory, manifest path, included/excluded counts, and verification hints.
