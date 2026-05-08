@@ -1,0 +1,25 @@
+Task 9: Add integration/e2e materializer verification
+
+Files added:
+- tests/wiki-materializer-e2e.test.ts
+- tests/fixtures/wiki-materializer-e2e-fixtures.ts
+
+Targeted verification:
+- Command: rtk bun test tests/wiki-materializer-e2e.test.ts
+- Outcome: PASS — 2 tests, 30 assertions.
+
+Full verification:
+- Command: rtk bun run typecheck && rtk bun run test && rtk bun run build
+- Outcome: PASS.
+- Full test result: 27 test files passed, 199 tests passed.
+
+E2E coverage confirmed by tests:
+- Empty scope writes valid index.md, log.md, manifest.json, empty records/ and sources/ directories.
+- Canonical JSONL records are seeded through a temp JsonlLogStore and materialized through the CLI runner.
+- Generated files are inspected for record pages, source pages, source metadata, non-ASCII titles, missing metadata labels, and filtered records.
+- Manifest freshness is validated with validateWikiMaterializerStaleness and reports fresh after materialization.
+- Duplicate source titles create distinct collision-safe source slugs/pages.
+- Default filtering excludes hypothesis, pending, deferred, and rejected records.
+- Scope isolation excludes wrong-project and wrong-container records.
+- Stale root/record files are removed by whole-directory replacement.
+- Deterministic reruns match after normalizing allowed generatedAt/log timestamp fields.

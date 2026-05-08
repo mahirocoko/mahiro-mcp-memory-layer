@@ -1,0 +1,18 @@
+Task 9 canonical no-mutation evidence
+
+Canonical input boundary:
+- Tests use temp directories under the OS temp folder only.
+- Canonical data is stored in a temp JSONL file through JsonlLogStore.
+- No network, no real user home, and no real .agent-state path is used.
+
+No-mutation assertion:
+- tests/wiki-materializer-e2e.test.ts reads the canonical JSONL bytes before materialization and after two CLI materializer reruns.
+- The test asserts canonicalAfter === canonicalBefore.
+- The empty-scope test also asserts a missing canonical JSONL input remains byte-for-byte unchanged as an empty string.
+
+Verification commands:
+- rtk bun test tests/wiki-materializer-e2e.test.ts — PASS, 2 tests / 30 assertions.
+- rtk bun run typecheck && rtk bun run test && rtk bun run build — PASS, 27 test files / 199 tests.
+
+Conclusion:
+- Wiki materialization is verified as a read-only projection over canonical memory records for these e2e scenarios.
