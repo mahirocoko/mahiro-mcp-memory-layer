@@ -115,6 +115,10 @@ export function slugifyWikiMaterializerSource(input: WikiMaterializerSourceSlugI
   return `${slugBase}-${shortHash(collisionSeed)}`;
 }
 
+export function slugifyWikiMaterializerScopeId(value: string): string {
+  return normalizeSlugBase(value);
+}
+
 export function hashWikiMaterializerRecord(record: WikiMaterializerHashInput): string {
   const projected = {
     id: record.id,

@@ -1,0 +1,8 @@
+Task 7 fresh validation evidence
+
+Command: rtk bun run test -- tests/wiki-materializer-staleness.test.ts -t "reports fresh immediately"
+Result: PASS - 1 test passed, 2 skipped. The test materializes a fixture, validates the saved manifest against unchanged canonical scoped records, reports status=fresh, no changes, and asserts the manifest recordHash equals hashWikiMaterializerRecord().
+
+Additional verification in same task:
+- rtk bun run test -- tests/wiki-materializer-staleness.test.ts tests/wiki-materializer-cli.test.ts tests/wiki-materializer-contract.test.ts tests/wiki-materializer-utils.test.ts => PASS (21 tests)
+- rtk bun run typecheck => PASS

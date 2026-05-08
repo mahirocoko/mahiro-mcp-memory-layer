@@ -2,16 +2,20 @@ import { stdout, stderr } from "node:process";
 
 import type { WikiCanonicalRecordReader } from "./selector.js";
 import { runWikiMaterialization } from "./materialize.js";
+import { validateWikiMaterializerStaleness } from "./staleness.js";
 
 export interface WikiMaterializerCliArgs {
   readonly projectId: string;
   readonly containerId: string;
   readonly outputDir?: string;
   readonly includeHypotheses: boolean;
+  readonly validateStaleness: boolean;
+  readonly manifestPath?: string;
 }
 
 export interface WikiMaterializerCliDependencies {
   readonly runWikiMaterialization?: typeof runWikiMaterialization;
+  readonly validateWikiMaterializerStaleness?: typeof validateWikiMaterializerStaleness;
   readonly logStore?: WikiCanonicalRecordReader;
   readonly stdout?: Pick<typeof stdout, "write">;
   readonly stderr?: Pick<typeof stderr, "write">;
@@ -29,6 +33,8 @@ export function parseWikiMaterializerCliArgs(argv: readonly string[]): WikiMater
   let containerId = "";
   let outputDir: string | undefined;
   let includeHypotheses = false;
+  let validateStaleness = false;
+  let manifestPath: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -54,6 +60,12 @@ export function parseWikiMaterializerCliArgs(argv: readonly string[]): WikiMater
       case "--include-hypotheses":
         includeHypotheses = true;
         break;
+      case "--validate-staleness":
+        validateStaleness = true;
+        break;
+      case "--manifest-path":
+        manifestPath = readRequiredValue(token, argv[++index]);
+        break;
       default:
         throw new Error(`Unknown flag: ${token}`);
     }
@@ -67,7 +79,7 @@ export function parseWikiMaterializerCliArgs(argv: readonly string[]): WikiMater
     throw new Error("--container-id is required.");
   }
 
-  return { projectId, containerId, outputDir, includeHypotheses };
+  return { projectId, containerId, outputDir, includeHypotheses, validateStaleness, manifestPath };
 }
 
 export async function runWikiMaterializerCli(
@@ -76,6 +88,20 @@ export async function runWikiMaterializerCli(
 ): Promise<WikiMaterializerCliResult> {
   try {
     const args = parseWikiMaterializerCliArgs(argv);
+
+    if (args.validateStaleness) {
+      const report = await (dependencies.validateWikiMaterializerStaleness ?? validateWikiMaterializerStaleness)({
+        projectId: args.projectId,
+        containerId: args.containerId,
+        outputDir: args.outputDir,
+        manifestPath: args.manifestPath,
+        logStore: dependencies.logStore,
+      });
+      const output = formatWikiMaterializerStalenessCliOutput(report);
+      (dependencies.stdout ?? stdout).write(`${output}\n`);
+      return { exitCode: report.status === "fresh" ? 0 : 2, output };
+    }
+
     const result = await (dependencies.runWikiMaterialization ?? runWikiMaterialization)({
       projectId: args.projectId,
       containerId: args.containerId,
@@ -98,6 +124,24 @@ export async function runWikiMaterializerCli(
     (dependencies.stderr ?? stderr).write(`${message}\n`);
     return { exitCode: 1, error: message };
   }
+}
+
+export function formatWikiMaterializerStalenessCliOutput(input: {
+  readonly status: "fresh" | "stale";
+  readonly manifestPath: string;
+  readonly changes: readonly { readonly reason: string; readonly recordId?: string }[];
+}): string {
+  const lines = [
+    `Wiki materialization staleness: ${input.status}`,
+    `Manifest path: ${input.manifestPath}`,
+  ];
+
+  if (input.changes.length > 0) {
+    lines.push("Changes:");
+    lines.push(...input.changes.map((change) => `- ${change.reason}${change.recordId ? `: ${change.recordId}` : ""}`));
+  }
+
+  return lines.join("\n");
 }
 
 export function formatWikiMaterializerCliOutput(input: {

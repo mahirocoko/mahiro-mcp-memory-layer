@@ -1,0 +1,8 @@
+Task 7 stale validation evidence
+
+Command: rtk bun run test -- tests/wiki-materializer-staleness.test.ts -t "reports stale"
+Result: PASS - 2 tests passed, 1 skipped. The tests validate stale reports for projected content/source hash changes and for default-filter included set changes (record_added and record_removed).
+
+Additional verification in same task:
+- rtk bun run test -- tests/wiki-materializer-staleness.test.ts tests/wiki-materializer-cli.test.ts tests/wiki-materializer-contract.test.ts tests/wiki-materializer-utils.test.ts => PASS (21 tests)
+- rtk bun run typecheck => PASS

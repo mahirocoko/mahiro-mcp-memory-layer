@@ -20,6 +20,24 @@ describe("wiki materializer cli", () => {
       containerId: "container-main",
       outputDir: "/tmp/wiki",
       includeHypotheses: true,
+      validateStaleness: false,
+      manifestPath: undefined,
+    });
+  });
+
+  it("parses staleness validation mode without implying materialization", () => {
+    expect(parseWikiMaterializerCliArgs([
+      "--project-id", "project-alpha",
+      "--container-id", "container-main",
+      "--validate-staleness",
+      "--manifest-path", "/tmp/wiki/manifest.json",
+    ])).toEqual({
+      projectId: "project-alpha",
+      containerId: "container-main",
+      outputDir: undefined,
+      includeHypotheses: false,
+      validateStaleness: true,
+      manifestPath: "/tmp/wiki/manifest.json",
     });
   });
 
@@ -109,6 +127,35 @@ describe("wiki materializer cli", () => {
       "- verified records only",
       "- excluded review statuses: pending",
     ].join("\n"));
+  });
+
+  it("prints staleness validation status without invoking materialization", async () => {
+    const captured = captureWrites();
+    const runWikiMaterialization = vi.fn();
+    const validateWikiMaterializerStaleness = vi.fn(async () => ({
+      status: "stale" as const,
+      manifestPath: "/tmp/wiki/manifest.json",
+      projectId: "project-alpha",
+      containerId: "container-main",
+      changes: [{ reason: "record_added" as const, recordId: "mem-2" }],
+    }));
+
+    const result = await runWikiMaterializerCli([
+      "--project-id", "project-alpha",
+      "--container-id", "container-main",
+      "--validate-staleness",
+      "--manifest-path", "/tmp/wiki/manifest.json",
+    ], {
+      runWikiMaterialization,
+      validateWikiMaterializerStaleness,
+      stdout: captured.stdout,
+      stderr: captured.stderr,
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(runWikiMaterialization).not.toHaveBeenCalled();
+    expect(captured.stdoutText).toContain("Wiki materialization staleness: stale");
+    expect(captured.stdoutText).toContain("- record_added: mem-2");
   });
 });
 

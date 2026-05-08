@@ -108,6 +108,31 @@ export interface WikiMaterializerManifest {
   readonly excludedByReason?: Partial<Record<WikiMaterializerExclusionReason, number>>;
 }
 
+export const wikiMaterializerStalenessReasons = [
+  "manifest_scope_mismatch",
+  "manifest_schema_mismatch",
+  "record_added",
+  "record_removed",
+  "record_hash_changed",
+] as const;
+
+export type WikiMaterializerStalenessReason = (typeof wikiMaterializerStalenessReasons)[number];
+
+export interface WikiMaterializerStalenessChange {
+  readonly reason: WikiMaterializerStalenessReason;
+  readonly recordId?: string;
+  readonly manifestRecordHash?: string;
+  readonly currentRecordHash?: string;
+}
+
+export interface WikiMaterializerStalenessReport {
+  readonly status: "fresh" | "stale";
+  readonly manifestPath: string;
+  readonly projectId: string;
+  readonly containerId: string;
+  readonly changes: readonly WikiMaterializerStalenessChange[];
+}
+
 export interface WikiGeneratedPage {
   readonly kind: WikiGeneratedPageKind;
   readonly relativePath: string;
