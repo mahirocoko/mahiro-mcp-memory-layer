@@ -1,0 +1,7 @@
+Task 8 evidence
+
+- README now documents `bun run wiki:materialize -- --project-id <id> --container-id <id>`.
+- ARCHITECTURE now includes the source-of-truth hierarchy and states that generated wiki files are derived artifacts.
+- MCP_USAGE now states `wiki:materialize` is not an MCP memory tool and must not be confused with `memory_context` or retrieval traces.
+- Verification passed: `rtk bunx vitest run tests/wiki-materializer-*.test.ts`.
+- Verification passed: `rtk bun run typecheck`.

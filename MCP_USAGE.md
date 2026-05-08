@@ -53,6 +53,16 @@ Compaction continuity is append-only and fail-open. It keeps memory continuity m
 
 On a source checkout or standalone server path, the repo can also expose the same memory-focused tools through the standalone MCP server.
 
+## Wiki materializer CLI
+
+`wiki:materialize` is a CLI projection command, not an MCP memory tool. It is separate from `memory_context`, `runtime_capabilities`, and retrieval traces.
+
+It writes generated wiki output from canonical reviewed memory records. It does not treat `memory_context` as source data, and it excludes retrieval traces from materialization.
+
+MVP scope is one way only. There is no bidirectional sync and no import path from wiki output back into memory.
+
+Generated wiki files are derived artifacts. Do not edit them as source data. Regenerate the projection instead.
+
 ## `runtime_capabilities`
 
 Use this to read the current plugin-native memory capability contract.
@@ -96,6 +106,7 @@ The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and
 - `inspect_memory_retrieval` exposes `requestId` as the public input. The plugin path may inject scoped latest lookup state internally when no `requestId` is supplied, but `latestScopeFilter` is not a user-facing input.
 - `contextSize` is the returned item text payload size, meaning returned `content.length` plus `summary.length` when a summary exists. It is not rendered context length and it is not the continuity-cache size.
 - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
+- Do not confuse `wiki:materialize` with `memory_context` or retrieval diagnostics. The CLI is a projection writer, not an MCP memory surface.
 - Use `inspect_memory_retrieval` before guessing why retrieval hit, missed, or degraded.
 - When the plugin path returns an empty scoped latest lookup with `latestScopeFilter`, the scoped trace lookup missed for that `projectId`/`containerId`; it does not prove the global trace store is empty.
 - `returnedMemoryIds: []` with `degraded: false` means no scoped matches and no rendered context, not degraded retrieval.

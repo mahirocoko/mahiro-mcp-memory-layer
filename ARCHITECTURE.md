@@ -79,6 +79,22 @@ tool family ที่โฟกัส memory ชุดเดียวกันเ
 
 Retrieval และ context assembly อ่านจาก indexed retrieval rows ก่อน แล้วค่อย emit trace records สำหรับ hit, miss, degraded, และ provenance inspection. continuity cache ไม่ใช่ durable storage.
 
+## Source-of-truth hierarchy
+
+ลำดับความจริงของข้อมูลใน repo นี้คือ:
+
+1. raw or original materials, when they exist upstream
+2. canonical reviewed memory records
+3. derived retrieval index
+4. generated wiki projection
+5. runtime cache and traces
+
+Generated wiki files are derived artifacts, not canonical source data. They exist as a projection of reviewed memory records.
+
+Wiki materialization does not bidirectionally sync with wiki editors, and it does not import wiki output back into memory in the MVP.
+
+The projection excludes `memory_context` continuity cache data and retrieval traces. Those belong to runtime diagnostics and continuity, not to wiki materialization.
+
 ## โมเดล lifecycle
 
 คำศัพท์ของ lifecycle มีดังนี้:

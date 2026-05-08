@@ -1,0 +1,6 @@
+Task 8 no-overpromise evidence
+
+- Docs say the wiki output is a derived projection, not the canonical source of truth.
+- Docs say there is no bidirectional sync and no import path from wiki output back into memory in MVP.
+- Docs say the projection excludes `memory_context` continuity cache data and retrieval traces.
+- Docs avoid claiming automatic hooks, workflow ownership, or new MCP tools.

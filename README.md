@@ -46,6 +46,23 @@ bun run dev
 bun run start
 ```
 
+### 3. Wiki materialization
+
+The repo also ships a standalone wiki projection command:
+
+```bash
+bun run wiki:materialize -- --project-id <id> --container-id <id>
+```
+
+Use it to generate wiki output from canonical reviewed memory records. The generated wiki is a derived projection, not the canonical source of truth. Do not edit the generated files manually. Regenerate the projection instead.
+
+MVP scope is one way only. There is no bidirectional sync, and there is no import path from wiki output back into memory records.
+
+The projection excludes `memory_context` continuity cache data and retrieval traces. It stays aligned with the memory-only package boundary.
+
+> Generated wiki files are derived artifacts. Do not treat them as source data.
+> Regenerate from canonical memory records when the projection needs to change.
+
 ## Memory tools
 
 The stable tool surface is:
@@ -103,6 +120,7 @@ bun run typecheck
 bun run test
 bun run build
 bun run reindex
+bun run wiki:materialize -- --project-id <id> --container-id <id>
 ```
 
 ## Docs map
