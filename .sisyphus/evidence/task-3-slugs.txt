@@ -1,0 +1,9 @@
+Command summary:
+- `rtk bun run test tests/wiki-materializer-utils.test.ts`
+- Result: passing after updating the stable-id fallback expectation to keep Unicode letters in the slug.
+
+What this covered:
+- filename-safe slug sanitization
+- deterministic collision suffixing
+- missing source metadata fallback
+- non-ASCII source titles remaining valid for paths

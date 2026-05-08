@@ -1,0 +1,9 @@
+Command summary:
+- `rtk bun run test tests/wiki-materializer-utils.test.ts`
+- `rtk bun run typecheck`
+- Result: both passed.
+
+What this covered:
+- stable recursive key ordering for canonical JSON
+- projected-field-only hash input
+- hash changes on content and verification state updates
