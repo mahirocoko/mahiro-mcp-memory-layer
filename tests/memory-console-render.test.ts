@@ -66,7 +66,10 @@ describe("memory console rendering", () => {
     const html = renderMemoryConsolePage(createResult([], undefined));
 
     expect(html).toContain("No memories matched the current filters.");
+    expect(html).toContain("Try removing search text, broadening scope, or resetting to verified active records.");
+    expect(html).toContain('href="/">Reset browse filters</a>');
     expect(html).toContain("Select a memory to inspect its source, evidence, and review decisions.");
+    expect(html).toContain("Browse is read-only; use the Review Queue for review decisions or Rejected for guarded cleanup.");
   });
 
   it("renders console navigation labels without stale scoped ids", () => {
@@ -83,13 +86,17 @@ describe("memory console rendering", () => {
     });
 
     expect(html).toContain('href="/"');
-    expect(html).toContain('>Browse</a>');
+    expect(html).toContain('<span class="nav-label">Browse</span>');
+    expect(html).toContain("Read verified and active records");
     expect(html).toContain('href="/review"');
-    expect(html).toContain('>Review Queue</a>');
+    expect(html).toContain('<span class="nav-label">Review Queue</span>');
+    expect(html).toContain("Decide pending hypotheses");
     expect(html).toContain('href="/rejected"');
-    expect(html).toContain('>Rejected</a>');
+    expect(html).toContain('<span class="nav-label">Rejected</span>');
+    expect(html).toContain("Preview guarded cleanup");
     expect(html).toContain('href="/graph"');
-    expect(html).toContain('>Graph</a>');
+    expect(html).toContain('<span class="nav-label">Graph</span>');
+    expect(html).toContain("Inspect metadata links");
     expect(html).not.toContain('>Verified</a>');
     expect(html).not.toContain('>Inbox</a>');
     expect(html).not.toContain('>Firehose</a>');
@@ -140,6 +147,8 @@ describe("memory console rendering", () => {
     });
 
     expect(html).toContain('class="scope-context"');
+    expect(html).toContain("Locked project scope");
+    expect(html).toContain("Container: container-a");
     expect(html).toContain('<input type="hidden" name="scope" value="project">');
     expect(html).toContain('<input type="hidden" name="projectId" value="project-a">');
     expect(html).toContain('<input type="hidden" name="containerId" value="container-a">');
@@ -151,8 +160,10 @@ describe("memory console rendering", () => {
     const html = renderMemoryConsolePage(createResult([], undefined));
 
     expect(html).toContain('<button type="submit">Search</button>');
-    expect(html).toContain('<details class="advanced-filters">');
-    expect(html).toContain('<summary>Advanced filters</summary>');
+    expect(html).toContain("Browse filters");
+    expect(html).toContain('<a class="reset-link" href="/">Reset browse filters</a>');
+    expect(html).toContain('<details class="advanced-filters" open>');
+    expect(html).toContain('<summary>Scope and status filters</summary>');
     expect(html).toContain('<select name="limit">');
     expect(html).toContain('<option value="25">25</option>');
     expect(html).toContain('<option value="50" selected>50</option>');
@@ -186,7 +197,11 @@ describe("memory console rendering", () => {
 
     expect(html).toContain("Memory graph");
     expect(html).toContain('<form class="filters graph-filters" method="get" action="/graph"');
+    expect(html).toContain("Graph filters");
+    expect(html).toContain("Read-only metadata projection. Narrowing edges only changes what is shown here.");
+    expect(html).toContain('href="/graph">Reset graph filters</a>');
     expect(html).toContain('<select name="edgeType">');
+    expect(html).toContain("Active filters");
     expect(html).toContain("Nodes: memory 1 · source 1 · tag 1 · evidence 2");
     expect(html).toContain("Edges: has_source 1 · tagged_with 1 · has_evidence 2 · reviewed_as 1");
     expect(html).toContain("memory (1)");
@@ -229,11 +244,15 @@ describe("memory console rendering", () => {
 
     expect(html).toContain("Rejected memory quarantine");
     expect(html).toContain("Only records with <strong>reviewStatus rejected</strong> belong here.");
+    expect(html).toContain("Purge scope:</strong> project rejected records only · project-a / container-a");
     expect(html).toContain("Rejected &lt;summary&gt;");
     expect(html).toContain("Rejected &lt;quarantine&gt; memory.");
     expect(html).toContain('method="post" action="/actions/purge-rejected"');
     expect(html).toContain('name="dryRun" value="true"');
     expect(html).toContain('name="ids" value="mem-rejected"');
+    expect(html).toContain('name="scope" value="project"');
+    expect(html).toContain('name="projectId" value="project-a"');
+    expect(html).toContain('name="containerId" value="container-a"');
     expect(html).toContain("Preview purge");
     expect(html).toContain("DELETE REJECTED");
     expect(html).not.toContain('action="/actions/review"');
@@ -242,6 +261,56 @@ describe("memory console rendering", () => {
     expect(html).not.toContain("Verified active memory.");
     expect(html).not.toContain("Pending memory.");
     expect(html).not.toContain("Deferred memory.");
+  });
+
+  it("groups mixed-scope rejected records into separate purge forms without manual scope inputs", () => {
+    const globalRejected = createMemory("mem-global", "Global rejected memory.", {
+      scope: "global",
+      summary: "Global rejected summary",
+    });
+    const projectRejected = createMemory("mem-project-&", "Project rejected memory.", {
+      projectId: "project-<a>\"",
+      containerId: "container-&",
+      summary: "Project rejected summary",
+    });
+    const unknownRejected = createMemory("mem-unknown", "Unknown rejected memory.", {
+      scope: undefined,
+      projectId: undefined,
+      containerId: undefined,
+      summary: "Unknown rejected summary",
+    });
+
+    const html = renderRejectedConsolePage({
+      ...createResult([globalRejected, projectRejected, unknownRejected], undefined),
+      filters: {
+        ...rejectedFilters,
+        scope: "all",
+        projectId: undefined,
+        containerId: undefined,
+      },
+    });
+    const forms = html.match(/<form class="quarantine-form quarantine-scope-block"[\s\S]*?<\/form>/g) ?? [];
+
+    expect(forms).toHaveLength(2);
+    expect(forms[0]).toContain('name="scope" value="global"');
+    expect(forms[0]).toContain('name="ids" value="mem-global"');
+    expect(forms[0]).not.toContain("mem-project-&amp;");
+    expect(forms[0]).not.toContain('name="projectId"');
+    expect(forms[0]).not.toContain('name="containerId"');
+    expect(forms[1]).toContain('name="scope" value="project"');
+    expect(forms[1]).toContain('name="projectId" value="project-&lt;a&gt;&quot;"');
+    expect(forms[1]).toContain('name="containerId" value="container-&amp;"');
+    expect(forms[1]).toContain('name="ids" value="mem-project-&amp;"');
+    expect(forms[1]).not.toContain("mem-global");
+    expect(html).toContain("grouped by their stored scope metadata");
+    expect(html).toContain("skipped_scope_mismatch");
+    expect(html).toContain("Not purgeable until scope metadata is complete.");
+    expect(html).toContain("Unknown rejected summary");
+    expect(html).not.toContain('value="mem-unknown"');
+    expect(html).not.toContain("Project ID for project scope");
+    expect(html).not.toContain("Container ID for project scope");
+    expect(html).not.toContain("required for project scope");
+    expect(html).not.toContain('<select name="scope">');
   });
 
   it("renders rejected quarantine purge preview with escaped per-id statuses and final typed confirmation", () => {
@@ -266,12 +335,16 @@ describe("memory console rendering", () => {
     }, result);
 
     expect(html).toContain("Dry-run preview only. No records were deleted.");
+    expect(html).toContain("Only rows marked <strong>dry_run</strong> are eligible for the final delete step. Skipped rows stay untouched.");
     expect(html).toContain("mem-&lt;rejected&gt;");
     expect(html).toContain("dry_run");
     expect(html).toContain("skipped_not_rejected");
     expect(html).toContain('method="post" action="/actions/purge-rejected"');
     expect(html).toContain('placeholder="DELETE REJECTED"');
     expect(html).toContain('name="ids" value="mem-&lt;rejected&gt;"');
+    expect(html).toContain('name="scope" value="project"');
+    expect(html).toContain('name="projectId" value="project-a"');
+    expect(html).toContain('name="containerId" value="container-a"');
     expect(html).not.toContain("mem-<rejected>");
   });
 
@@ -300,6 +373,13 @@ describe("memory console rendering", () => {
     expect(html).toContain("Check the linked issue before promotion &lt;now&gt;.");
     expect(html).toContain("Suggested context &lt;draft&gt;");
     expect(html).toContain("Advisory only. Suggestions are not selected, applied, or submitted automatically.");
+    expect(html).toContain("Choose one explicit action. Use promotion paths only when you can provide evidence; reject is destructive to review state but does not delete the record.");
+    expect(html).toContain("Evidence value is required before a memory becomes verified.");
+    expect(html).toContain("Edit then promote with evidence");
+    expect(html).toContain("Promote with evidence");
+    expect(html).toContain('<textarea name="content" rows="5">Needs review &lt;content&gt;.</textarea>');
+    expect(html).toContain('name="summary" value="Needs review &lt;summary&gt;."');
+    expect(html).toContain('name="tags" value="queue"');
     expect(html).toContain('method="post" action="/actions/review"');
     expect(html).toContain('method="post" action="/actions/promote"');
     expect(html).toContain('name="action" value="reject"');

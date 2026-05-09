@@ -215,7 +215,8 @@ describe("memory console server", () => {
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(body).toContain("Local memory console");
       expect(body).toContain("Browseable memory.");
-      expect(body).toContain(">Browse</a>");
+      expect(body).toContain('<span class="nav-label">Browse</span>');
+      expect(body).toContain("Read verified and active records");
       expect(body).not.toContain('method="post"');
       expect(reviewMemory).not.toHaveBeenCalled();
       expect(promoteMemory).not.toHaveBeenCalled();
@@ -314,6 +315,15 @@ describe("memory console server", () => {
       expect(html).toContain("mem-rejected");
       expect(html).toContain("dry_run");
       expect(html).toContain("skipped_not_rejected");
+      expect(html).toContain('method="post" action="/actions/purge-rejected"');
+      expect(html.match(/name="ids"/g)).toHaveLength(2);
+      expect(html).toContain('<input type="hidden" name="ids" value="mem-rejected">');
+      expect(html).toContain('<input type="hidden" name="ids" value="mem-pending">');
+      expect(html).toContain('<input type="hidden" name="scope" value="project">');
+      expect(html).toContain('<input type="hidden" name="projectId" value="project-a">');
+      expect(html).toContain('<input type="hidden" name="containerId" value="container-a">');
+      expect(html).toContain('input name="confirmation"');
+      expect(html).not.toContain('name="dryRun"');
       expect(html).toContain('placeholder="DELETE REJECTED"');
       expect(purgeRejectedMemories).toHaveBeenCalledWith({
         ids: ["mem-rejected", "mem-pending"],

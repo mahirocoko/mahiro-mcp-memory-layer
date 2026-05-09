@@ -31,6 +31,13 @@ import type { MemoryReviewHint, ReviewAssistResult, ReviewAssistSuggestion, Revi
 const graphNodeTypes = ["memory", "source", "tag", "evidence"] as const satisfies readonly MemoryGraphNodeType[];
 const graphEdgeTypes = ["has_source", "tagged_with", "has_evidence", "reviewed_as", "related_memory"] as const satisfies readonly MemoryGraphEdgeType[];
 
+interface RejectedPurgeScopeGroup {
+  readonly scope: "global" | "project";
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly memories: ConsoleMemory[];
+}
+
 export function renderMemoryConsolePage(result: ConsoleLoadResult): string {
   const title = "Local memory console";
   return `<!doctype html>
@@ -46,7 +53,7 @@ export function renderMemoryConsolePage(result: ConsoleLoadResult): string {
     <header class="topbar">
       <div>
         <h1>${escapeHtml(title)}</h1>
-        <p>Read-only localhost introspection for stored memory records.</p>
+        <p>Localhost memory management for browsing canonical records, reviewing hypotheses, checking rejected quarantine, and inspecting the read-only graph.</p>
       </div>
       <a class="refresh" href="/?${escapeAttribute(filtersToSearchParams(result.filters).toString())}">Refresh</a>
     </header>
@@ -84,11 +91,12 @@ export function renderReviewConsolePage(result: ConsoleReviewLoadResult): string
     <header class="topbar">
       <div>
         <h1>${escapeHtml(title)}</h1>
-        <p>Review pending memory records with explicit POST-only decisions.</p>
+        <p>Review pending memory records with explicit POST-only decisions. Promotion requires evidence; advisory hints never apply automatically.</p>
       </div>
       <a class="refresh" href="/review?${escapeAttribute(filtersToSearchParams(result.filters).toString())}">Refresh</a>
     </header>
     ${renderNavigation(result.filters)}
+    ${renderActiveFilterSummary(result.filters, "Review queue state")}
     <section class="status" aria-live="polite">
       <strong>${escapeHtml(String(result.reviewItems.length))}</strong> review queue item${result.reviewItems.length === 1 ? "" : "s"} · refreshed ${escapeHtml(result.refreshedAt)}
     </section>
@@ -116,17 +124,19 @@ export function renderRejectedConsolePage(result: ConsoleLoadResult): string {
     <header class="topbar">
       <div>
         <h1>${escapeHtml(title)}</h1>
-        <p>Rejected memory quarantine. Preview purge candidates first; deletion requires exact typed confirmation.</p>
+        <p>Rejected memory quarantine for local cleanup. Preview purge candidates first; final deletion still requires exact typed confirmation.</p>
       </div>
       <a class="refresh" href="/rejected?${escapeAttribute(filtersToSearchParams(result.filters).toString())}">Refresh</a>
     </header>
     ${renderNavigation(result.filters)}
+    ${renderActiveFilterSummary(result.filters, "Rejected quarantine state")}
     <section class="status quarantine-status" aria-live="polite">
       <strong>${escapeHtml(String(result.memories.length))}</strong> rejected record${result.memories.length === 1 ? "" : "s"} shown from ${escapeHtml(String(result.fetchedCount))} fetched by ${escapeHtml(result.fetchMode)}${result.degraded ? " · degraded search" : ""} · refreshed ${escapeHtml(result.refreshedAt)}
     </section>
     <section class="quarantine-copy" aria-label="Rejected quarantine safety notice">
       <h2>Quarantine review</h2>
       <p>Only records with <strong>reviewStatus rejected</strong> belong here. Browse and review decision controls are intentionally absent; purge starts with a dry-run preview and the final POST requires typing <strong>DELETE REJECTED</strong>.</p>
+      <p>Rejected records are grouped by their stored scope metadata so each purge preview uses one exact boundary and avoids <strong>skipped_scope_mismatch</strong>.</p>
     </section>
     <section class="console-grid rejected-grid">
       ${renderRejectedQuarantineList(result.memories, result.filters, result.selectedMemory)}
@@ -157,12 +167,13 @@ export function renderGraphConsolePage(result: ConsoleGraphLoadResult): string {
     <header class="topbar">
       <div>
         <h1>${escapeHtml(title)}</h1>
-        <p>Read-only projection of canonical memory metadata. Filters and node selection use GET links only.</p>
+        <p>Read-only projection of canonical memory metadata. Filters and node selection use GET links only; this view never writes records.</p>
       </div>
       <a class="refresh" href="/graph?${escapeAttribute(filtersToSearchParams(result.filters).toString())}">Refresh</a>
     </header>
     ${renderNavigation(result.filters)}
     ${renderGraphFilters(result.filters)}
+    ${renderActiveFilterSummary(result.filters, "Graph filter state")}
     ${renderGraphSummary(result, visibleEdges)}
     ${renderGraphWarnings(result.graph.warnings)}
     <section class="graph-layout">
@@ -205,6 +216,7 @@ export function renderPurgeRejectedResultPage(
       <h2>${result.dryRun ? "Preview outcomes" : "Purge outcomes"}</h2>
       <p>Scope: <strong>${escapeHtml(input.scope)}</strong>${input.scope === "project" ? ` · Project: <strong>${escapeHtml(input.projectId ?? "")}</strong> · Container: <strong>${escapeHtml(input.containerId ?? "")}</strong>` : ""}</p>
       <p>${escapeHtml(String(result.outcomes.length))} id${result.outcomes.length === 1 ? "" : "s"} checked · ${escapeHtml(String(result.deletedRecords.length))} deleted · ${escapeHtml(String(result.missingIds.length))} missing.</p>
+      ${result.dryRun ? "<p>Only rows marked <strong>dry_run</strong> are eligible for the final delete step. Skipped rows stay untouched.</p>" : ""}
     </section>
     <section class="details purge-results" aria-label="Per-id purge results">
       <h2>Per-id status</h2>
@@ -227,27 +239,62 @@ export function escapeHtml(value: string): string {
 
 function renderNavigation(filters: ConsoleFilterState): string {
   const links = [
-    renderNavigationLink("Browse", "/", isActiveNavigation(filters, "verified")),
-    renderNavigationLink("Review Queue", "/review", isActiveNavigation(filters, "inbox")),
-    renderNavigationLink("Rejected", "/rejected", isActiveNavigation(filters, "firehose")),
-    renderNavigationLink("Graph", "/graph", isActiveNavigation(filters, "projects")),
+    renderNavigationLink("Browse", "Read verified and active records", "/", isActiveNavigation(filters, "verified")),
+    renderNavigationLink("Review Queue", "Decide pending hypotheses", "/review", isActiveNavigation(filters, "inbox")),
+    renderNavigationLink("Rejected", "Preview guarded cleanup", "/rejected", isActiveNavigation(filters, "firehose")),
+    renderNavigationLink("Graph", "Inspect metadata links", "/graph", isActiveNavigation(filters, "projects")),
   ];
 
   return `<nav class="nav" aria-label="Memory console navigation">${links.join("")}</nav>`;
 }
 
-function renderNavigationLink(label: string, href: string, active: boolean): string {
+function renderNavigationLink(label: string, hint: string, href: string, active: boolean): string {
   const activeClass = active ? " active" : "";
   const currentAttribute = active ? " aria-current=\"page\"" : "";
-  return `<a class="nav-link${activeClass}" href="${href}"${currentAttribute}>${escapeHtml(label)}</a>`;
+  return `<a class="nav-link${activeClass}" href="${href}"${currentAttribute}><span class="nav-label">${escapeHtml(label)}</span><span class="nav-hint">${escapeHtml(hint)}</span></a>`;
 }
 
 function isActiveNavigation(filters: ConsoleFilterState, view: ConsoleNavigationView): boolean {
   return filters.view === view;
 }
 
+function renderActiveFilterSummary(filters: ConsoleFilterState, label: string): string {
+  const chips = [
+    formatScopeChip(filters),
+    filters.query ? `search: ${filters.query}` : "search: none",
+    `kind: ${formatFilterLabel(filters.kind)}`,
+    `verification: ${formatFilterLabel(filters.verificationStatus)}`,
+    `review: ${formatFilterLabel(filters.reviewStatus)}`,
+    `limit: ${String(filters.limit)}`,
+    filters.graphEdgeType && filters.graphEdgeType !== "all" ? `edge type: ${formatFilterLabel(filters.graphEdgeType)}` : undefined,
+  ].filter((chip): chip is string => chip !== undefined);
+
+  return `<section class="filter-summary" aria-label="${escapeAttribute(label)}">
+    <span class="filter-summary-label">Active filters</span>
+    <span class="filter-chips">${chips.map((chip) => `<span class="filter-chip">${escapeHtml(chip)}</span>`).join("")}</span>
+  </section>`;
+}
+
+function formatScopeChip(filters: ConsoleFilterState): string {
+  if (filters.scope === "project" && filters.projectId && filters.containerId) {
+    return `scope: project · ${filters.projectId} / ${filters.containerId}`;
+  }
+
+  return `scope: ${formatFilterLabel(filters.scope)}`;
+}
+
+function renderEmptyState(message: string, guidance: string, href: string | undefined, actionLabel: string | undefined): string {
+  const action = href && actionLabel ? `<a class="empty-action" href="${escapeAttribute(href)}">${escapeHtml(actionLabel)}</a>` : "";
+  return `<div class="empty-state">
+    <p class="empty"><strong>${escapeHtml(message)}</strong></p>
+    <p class="empty">${escapeHtml(guidance)}</p>
+    ${action}
+  </div>`;
+}
+
 function renderMemoryExplorer(result: ConsoleLoadResult): string {
   return `${renderFilters(result.filters)}
+    ${renderActiveFilterSummary(result.filters, "Browse state")}
     <section class="status" aria-live="polite">
       <strong>${escapeHtml(String(result.memories.length))}</strong> shown from ${escapeHtml(String(result.fetchedCount))} fetched by ${escapeHtml(result.fetchMode)}${result.degraded ? " · degraded search" : ""} · refreshed ${escapeHtml(result.refreshedAt)}
     </section>
@@ -263,7 +310,7 @@ function renderReviewQueueList(
   selectedReviewItem: ReviewQueueOverviewItem | undefined,
 ): string {
   if (reviewItems.length === 0) {
-    return `<section class="list-panel"><p class="empty">No review queue items matched the current scope.</p></section>`;
+    return `<section class="list-panel">${renderEmptyState("No review queue items matched the current scope.", "Use the scope filters above, or reset to the full review queue.", "/review", "Reset review filters")}</section>`;
   }
 
   const items = reviewItems.map((item) => {
@@ -286,7 +333,7 @@ function renderReviewDetailsPane(
   assist: ReviewAssistResult | undefined,
 ): string {
   if (!item) {
-    return `<aside class="details"><p class="empty">Select a review queue item to inspect hints and submit an explicit decision.</p></aside>`;
+    return `<aside class="details">${renderEmptyState("Select a review queue item to inspect hints and submit an explicit decision.", "Promotion and edit-then-promote require evidence; defer and reject only record the reviewer decision.", undefined, undefined)}</aside>`;
   }
 
   return `<aside class="details" aria-label="Review details">
@@ -358,15 +405,17 @@ function renderReviewAssistSuggestion(suggestion: ReviewAssistSuggestion): strin
 function renderReviewActionForms(item: ReviewQueueOverviewItem): string {
   return `<section class="detail-section review-actions" aria-label="Review actions">
     <h3>Review decision</h3>
-    ${renderSimpleReviewForm(item.id, "reject", "Reject")}
-    ${renderSimpleReviewForm(item.id, "defer", "Defer")}
+    <p class="action-guidance">Choose one explicit action. Use promotion paths only when you can provide evidence; reject is destructive to review state but does not delete the record.</p>
     ${renderEditThenPromoteForm(item)}
     ${item.verificationStatus !== "verified" ? renderPromoteForm(item.id) : ""}
+    ${renderSimpleReviewForm(item.id, "defer", "Defer")}
+    ${renderSimpleReviewForm(item.id, "reject", "Reject")}
   </section>`;
 }
 
 function renderSimpleReviewForm(id: string, action: "reject" | "defer", label: string): string {
-  return `<form class="action-form" method="post" action="/actions/review">
+  const formClass = action === "reject" ? "action-form secondary danger-action" : "action-form secondary";
+  return `<form class="${formClass}" method="post" action="/actions/review">
       <input type="hidden" name="id" value="${escapeAttribute(id)}">
       <input type="hidden" name="action" value="${escapeAttribute(action)}">
       <label><span>${escapeHtml(label)} note</span><input name="note" placeholder="Optional reviewer note"></label>
@@ -375,7 +424,8 @@ function renderSimpleReviewForm(id: string, action: "reject" | "defer", label: s
 }
 
 function renderEditThenPromoteForm(item: ReviewQueueOverviewItem): string {
-  return `<form class="action-form stacked" method="post" action="/actions/review">
+  return `<form class="action-form stacked primary-action" method="post" action="/actions/review">
+      <h4>Edit content, then promote</h4>
       <input type="hidden" name="id" value="${escapeAttribute(item.id)}">
       <input type="hidden" name="action" value="edit_then_promote">
       <label><span>Content</span><textarea name="content" rows="5">${escapeHtml(item.content)}</textarea></label>
@@ -383,21 +433,23 @@ function renderEditThenPromoteForm(item: ReviewQueueOverviewItem): string {
       <label><span>Tags</span><input name="tags" value="${escapeAttribute(item.tags.join(", "))}" placeholder="comma separated"></label>
       <label><span>Decision note</span><input name="note" placeholder="Optional reviewer note"></label>
       ${renderEvidenceFields(true)}
-      <button type="submit">Edit then promote</button>
+      <button type="submit">Edit then promote with evidence</button>
     </form>`;
 }
 
 function renderPromoteForm(id: string): string {
-  return `<form class="action-form stacked" method="post" action="/actions/promote">
+  return `<form class="action-form stacked primary-action" method="post" action="/actions/promote">
+      <h4>Promote as-is</h4>
       <input type="hidden" name="id" value="${escapeAttribute(id)}">
       ${renderEvidenceFields(true)}
-      <button type="submit">Promote</button>
+      <button type="submit">Promote with evidence</button>
     </form>`;
 }
 
 function renderEvidenceFields(required: boolean): string {
   const requiredAttribute = required ? " required" : "";
-  return `<div class="evidence-grid">
+  return `<div class="evidence-grid" aria-label="Promotion evidence fields">
+      <p class="evidence-help">Evidence value is required before a memory becomes verified.</p>
       <label><span>Evidence type</span>${renderSelect("evidenceType", ["human", "test", "trace", "issue", "link"], "human", formatPlainLabel)}</label>
       <label><span>Evidence value</span><input name="evidenceValue"${requiredAttribute} placeholder="Required for promotion"></label>
       <label><span>Evidence note</span><input name="evidenceNote" placeholder="Optional note"></label>
@@ -409,7 +461,7 @@ function renderProjectsView(result: ConsoleLoadResult): string {
     return `<section class="status" aria-live="polite">
       <strong>0</strong> project/container scopes discovered from canonical records · refreshed ${escapeHtml(result.refreshedAt)}
     </section>
-    <section class="projects-panel"><p class="empty">No complete project/container scopes were found.</p></section>`;
+    <section class="projects-panel">${renderEmptyState("No complete project/container scopes were found.", "Project shortcuts appear only after canonical records contain both projectId and containerId.", "/", "Back to browse")}</section>`;
   }
 
   const rows = result.projectScopes.map((projectScope) => renderProjectScopeRow(projectScope, result.filters));
@@ -427,17 +479,35 @@ function renderRejectedQuarantineList(
   selectedMemory: ConsoleMemory | undefined,
 ): string {
   if (memories.length === 0) {
-    return `<section class="list-panel"><p class="empty">No rejected memories matched the current quarantine filters.</p></section>`;
+    return `<section class="list-panel">${renderEmptyState("No rejected memories matched the current quarantine filters.", "Rejected cleanup is intentionally limited to records with reviewStatus rejected. Reset the quarantine filters or choose a project scope with rejected records.", "/rejected", "Reset quarantine filters")}</section>`;
   }
 
-  const rows = memories.map((memory) => renderRejectedQuarantineRow(memory, filters, selectedMemory));
-  return `<form class="list-panel quarantine-form" method="post" action="/actions/purge-rejected" aria-label="Preview rejected memory purge">
-    <input type="hidden" name="dryRun" value="true">
-    ${renderPurgeScopeInputs(filters)}
+  const { groups, nonPurgeable } = groupRejectedMemoriesByPurgeScope(memories);
+  const scopeForms = groups.map((group) => renderRejectedPurgeScopeForm(group, filters, selectedMemory)).join("");
+  const unknownRows = nonPurgeable.length > 0 ? `<div class="quarantine-scope-block" aria-label="Rejected records without purgeable scope">
+      <div class="purge-scope-note"><strong>Not purgeable:</strong> these records do not have complete scope metadata, so the console will not render purge checkboxes for them.</div>
+      <div class="quarantine-rows">${nonPurgeable.map((memory) => renderRejectedQuarantineRow(memory, filters, selectedMemory, false)).join("")}</div>
+    </div>` : "";
+
+  return `<section class="list-panel quarantine-panel" aria-label="Rejected memory purge groups">
     <div class="quarantine-form-header">
       <h2>Rejected records</h2>
-      <p>Select one or more rejected ids, then preview the purge result before any deletion can run.</p>
+      <p>Select one or more rejected ids inside a single scope group, then preview the purge result before any deletion can run.</p>
     </div>
+    ${scopeForms || `<div class="purge-scope-note"><strong>No purgeable scope groups:</strong> complete global or project/container metadata is required before a rejected record can be selected for purge.</div>`}
+    ${unknownRows}
+  </section>`;
+}
+
+function renderRejectedPurgeScopeForm(
+  group: RejectedPurgeScopeGroup,
+  filters: ConsoleFilterState,
+  selectedMemory: ConsoleMemory | undefined,
+): string {
+  const rows = group.memories.map((memory) => renderRejectedQuarantineRow(memory, filters, selectedMemory, true));
+  return `<form class="quarantine-form quarantine-scope-block" method="post" action="/actions/purge-rejected" aria-label="Preview rejected memory purge for ${escapeAttribute(formatRejectedPurgeScope(group))}">
+    <input type="hidden" name="dryRun" value="true">
+    ${renderPurgeScopeInputs(group)}
     <div class="quarantine-rows">${rows.join("")}</div>
     <div class="quarantine-actions">
       <button type="submit">Preview purge</button>
@@ -450,26 +520,83 @@ function renderRejectedQuarantineRow(
   memory: ConsoleMemory,
   filters: ConsoleFilterState,
   selectedMemory: ConsoleMemory | undefined,
+  purgeable: boolean,
 ): string {
   const params = filtersToSearchParams(filters, memory.id);
   const activeClass = selectedMemory?.id === memory.id ? " active" : "";
   const summary = memory.summary ?? memory.content;
-  return `<div class="memory-row rejected-row${activeClass}">
-    <label class="checkbox-row">
+  const selector = purgeable ? `<label class="checkbox-row">
       <input type="checkbox" name="ids" value="${escapeAttribute(memory.id)}">
       <span>
         <span class="row-title">${escapeHtml(summary)}</span>
         <span class="row-meta">${escapeHtml(memory.kind)} · ${escapeHtml(memory.scope ?? "unknown scope")} · ${escapeHtml(memory.id)}</span>
       </span>
-    </label>
+    </label>` : `<div class="non-purgeable-row">
+      <span class="row-title">${escapeHtml(summary)}</span>
+      <span class="row-meta">${escapeHtml(memory.kind)} · ${escapeHtml(memory.scope ?? "unknown scope")} · ${escapeHtml(memory.id)}</span>
+      <span class="empty">Not purgeable until scope metadata is complete.</span>
+    </div>`;
+
+  return `<div class="memory-row rejected-row${activeClass}">
+    ${selector}
     <span class="signal-badges">${renderStatusBadges(memory)}</span>
     <a class="inspect-link" href="/rejected?${escapeAttribute(params.toString())}">Inspect</a>
   </div>`;
 }
 
+function groupRejectedMemoriesByPurgeScope(memories: readonly ConsoleMemory[]): {
+  readonly groups: readonly RejectedPurgeScopeGroup[];
+  readonly nonPurgeable: readonly ConsoleMemory[];
+} {
+  const groups = new Map<string, RejectedPurgeScopeGroup>();
+  const nonPurgeable: ConsoleMemory[] = [];
+
+  for (const memory of memories) {
+    const scope = getRejectedPurgeScope(memory);
+    if (!scope) {
+      nonPurgeable.push(memory);
+      continue;
+    }
+
+    const key = scope.scope === "global" ? "global" : `project\u0000${scope.projectId}\u0000${scope.containerId}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.memories.push(memory);
+      continue;
+    }
+
+    const group: RejectedPurgeScopeGroup = scope.scope === "global"
+      ? { scope: "global", memories: [memory] }
+      : { scope: "project", projectId: scope.projectId, containerId: scope.containerId, memories: [memory] };
+    groups.set(key, group);
+  }
+
+  return { groups: [...groups.values()], nonPurgeable };
+}
+
+function getRejectedPurgeScope(memory: ConsoleMemory): Omit<RejectedPurgeScopeGroup, "memories"> | undefined {
+  if (memory.scope === "global") {
+    return { scope: "global" };
+  }
+
+  if (memory.scope === "project" && memory.projectId && memory.containerId) {
+    return { scope: "project", projectId: memory.projectId, containerId: memory.containerId };
+  }
+
+  return undefined;
+}
+
+function formatRejectedPurgeScope(group: RejectedPurgeScopeGroup): string {
+  if (group.scope === "global") {
+    return "global rejected records only";
+  }
+
+  return `project rejected records only · ${group.projectId} / ${group.containerId}`;
+}
+
 function renderRejectedDetailsPane(memory: ConsoleMemory | undefined): string {
   if (!memory) {
-    return `<aside class="details"><p class="empty">Select a rejected memory to inspect quarantine metadata before previewing a purge.</p></aside>`;
+    return `<aside class="details">${renderEmptyState("Select a rejected memory to inspect quarantine metadata before previewing a purge.", "Purge controls stay preview-first and rejected-only; final deletion is never available from this details pane.", undefined, undefined)}</aside>`;
   }
 
   return `<aside class="details" aria-label="Rejected memory details">
@@ -502,22 +629,14 @@ function renderRejectedDetailsPane(memory: ConsoleMemory | undefined): string {
   </aside>`;
 }
 
-function renderPurgeScopeInputs(filters: ConsoleFilterState): string {
-  if (filters.scope === "global") {
-    return `<input type="hidden" name="scope" value="global">`;
+function renderPurgeScopeInputs(group: RejectedPurgeScopeGroup): string {
+  if (group.scope === "global") {
+    return `<div class="purge-scope-note"><strong>Purge scope:</strong> global rejected records only.</div><input type="hidden" name="scope" value="global">`;
   }
 
-  if (filters.scope === "project" && filters.projectId && filters.containerId) {
-    return `<input type="hidden" name="scope" value="project">
-      <input type="hidden" name="projectId" value="${escapeAttribute(filters.projectId)}">
-      <input type="hidden" name="containerId" value="${escapeAttribute(filters.containerId)}">`;
-  }
-
-  return `<div class="purge-scope-grid">
-    <label><span>Purge scope</span>${renderSelect("scope", ["global", "project"], "global", formatPlainLabel)}</label>
-    <label><span>Project ID for project scope</span><input name="projectId" value="${escapeAttribute(filters.projectId ?? "")}" placeholder="required for project scope"></label>
-    <label><span>Container ID for project scope</span><input name="containerId" value="${escapeAttribute(filters.containerId ?? "")}" placeholder="required for project scope"></label>
-  </div>`;
+  return `<div class="purge-scope-note"><strong>Purge scope:</strong> project rejected records only · ${escapeHtml(group.projectId ?? "")} / ${escapeHtml(group.containerId ?? "")}</div><input type="hidden" name="scope" value="project">
+      <input type="hidden" name="projectId" value="${escapeAttribute(group.projectId ?? "")}">
+      <input type="hidden" name="containerId" value="${escapeAttribute(group.containerId ?? "")}">`;
 }
 
 function renderPurgeOutcomeList(result: ConsolePurgeRejectedActionResult): string {
@@ -588,6 +707,11 @@ function formatCountPart(label: string, count: number): string | undefined {
 
 function renderGraphFilters(filters: ConsoleFilterState): string {
   return `<form class="filters graph-filters" method="get" action="/graph" aria-label="Graph filters">
+    <div class="filter-help">
+      <strong>Graph filters</strong>
+      <span>Read-only metadata projection. Narrowing edges only changes what is shown here.</span>
+      <a class="reset-link" href="/graph">Reset graph filters</a>
+    </div>
     <div class="advanced-grid graph-filter-grid">
       ${renderEditableScopeFilters(filters)}
       <label>
@@ -643,7 +767,7 @@ function renderGraphNodeGroup(
   selectedNode: MemoryGraphNode | undefined,
 ): string {
   if (nodes.length === 0) {
-    return `<section class="graph-group"><h3>${escapeHtml(formatPlainLabel(type))}</h3><p class="empty">No ${escapeHtml(formatPlainLabel(type))} nodes.</p></section>`;
+    return `<section class="graph-group"><h3>${escapeHtml(formatPlainLabel(type))}</h3><p class="empty">No ${escapeHtml(formatPlainLabel(type))} nodes in the current read-only projection.</p></section>`;
   }
 
   const rows = nodes.map((node) => {
@@ -665,7 +789,7 @@ function renderGraphEdgeGroups(edges: readonly MemoryGraphEdge[], totalEdgeCount
 
 function renderGraphEdgeGroup(type: MemoryGraphEdgeType, edges: readonly MemoryGraphEdge[]): string {
   if (edges.length === 0) {
-    return `<section class="graph-group"><h3>${escapeHtml(formatPlainLabel(type))}</h3><p class="empty">No ${escapeHtml(formatPlainLabel(type))} edges.</p></section>`;
+    return `<section class="graph-group"><h3>${escapeHtml(formatPlainLabel(type))}</h3><p class="empty">No ${escapeHtml(formatPlainLabel(type))} edges with the current graph filters.</p></section>`;
   }
 
   const rows = edges.map((edge) => `<div class="graph-edge-row">
@@ -679,7 +803,7 @@ function renderGraphEdgeGroup(type: MemoryGraphEdgeType, edges: readonly MemoryG
 
 function renderGraphDetailsPane(node: MemoryGraphNode | undefined): string {
   if (!node) {
-    return `<aside class="details"><p class="empty">Select a memory, source, tag, or evidence node to inspect graph metadata.</p></aside>`;
+    return `<aside class="details">${renderEmptyState("Select a memory, source, tag, or evidence node to inspect graph metadata.", "Graph selection uses GET links only, so inspecting nodes cannot mutate memory records.", undefined, undefined)}</aside>`;
   }
 
   return `<aside class="details" aria-label="Graph node details">
@@ -726,16 +850,21 @@ function renderFilters(filters: ConsoleFilterState): string {
   const hasCompleteProjectScope = filters.scope === "project" && filters.projectId !== undefined && filters.containerId !== undefined;
 
   return `<form class="filters" method="get" action="/">
+    <div class="filter-help">
+      <strong>Browse filters</strong>
+      <span>Search and scope stay local to this console. Reset returns to verified, active memory records.</span>
+    </div>
     <div class="search-row">
       <label>
         <span>Search</span>
-        <input name="q" value="${escapeAttribute(filters.query ?? "")}" placeholder="Search memory content">
+        <input name="q" value="${escapeAttribute(filters.query ?? "")}" placeholder="Search content, summary, source, or tags">
       </label>
       <button type="submit">Search</button>
+      <a class="reset-link" href="/">Reset browse filters</a>
     </div>
     ${hasCompleteProjectScope ? renderScopeContext(filters.projectId, filters.containerId) : ""}
-    <details class="advanced-filters">
-      <summary>Advanced filters</summary>
+    <details class="advanced-filters" open>
+      <summary>Scope and status filters</summary>
       <div class="advanced-grid">
         ${hasCompleteProjectScope ? "" : renderEditableScopeFilters(filters)}
         <label>
@@ -776,9 +905,9 @@ function renderEditableScopeFilters(filters: ConsoleFilterState): string {
 
 function renderScopeContext(projectId: string, containerId: string): string {
   return `<div class="scope-context">
-      <span>Scope</span>
+      <span>Locked project scope</span>
       <strong>${escapeHtml(projectId)}</strong>
-      <span>${escapeHtml(containerId)}</span>
+      <span>Container: ${escapeHtml(containerId)}</span>
       <input type="hidden" name="scope" value="project">
       <input type="hidden" name="projectId" value="${escapeAttribute(projectId)}">
       <input type="hidden" name="containerId" value="${escapeAttribute(containerId)}">
@@ -805,7 +934,7 @@ function renderMemoryList(
   selectedMemory: ConsoleMemory | undefined,
 ): string {
   if (memories.length === 0) {
-    return `<section class="list-panel"><p class="empty">No memories matched the current filters.</p></section>`;
+    return `<section class="list-panel">${renderEmptyState("No memories matched the current filters.", "Try removing search text, broadening scope, or resetting to verified active records.", "/", "Reset browse filters")}</section>`;
   }
 
   const items = memories.map((memory) => {
@@ -824,7 +953,7 @@ function renderMemoryList(
 
 function renderDetailsPane(memory: ConsoleMemory | undefined): string {
   if (!memory) {
-    return `<aside class="details"><p class="empty">Select a memory to inspect its source, evidence, and review decisions.</p></aside>`;
+    return `<aside class="details">${renderEmptyState("Select a memory to inspect its source, evidence, and review decisions.", "Browse is read-only; use the Review Queue for review decisions or Rejected for guarded cleanup.", undefined, undefined)}</aside>`;
   }
 
   return `<aside class="details" aria-label="Memory details">
@@ -935,6 +1064,7 @@ function renderStyles(): string {
       --text: #27231d;
       --muted: #625b4f;
       --accent: #2f5f4d;
+      --accent-strong: #1f4638;
       --accent-soft: #dce8df;
       --focus: #9fb9aa;
       --warning-bg: #fff4d2;
@@ -955,22 +1085,29 @@ function renderStyles(): string {
     body { margin: 0; background: var(--background); color: var(--text); font: 14px/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif; }
     .shell { max-width: 1320px; margin: 0 auto; padding: 28px var(--space-6) var(--space-6); }
     .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
-    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3, h4, p { margin-top: 0; }
     h1 { margin-bottom: var(--space-1); font-size: 24px; line-height: 1.18; letter-spacing: -0.015em; }
     h2 { margin-bottom: var(--space-3); font-size: 18px; line-height: 1.3; letter-spacing: -0.01em; }
     h3 { margin-bottom: var(--space-2); font-size: 13px; line-height: 1.35; }
+    h4 { margin-bottom: var(--space-2); font-size: 13px; line-height: 1.35; }
     .topbar p, .empty, .row-meta, .status { color: var(--muted); }
     .topbar p { max-width: 520px; margin-bottom: 0; }
     .refresh, button { border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent); color: white; padding: 8px 12px; text-decoration: none; font-weight: 650; cursor: pointer; }
     .refresh { background: transparent; color: var(--accent); }
     .refresh:hover, .refresh:focus-visible { background: var(--accent-soft); }
-    .nav { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
-    .nav-link { border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px var(--space-3) 9px; text-decoration: none; font-weight: 650; }
+    .nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-4); }
+    .nav-link { display: grid; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); padding: var(--space-3); text-decoration: none; font-weight: 650; background: rgba(255, 253, 247, 0.72); }
     .nav-link:hover { color: var(--text); background: var(--surface-hover); }
-    .nav-link.active { border-bottom-color: var(--accent); color: var(--accent); }
+    .nav-link.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+    .nav-label { color: inherit; }
+    .nav-hint { color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.35; }
     .filters { display: grid; gap: var(--space-3); padding: var(--space-4); margin-bottom: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .graph-filters { margin-bottom: var(--space-3); }
-    .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; }
+    .filter-help { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; color: var(--muted); font-size: 12px; }
+    .filter-help strong { color: var(--text); font-size: 13px; }
+    .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: end; }
+    .reset-link, .empty-action { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius); color: var(--accent); padding: 8px 12px; text-decoration: none; font-weight: 650; background: var(--surface-wash); }
+    .reset-link:hover, .empty-action:hover { border-color: var(--accent); background: var(--accent-soft); }
     .advanced-filters { border-top: 1px solid var(--surface-muted); padding-top: var(--space-3); }
     .advanced-filters summary { color: var(--muted); cursor: pointer; font-weight: 650; }
     .advanced-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
@@ -984,6 +1121,10 @@ function renderStyles(): string {
     input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--accent); }
     .filters button { align-self: end; min-height: 38px; }
     .status { margin-bottom: var(--space-4); }
+    .filter-summary { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); align-items: start; padding: var(--space-3); margin-bottom: var(--space-3); background: var(--surface-wash); border: 1px solid var(--border); border-radius: var(--radius); }
+    .filter-summary-label { color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.04em; }
+    .filter-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+    .filter-chip { border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); padding: 2px 8px; font-size: 12px; overflow-wrap: anywhere; }
     .graph-summary { display: grid; gap: var(--space-1); }
     .graph-counts { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
     .graph-warnings { padding: var(--space-4); margin-bottom: var(--space-4); background: var(--warning-bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--warning-text); }
@@ -1004,6 +1145,9 @@ function renderStyles(): string {
     .console-grid { display: grid; grid-template-columns: minmax(320px, 460px) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
     .list-panel, .details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .list-panel { overflow: hidden; }
+    .empty-state { display: grid; gap: var(--space-2); padding: var(--space-5); }
+    .empty-state p { margin-bottom: 0; }
+    .empty-state .empty-action { justify-self: start; }
     .memory-row { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); color: var(--text); text-decoration: none; border-bottom: 1px solid var(--surface-muted); }
     .memory-row:last-child { border-bottom: 0; }
     .memory-row:hover { background: var(--surface-hover); }
@@ -1027,12 +1171,16 @@ function renderStyles(): string {
     .quarantine-copy { padding: var(--space-4); margin-bottom: var(--space-4); background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); color: var(--danger); }
     .quarantine-copy h2 { margin-bottom: var(--space-2); }
     .quarantine-copy p { margin-bottom: 0; color: var(--danger); }
+    .quarantine-panel { display: grid; }
     .quarantine-form { display: grid; }
+    .quarantine-scope-block { border-top: 1px solid var(--surface-muted); }
     .quarantine-form-header, .quarantine-actions { display: grid; gap: var(--space-2); padding: var(--space-4); border-bottom: 1px solid var(--surface-muted); }
     .quarantine-form-header p, .quarantine-actions .empty { margin-bottom: 0; }
     .quarantine-rows { display: grid; }
     .quarantine-actions { border-top: 1px solid var(--surface-muted); border-bottom: 0; }
-    .purge-scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-4); border-bottom: 1px solid var(--surface-muted); background: var(--surface-wash); }
+    .non-purgeable-row { display: grid; gap: var(--space-1); }
+    .purge-scope-note { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--surface-muted); background: var(--surface-wash); color: var(--muted); overflow-wrap: anywhere; }
+    .purge-scope-note strong { color: var(--text); }
     .purge-results { position: static; }
     .purge-outcomes { margin-bottom: var(--space-4); }
     .final-purge-form { margin-top: var(--space-4); }
@@ -1056,13 +1204,22 @@ function renderStyles(): string {
     .content-section p { padding: var(--space-3); border-left: 3px solid var(--surface-muted); background: #fbf8f0; }
     .assist-section p { margin-bottom: var(--space-2); }
     .review-actions { display: grid; gap: var(--space-3); }
+    .action-guidance { margin-bottom: 0; color: var(--muted); }
     .action-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; padding: var(--space-3); border: 1px solid var(--surface-muted); border-radius: var(--radius); background: #fbf8f0; }
     .action-form.stacked { grid-template-columns: 1fr; }
+    .action-form.primary-action { border-color: var(--focus); background: var(--accent-soft); }
+    .action-form.primary-action h4 { color: var(--accent-strong); }
+    .action-form.secondary { background: var(--surface-wash); }
+    .action-form.secondary button { background: var(--surface); color: var(--accent); }
+    .action-form.danger-action { border-color: var(--danger-border); background: var(--danger-bg); }
+    .action-form.danger-action button { border-color: var(--danger); background: var(--danger); color: white; }
     .evidence-grid { display: grid; grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); }
+    .evidence-help { grid-column: 1 / -1; margin-bottom: 0; color: var(--muted); }
     ul { margin: 0; padding-left: var(--space-5); }
     li { margin-bottom: var(--space-2); overflow-wrap: anywhere; }
     .compact-evidence { display: block; margin-top: var(--space-1); color: var(--muted); font-size: 12px; }
     @media (max-width: 980px) {
+      .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .project-row { grid-template-columns: 1fr; }
       .count-breakdown { grid-column: auto; grid-row: auto; text-align: left; }
       .graph-layout { grid-template-columns: 1fr; }
@@ -1071,15 +1228,17 @@ function renderStyles(): string {
     @media (max-width: 860px) {
       .shell { padding: var(--space-4); }
       .topbar { display: grid; }
-      .search-row, .advanced-grid, .graph-filter-grid, .graph-edge-row { grid-template-columns: 1fr; }
+      .filter-help, .search-row, .advanced-grid, .graph-filter-grid, .graph-edge-row { grid-template-columns: 1fr; }
       .graph-edge-row .compact-evidence { grid-column: auto; }
       .console-grid { grid-template-columns: 1fr; }
       .action-form, .evidence-grid, .purge-scope-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 640px) {
       .shell { padding: var(--space-3); }
-      .nav { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0; }
+      .nav { display: flex; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0; }
       .nav-link { white-space: nowrap; }
+      .nav-hint { display: none; }
+      .filter-summary { grid-template-columns: 1fr; }
       .details { padding: var(--space-4); }
       .meta-grid { grid-template-columns: 1fr; gap: var(--space-1); }
     }
