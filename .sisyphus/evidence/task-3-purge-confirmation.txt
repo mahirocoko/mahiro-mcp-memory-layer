@@ -1,0 +1,19 @@
+Task 3 purge confirmation gate evidence
+
+Validation implemented:
+- purgeRejectedMemoriesInputSchema requires confirmation: "DELETE REJECTED".
+- ids must be non-empty and unique.
+- project scope requires projectId and containerId.
+- global scope rejects projectId and containerId.
+
+Safety behavior covered by tests:
+- "purge rejected invalid confirmation fails before deletion" passes.
+- The invalid-confirmation test creates a rejected record, calls purgeRejectedMemories with confirmation "DELETE", expects validation failure, and confirms the record remains in the canonical log.
+- "purge rejected validation rejects duplicate ids and invalid scope fields before deletion" passes.
+- The validation-edge test keeps the rejected record in the canonical log and retrieval index after duplicate-id, project-scope, and global-scope validation failures.
+
+Deletion behavior covered by tests:
+- Only records with reviewStatus="rejected" and matching requested scope are deleted.
+- Verified, pending, and deferred records return skipped_not_rejected and are not deleted.
+- Mixed batches return per-id outcomes instead of failing after validation.
+- Dry run returns dry_run outcomes and leaves canonical log and retrieval index untouched.

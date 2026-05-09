@@ -16,6 +16,7 @@ Directionally:
 
 - memory stays here
 - continuity-cache helpers may stay if they remain memory-facing
+- `memory-console` stays local-only and memory-management focused
 - host-specific workflow control should stay outside this package
 - lifecycle docs should keep the memory vocabulary only: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
 
@@ -33,6 +34,7 @@ This is future-facing only, not current API or storage behavior.
 1. Keep docs and tests centered on the memory-only surface.
 2. Preserve plugin-native wake-up, turn preflight, idle persistence, `memory_context`, and `runtime_capabilities` as memory helpers.
 3. Prevent workflow-control concepts from creeping back in under memory-facing names.
+4. Keep console graph output derived and read-only, and keep rejected purge guarded and non-default.
 
 ## Guardrails
 

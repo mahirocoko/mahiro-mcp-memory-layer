@@ -1,81 +1,101 @@
 {
-  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/trusted-memory-diagnostics.md",
-  "started_at": "2026-05-07T14:20:19.434Z",
+  "active_plan": "/Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer/.sisyphus/plans/memory-console-control-graph.md",
+  "started_at": "2026-05-09T05:56:31.463Z",
   "session_ids": [
-    "ses_1fd3069b3ffePOCMY61P95bPz0",
-    "ses_1fd1b452cffe6hp8arkV3Jlz1f",
-    "ses_1fd1b44aeffeNUOVcLaOcF22Kd"
+    "ses_1f4b0efb5ffeTYRBazq7SZA3OQ",
+    "ses_1f4af48afffeqsO7rpMPfnz7W3",
+    "ses_1f4af204fffef58vBaIzhU0o71",
+    "ses_1f4aef73fffegiIpOenTPadxhb"
   ],
   "session_origins": {
-    "ses_1fd3069b3ffePOCMY61P95bPz0": "direct",
-    "ses_1fd1b452cffe6hp8arkV3Jlz1f": "appended",
-    "ses_1fd1b44aeffeNUOVcLaOcF22Kd": "appended"
+    "ses_1f4b0efb5ffeTYRBazq7SZA3OQ": "direct",
+    "ses_1f4af48afffeqsO7rpMPfnz7W3": "appended",
+    "ses_1f4af204fffef58vBaIzhU0o71": "appended",
+    "ses_1f4aef73fffegiIpOenTPadxhb": "appended"
   },
-  "plan_name": "trusted-memory-diagnostics",
+  "plan_name": "memory-console-control-graph",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Freeze Trusted Diagnostics Contract",
-      "session_id": "ses_1fd190a0dffebsgSuHXbbwsaXM",
+      "task_title": "Rename product identity from memory-viewer to memory-console",
+      "session_id": "ses_1f4ab508fffeB10SwLNT6SiXPa",
       "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-07T14:49:00.630Z"
+      "category": "quick",
+      "updated_at": "2026-05-09T06:12:22.473Z"
     },
     "todo:2": {
       "task_key": "todo:2",
       "task_label": "2",
-      "task_title": "Harden `contextSize` and Trace Payload Semantics",
-      "session_id": "ses_1fd1538c9ffevj1IlEzS2AD2JU",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-07T14:54:12.339Z"
-    },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "Improve `inspectMemoryRetrieval` Summary Classification",
-      "session_id": "ses_1fd103edaffet39jI634BB1q9y",
+      "task_title": "Introduce memory-console route and action contracts",
+      "session_id": "ses_1f499c812ffeQmqXz2SX45kGLk",
       "agent": "Sisyphus-Junior",
       "category": "deep",
-      "updated_at": "2026-05-07T14:58:01.789Z"
+      "updated_at": "2026-05-09T06:27:10.967Z"
     },
     "todo:4": {
       "task_key": "todo:4",
       "task_label": "4",
-      "task_title": "Pin Scoped Lookup, Request ID, Provenance, and Ranking Reason Boundaries",
-      "session_id": "ses_1fd0cdbc3ffe4HpMSFpXn909Hj",
+      "task_title": "Add read-only memory graph projection model",
+      "session_id": "ses_1f48dac57fferx9rQ9n5gDbiaq",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-05-07T15:03:22.459Z"
+      "updated_at": "2026-05-09T06:40:58.503Z"
     },
     "todo:5": {
       "task_key": "todo:5",
       "task_label": "5",
-      "task_title": "Align Diagnostics Documentation and Optional Trace-Store Resilience",
-      "session_id": "ses_1fd076d84ffebQ7H2be5kCQFku",
+      "task_title": "Build console browse and review management UI",
+      "session_id": "ses_1f485ff18ffeAkpG0UYZ7SEIwl",
       "agent": "Sisyphus-Junior",
-      "category": "writing",
-      "updated_at": "2026-05-07T15:08:57.140Z"
+      "category": "visual-engineering",
+      "updated_at": "2026-05-09T06:51:35.047Z"
     },
     "todo:6": {
       "task_key": "todo:6",
       "task_label": "6",
-      "task_title": "Full Verification and Evidence Packaging",
-      "session_id": "ses_1fd02cbdfffeQaPOGrCVNmetwX",
+      "task_title": "Build rejected quarantine and guarded purge UI",
+      "session_id": "ses_1f4747e7cffeSXFwgf5MErxNDU",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-09T07:12:18.649Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Build read-only knowledge graph page",
+      "session_id": "ses_1f45ca3d6ffeTUKmy1XmI0lSmc",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-05-09T07:36:18.924Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Update documentation and package references for memory-console",
+      "session_id": "ses_1f446a867ffe7wC2wDdMnGi0Ar",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-05-09T07:56:52.728Z"
+    },
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "Run full verification and collect evidence",
+      "session_id": "ses_1f43cd206ffej7gUcqXvn0IeEs",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-05-07T15:13:30.630Z"
+      "updated_at": "2026-05-09T08:20:25.517Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
       "task_title": "Plan Compliance Audit — oracle",
-      "session_id": "ses_1fcfc9defffeD0jOzkSBsI5Lia",
+      "session_id": "ses_1f410ed39ffeHfXmdXElwV26ms",
       "agent": "oracle",
       "category": "",
-      "updated_at": "2026-05-07T15:17:42.432Z"
+      "updated_at": "2026-05-09T08:53:14.784Z"
     }
   }
 }

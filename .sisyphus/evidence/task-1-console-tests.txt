@@ -1,0 +1,15 @@
+$ vitest run memory-console
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/memory-console-filters.test.ts (10 tests) 4ms
+ ✓ tests/memory-console-render.test.ts (7 tests) 4ms
+ ✓ tests/memory-console-server.test.ts (7 tests) 7ms
+
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+   Start at  13:16:45
+   Duration  305ms (transform 107ms, setup 0ms, collect 171ms, tests 14ms, environment 0ms, prepare 180ms)
+
+
+exit:0

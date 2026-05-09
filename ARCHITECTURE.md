@@ -10,6 +10,7 @@
 - เส้นทาง published plugin ได้ stable memory tool surface พร้อม `memory_context` และ `runtime_capabilities`.
 - เส้นทาง source-checkout และ standalone MCP เปิด tool ชุดเดียวกันที่โฟกัส memory แต่ไม่ได้ทำให้ repo นี้กลายเป็น hook runtime.
 - Host lifecycle events ถูกใช้เป็น input ที่หันเข้าหา memory เท่านั้น เพื่อรองรับ continuity.
+- `memory-console` เป็น local memory management UI ภายในขอบเขตแพ็กเกจนี้ ไม่ใช่ hosted admin plane หรือ workflow control surface.
 
 ```mermaid
 flowchart LR
@@ -37,6 +38,7 @@ flowchart LR
 - memory review และ save policy flows
 - document-shaped memory handling
 - memory lifecycle continuity
+- local memory console UI สำหรับ browse, review, quarantine, guarded rejected cleanup, และ graph inspection
 
 สิ่งที่ไม่รับผิดชอบ:
 
@@ -61,6 +63,14 @@ flowchart LR
 ### เส้นทาง standalone หรือ source-checkout MCP
 
 tool family ที่โฟกัส memory ชุดเดียวกันเปิดใช้ได้จาก source checkout หรือ standalone server และ surface ยังเป็น memory-only เหมือนเดิม.
+
+### Local memory console
+
+`bun run memory-console` เปิด UI local-only สำหรับ memory browsing, review management, rejected quarantine, guarded purge, และ graph inspection.
+
+Graph ที่ console แสดงเป็น derived projection จาก metadata ของ memory records เท่านั้น, read-only, และไม่ถูกเก็บเป็น canonical source of truth.
+
+Rejected purge เป็นเส้นทางเฉพาะสำหรับ records ที่ rejected แล้ว และต้องมี confirmation explicit ก่อนทำงาน. ไม่ใช่ default cleanup path.
 
 ## กลุ่มเครื่องมือ
 
@@ -132,6 +142,7 @@ sequenceDiagram
 - `memory_context` ใช้ inspect session-scoped continuity cache และ memory diagnostics.
 - `inspect_memory_retrieval` อธิบายข้อมูล hit, miss, degraded, query, และ provenance.
 - `runtime_capabilities` รายงาน current plugin-native memory contract รวมถึง tool names, lifecycle flags, และ memory protocol guidelines.
+- `memory-console` แสดง browse/read-only graph projection และ management routes โดยไม่ขยายขอบเขตไปยัง workflow control หรือ executor ownership.
 
 เมื่อ retrieval ส่งกลับ `returnedMemoryIds: []`, `contextSize: 0`, และ `degraded: false` นั่นคือ `empty_success` ไม่ใช่ `degraded_retrieval`. `contextSize` คือ returned item payload size, `content.length` บวก `summary.length` เมื่อมี summary, ไม่ใช่ rendered context length และไม่ใช่ continuity-cache size.
 
@@ -174,7 +185,7 @@ This keeps supersession hints reviewer-facing and advisory. They identify memori
 | Specialist Agents | adapted | ใช้ได้เฉพาะเป็น actor-attributed metadata convention, ไม่มี registry หรือ routing |
 | Contradiction Detection | adapted | ใช้ได้เฉพาะเป็น advisory review hints, ไม่มี truth engine |
 
-สิ่งที่อยู่นอกตารางนี้ยังคงยึดคำศัพท์ของ repo เอง เช่น memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, และ lifecycle continuity. ถ้าข้อเสนอใดพยายามยก host behavior ไปเป็น workflow control, worker routing, task lifecycle, supervision, executor ownership, หรือ hook dispatch ให้ถือว่าไม่อยู่ในขอบเขตของแพ็กเกจนี้.
+สิ่งที่อยู่นอกตารางนี้ยังคงยึดคำศัพท์ของ repo เอง เช่น memory records, document-shaped sources, retrieval, context assembly, review, diagnostics, และ lifecycle continuity. ถ้าข้อเสนอใดพยายามยก host behavior ไปเป็น workflow control, worker routing, task lifecycle, supervision, executor ownership, hook dispatch, หรือทำให้ graph/purge กลายเป็น canonical หรือ default write path ให้ถือว่าไม่อยู่ในขอบเขตของแพ็กเกจนี้.
 
 ## Actor-attributed memory convention / ข้อตกลง actor-attributed memory
 

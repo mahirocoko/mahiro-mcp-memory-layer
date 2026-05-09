@@ -15,7 +15,7 @@ import { suggestMemoryCandidates } from "./core/suggest-memory-candidates.js";
 import { upsertDocument } from "./core/upsert-document.js";
 import { reindexMemoryRecords } from "./index/reindex.js";
 import { createMemoryFacade, type MemoryFacade } from "./memory-facade.js";
-import { applyConservativeMemoryPolicyInputSchema, enqueueMemoryProposalInputSchema, getReviewAssistInputSchema, listReviewQueueInputSchema, listReviewQueueOverviewInputSchema, promoteMemoryInputSchema, reviewMemoryInputSchema } from "./schemas.js";
+import { applyConservativeMemoryPolicyInputSchema, enqueueMemoryProposalInputSchema, getReviewAssistInputSchema, listReviewQueueInputSchema, listReviewQueueOverviewInputSchema, promoteMemoryInputSchema, purgeRejectedMemoriesInputSchema, reviewMemoryInputSchema } from "./schemas.js";
 import { toRetrievalRow } from "./retrieval/rank.js";
 import type {
   ApplyConservativeMemoryPolicyInput,
@@ -39,6 +39,9 @@ import type {
   PrepareTurnMemoryResult,
   PromoteMemoryInput,
   PromoteMemoryResult,
+  PurgeRejectedMemoriesInput,
+  PurgeRejectedMemoriesResult,
+  PurgeRejectedMemoryOutcome,
   ReviewMemoryInput,
   ReviewMemoryResult,
   ResetMemoryStorageResult,
@@ -226,6 +229,74 @@ export class MemoryService {
       reviewDecisions: nextRecord.reviewDecisions ?? [],
       ...(nextRecord.verifiedAt ? { verifiedAt: nextRecord.verifiedAt } : {}),
       verificationEvidence: nextRecord.verificationEvidence ?? [],
+    };
+  }
+
+  public async purgeRejectedMemories(payload: PurgeRejectedMemoriesInput): Promise<PurgeRejectedMemoriesResult> {
+    const parsed = purgeRejectedMemoriesInputSchema.parse(payload);
+    const records = await this.logStore.readAll();
+    const recordsById = new Map(records.map((record) => [record.id, record]));
+    const dryRun = parsed.dryRun ?? false;
+    const outcomes: PurgeRejectedMemoryOutcome[] = [];
+    const eligibleIds: string[] = [];
+
+    for (const id of parsed.ids) {
+      const record = recordsById.get(id);
+
+      if (!record) {
+        outcomes.push({ id, status: "skipped_not_found" });
+        continue;
+      }
+
+      if (!matchesPurgeScope(record, parsed)) {
+        outcomes.push({ id, status: "skipped_scope_mismatch" });
+        continue;
+      }
+
+      if (record.reviewStatus !== "rejected") {
+        outcomes.push({ id, status: "skipped_not_rejected" });
+        continue;
+      }
+
+      if (dryRun) {
+        outcomes.push({ id, status: "dry_run" });
+        continue;
+      }
+
+      outcomes.push({ id, status: "deleted" });
+      eligibleIds.push(id);
+    }
+
+    if (dryRun || eligibleIds.length === 0) {
+      return {
+        status: "accepted",
+        dryRun,
+        outcomes,
+        deletedRecords: [],
+        missingIds: [],
+      };
+    }
+
+    const deletion = await this.logStore.deleteRecordsByIds(eligibleIds);
+    const deletedIds = deletion.deletedRecords.map((record) => record.id);
+
+    if (deletedIds.length > 0) {
+      await this.table.deleteRowsByIds(deletedIds);
+    }
+
+    const missingAfterDelete = new Set(deletion.missingIds);
+
+    return {
+      status: "accepted",
+      dryRun,
+      outcomes: outcomes.map((outcome) => {
+        if (outcome.status === "deleted" && missingAfterDelete.has(outcome.id)) {
+          return { id: outcome.id, status: "skipped_not_found" };
+        }
+        return outcome;
+      }),
+      deletedRecords: deletion.deletedRecords,
+      missingIds: deletion.missingIds,
     };
   }
 
@@ -625,6 +696,18 @@ function isSameMemoryScope(left: MemoryRecord, right: MemoryRecord): boolean {
   return left.scope === right.scope
     && left.projectId === right.projectId
     && left.containerId === right.containerId;
+}
+
+function matchesPurgeScope(record: MemoryRecord, scope: Pick<PurgeRejectedMemoriesInput, "scope" | "projectId" | "containerId">): boolean {
+  if (record.scope !== scope.scope) {
+    return false;
+  }
+
+  if (scope.scope === "global") {
+    return true;
+  }
+
+  return record.projectId === scope.projectId && record.containerId === scope.containerId;
 }
 
 function getEvidenceTime(record: MemoryRecord): number {

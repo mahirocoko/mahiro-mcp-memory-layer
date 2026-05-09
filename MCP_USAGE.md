@@ -53,6 +53,17 @@ Compaction continuity is append-only and fail-open. It keeps memory continuity m
 
 On a source checkout or standalone server path, the repo can also expose the same memory-focused tools through the standalone MCP server.
 
+## Memory console UI
+
+`bun run memory-console` starts the local memory console.
+
+This UI stays inside the memory-only package boundary. It is for local browse, review management, rejected quarantine, guarded rejected cleanup, and graph inspection.
+
+- Browse mode is read-only.
+- The graph is derived from memory metadata, read-only, and not canonical storage.
+- Rejected purge is rejected-only, guarded, and requires explicit confirmation. It is not the default cleanup path.
+- The console is not a hosted admin plane, workflow controller, or executor surface.
+
 ## Wiki materializer CLI
 
 `wiki:materialize` is a CLI projection command, not an MCP memory tool. It is separate from `memory_context`, `runtime_capabilities`, and retrieval traces.
@@ -107,6 +118,8 @@ The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and
 - `contextSize` is the returned item text payload size, meaning returned `content.length` plus `summary.length` when a summary exists. It is not rendered context length and it is not the continuity-cache size.
 - Treat `memory_context` as continuity-cache inspection, not as durable memory storage.
 - Do not confuse `wiki:materialize` with `memory_context` or retrieval diagnostics. The CLI is a projection writer, not an MCP memory surface.
+- Do not treat the graph as canonical storage. It is a read-only projection from memory metadata.
+- Do not treat rejected purge as normal cleanup. It is guarded and rejected-only.
 - Use `inspect_memory_retrieval` before guessing why retrieval hit, missed, or degraded.
 - When the plugin path returns an empty scoped latest lookup with `latestScopeFilter`, the scoped trace lookup missed for that `projectId`/`containerId`; it does not prove the global trace store is empty.
 - `returnedMemoryIds: []` with `degraded: false` means no scoped matches and no rendered context, not degraded retrieval.

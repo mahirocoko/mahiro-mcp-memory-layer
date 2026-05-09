@@ -1,0 +1,23 @@
+Task 7 graph route verification
+Date: 2026-05-09
+
+Command: rtk bun run test -- memory-console-server -t "GET /graph"
+Result: PASS
+Output summary:
+- Test file: tests/memory-console-server.test.ts
+- Tests: 1 passed, 21 skipped
+- Assertion coverage: GET /graph returns 200, renders Memory graph, summary counts, selected tag details, related_memory edge filter, GET-only form, no POST forms/action URLs, and reviewMemory/promoteMemory/purgeRejectedMemories spies are not called.
+
+Command: rtk bun run test -- memory-console-graph memory-console-render memory-console-server
+Result: PASS
+Output summary:
+- Test files: 3 passed
+- Tests: 40 passed
+
+Command: rtk bun run typecheck
+Result: PASS
+
+Read-only safety check:
+- render.ts forbidden write-capable call grep: no matches for reviewMemory/promoteMemory/purgeRejectedMemories/resetStorage/resetMemoryStorage or graph persistence names.
+- graph.ts persistence grep: no matches for graph store/write/persist/filesystem/log/index/lancedb names.
+- server.ts graph loader lines 259-293 call loadConsoleMemories, listReviewQueueOverview, getReviewAssist, and buildMemoryGraph only; write-capable calls remain outside the /graph loader/action path.

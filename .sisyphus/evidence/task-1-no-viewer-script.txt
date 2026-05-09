@@ -1,0 +1,2 @@
+package script guard passed
+exit:0

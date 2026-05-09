@@ -1,0 +1,38 @@
+Task 3 purge rejected verification
+
+Implementation files changed:
+- src/features/memory/types.ts
+- src/features/memory/schemas.ts
+- src/features/memory/memory-service.ts
+- src/features/memory/log/jsonl-log-store.ts
+- tests/memory-service.test.ts
+
+Focused command:
+- rtk bun run test -- memory-service -t "purge rejected"
+- Result: passed, 6 purge rejected tests passed; 38 skipped by filter.
+
+Broader memory-service command:
+- rtk bun run test -- memory-service
+- Result: passed, 44 memory-service tests passed.
+
+Full test command:
+- rtk bun run test
+- Result: passed, 229 tests across 27 files passed.
+
+Build command:
+- rtk bun run build
+- Result: passed.
+
+TypeScript diagnostics:
+- lsp_diagnostics on tests/memory-service.test.ts returned no diagnostics for this follow-up.
+
+Follow-up acceptance coverage added:
+- Verified, pending, and deferred records all return skipped_not_rejected and remain in canonical log plus retrieval index.
+- Duplicate ids fail validation before deletion.
+- Project scope missing projectId or containerId fails validation before deletion.
+- Global scope with projectId or containerId fails validation before deletion.
+
+Full repo verification note:
+- rtk bun run typecheck && rtk bun run test && rtk bun run build stopped at typecheck before tests/build.
+- Failure is outside this task scope: src/features/memory-console/server.ts has pre-existing unused _validatedInput variables at lines 239, 253, and 263.
+- This task did not modify console UI/routes per the explicit MUST NOT instruction.

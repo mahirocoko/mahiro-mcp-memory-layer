@@ -1,12 +1,12 @@
-import { createLocalReadOnlyMemoryReader } from "./features/memory-viewer/reader.js";
-import { defaultMemoryViewerPort, memoryViewerHost, startMemoryViewerServer } from "./features/memory-viewer/server.js";
+import { createLocalMemoryConsoleBackend } from "./features/memory-console/reader.js";
+import { defaultMemoryConsolePort, memoryConsoleHost, startMemoryConsoleServer } from "./features/memory-console/server.js";
 
 async function main(): Promise<void> {
-  const reader = await createLocalReadOnlyMemoryReader();
+  const reader = await createLocalMemoryConsoleBackend();
   const port = parsePort(process.argv.slice(2));
-  const { url } = await startMemoryViewerServer(reader, port);
-  console.error(`Memory viewer listening on ${url}`);
-  console.error(`Local only: bound to ${memoryViewerHost}. Press Ctrl+C to stop.`);
+  const { url } = await startMemoryConsoleServer(reader, port);
+  console.error(`Memory console listening on ${url}`);
+  console.error(`Local only: bound to ${memoryConsoleHost}. Press Ctrl+C to stop.`);
 }
 
 function parsePort(args: readonly string[]): number {
@@ -14,7 +14,7 @@ function parsePort(args: readonly string[]): number {
   const value = inline?.slice("--port=".length) ?? args[args.indexOf("--port") + 1];
 
   if (!value) {
-    return defaultMemoryViewerPort;
+    return defaultMemoryConsolePort;
   }
 
   const parsed = Number.parseInt(value, 10);

@@ -6,6 +6,8 @@ The package should be understood as local-first memory and retrieval infrastruct
 
 Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
 
+`memory-console` is a local memory management UI inside this package boundary. It stays local-only, memory-only, and read-only for graph inspection.
+
 ## Purpose and scope
 
 `mahiro-mcp-memory-layer` owns:
@@ -18,8 +20,11 @@ Host lifecycle events may be consumed for memory continuity, but only as memory-
 - document-shaped memory handling
 - host-facing memory introspection
 - memory lifecycle continuity
+- local memory console UI for browse, review, quarantine, and guarded rejected cleanup
 
 The package should not own workflow control, worker routing, task lifecycle state, supervision, or executor ownership rules.
+
+Graph output is derived from memory metadata, read-only, and not canonical storage. Rejected purge is guarded, rejected-only, and not the default cleanup path.
 
 ## Stable memory core
 

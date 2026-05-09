@@ -1,0 +1,5 @@
+Command: git grep -n "workflow control\|worker routing\|executor" ARCHITECTURE_BOUNDARIES.md AGENT_NEXT_STEPS.md README.md
+Output:
+AGENT_NEXT_STEPS.md:20:- host-specific workflow control should stay outside this package
+ARCHITECTURE_BOUNDARIES.md:25:The package should not own workflow control, worker routing, task lifecycle state, supervision, or executor ownership rules.
+README.md:7:Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.

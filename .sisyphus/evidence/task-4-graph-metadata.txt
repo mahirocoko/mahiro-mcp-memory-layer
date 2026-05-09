@@ -1,0 +1,10 @@
+Task 4 graph metadata projection evidence.
+
+Implemented `src/features/memory-console/graph.ts` as a pure read-only projection from memory metadata only: memory ids, kind/scope/project/container/status timestamps, source metadata, tags, verification evidence, review decision evidence, review decisions, and supplied review hint/assist relation ids.
+
+Focused coverage: `tests/memory-console-graph.test.ts` asserts empty input, exact source/tag/evidence node keys, metadata edge creation, raw records without related hints producing no related edges/warnings, and deterministic node/edge order.
+
+Verification passed:
+- `rtk bun run test -- memory-console-graph` — 7 tests passed.
+- `rtk bun run typecheck` — exited 0.
+- `rtk bun run build` — exited 0.

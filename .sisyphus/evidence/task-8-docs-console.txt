@@ -1,0 +1,17 @@
+Command: git grep -n "memory-console" README.md package.json
+Output:
+README.md:54:bun run memory-console
+README.md:57:`memory-console` is a localhost-only memory management UI inside this memory-only package boundary. It is for browse, review, quarantine, guarded rejected cleanup, and graph inspection.
+README.md:134:bun run memory-console
+package.json:24:    "src/features/memory-console",
+package.json:26:    "src/memory-console.ts",
+package.json:46:    "memory-console": "tsx src/memory-console.ts"
+
+Command: git grep -n "memory-viewer\|Memory viewer\|memory viewer" README.md MCP_USAGE.md ARCHITECTURE.md ARCHITECTURE_BOUNDARIES.md AGENT_NEXT_STEPS.md package.json src tests
+Output:
+No matches found.
+
+Command: rtk bun run typecheck
+Output:
+$ tsc -p tsconfig.json --noEmit
+Result: passed.

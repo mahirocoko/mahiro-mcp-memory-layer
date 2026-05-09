@@ -1,0 +1,11 @@
+Task 5 review POST evidence
+
+- Routes verified: POST /actions/review and POST /actions/promote
+- Result: valid review POST calls only `reviewMemory(...)` and returns 303 to /review.
+- Result: valid promote POST calls only `promoteMemory(...)` and returns 303 to /.
+- Result: edit_then_promote form fields parse into service shape: id, action, note, evidence, content, summary, tags.
+- Result: review assist suggestions render as advisory text only and are never auto-submitted.
+- Result: the default local backend returned by the CLI adapter now exposes `listReviewQueueOverview`, `getReviewAssist`, `reviewMemory`, and `promoteMemory`, so real console POST actions no longer depend on injected test spies.
+- Focused adapter check: `rtk bun run test -- memory-console-server -t "adapts the local console backend to expose review and promote methods"`
+- Focused checks: `rtk bun run test -- memory-console-server -t "POST action"`
+- Suite/type/build checks: `rtk bun run test -- memory-console-render memory-console-server`, `rtk bun run typecheck`, `rtk bun run build`

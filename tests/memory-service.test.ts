@@ -433,6 +433,341 @@ describe("memory service core", () => {
     expect(records.find((item) => item.id === edited.id)?.reviewDecisions?.map((entry) => entry.action)).toEqual(["edit_then_promote"]);
   });
 
+  it("purge rejected deletes only rejected project records from canonical log and retrieval index", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Rejected purge target alpha.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejected.id, action: "reject", note: "Rejected by reviewer." });
+
+    const beforeSearch = await service.search({
+      query: "Rejected purge target alpha",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+    expect(beforeSearch.items.map((item) => item.id)).toContain(rejected.id);
+
+    const result = await service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    });
+
+    expect(result).toMatchObject({
+      status: "accepted",
+      dryRun: false,
+      outcomes: [{ id: rejected.id, status: "deleted" }],
+      missingIds: [],
+    });
+    expect(result.deletedRecords.map((record) => record.id)).toEqual([rejected.id]);
+    expect((await fixture.logStore.readAll()).map((record) => record.id)).not.toContain(rejected.id);
+
+    const afterSearch = await service.search({
+      query: "Rejected purge target alpha",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+    expect(afterSearch.items.map((item) => item.id)).not.toContain(rejected.id);
+  });
+
+  it("purge rejected reports mixed batch outcomes without deleting non-rejected or wrong-scope records", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejectedInScope = await service.remember({
+      content: "Rejected purge target beta.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    const nonRejected = await service.remember({
+      content: "Pending purge skip beta.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+      reviewStatus: "pending",
+    });
+    const rejectedWrongScope = await service.remember({
+      content: "Wrong scope purge skip beta.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-beta",
+      containerId: "workspace:project-beta",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejectedInScope.id, action: "reject", note: "Rejected in scope." });
+    await service.reviewMemory({ id: rejectedWrongScope.id, action: "reject", note: "Rejected elsewhere." });
+
+    const result = await service.purgeRejectedMemories({
+      ids: [rejectedInScope.id, nonRejected.id, rejectedWrongScope.id, "missing-memory-id"],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    });
+
+    expect(result.outcomes).toEqual([
+      { id: rejectedInScope.id, status: "deleted" },
+      { id: nonRejected.id, status: "skipped_not_rejected" },
+      { id: rejectedWrongScope.id, status: "skipped_scope_mismatch" },
+      { id: "missing-memory-id", status: "skipped_not_found" },
+    ]);
+    expect(result.deletedRecords.map((record) => record.id)).toEqual([rejectedInScope.id]);
+
+    const remainingIds = (await fixture.logStore.readAll()).map((record) => record.id);
+    expect(remainingIds).not.toContain(rejectedInScope.id);
+    expect(remainingIds).toEqual(expect.arrayContaining([nonRejected.id, rejectedWrongScope.id]));
+  });
+
+  it("purge rejected skips verified pending and deferred records as not rejected", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const verified = await service.remember({
+      content: "Verified purge skip gamma.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.promoteMemory({
+      id: verified.id,
+      evidence: [{ type: "test", value: "purge rejected skips verified pending and deferred records" }],
+    });
+
+    const pending = await service.remember({
+      content: "Pending purge skip gamma.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+      reviewStatus: "pending",
+    });
+
+    const deferred = await service.remember({
+      content: "Deferred purge skip gamma.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: deferred.id, action: "defer", note: "Keep for later review." });
+
+    const result = await service.purgeRejectedMemories({
+      ids: [verified.id, pending.id, deferred.id],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    });
+
+    expect(result).toMatchObject({
+      status: "accepted",
+      dryRun: false,
+      deletedRecords: [],
+      missingIds: [],
+    });
+    expect(result.outcomes).toEqual([
+      { id: verified.id, status: "skipped_not_rejected" },
+      { id: pending.id, status: "skipped_not_rejected" },
+      { id: deferred.id, status: "skipped_not_rejected" },
+    ]);
+
+    const remainingRecords = await fixture.logStore.readAll();
+    expect(remainingRecords.map((record) => record.id)).toEqual(expect.arrayContaining([verified.id, pending.id, deferred.id]));
+    expect(remainingRecords.find((record) => record.id === verified.id)?.verificationStatus).toBe("verified");
+    expect(remainingRecords.find((record) => record.id === pending.id)?.reviewStatus).toBe("pending");
+    expect(remainingRecords.find((record) => record.id === deferred.id)?.reviewStatus).toBe("deferred");
+
+    const search = await service.search({
+      query: "purge skip gamma",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+    expect(search.items.map((item) => item.id)).toEqual(expect.arrayContaining([verified.id, pending.id, deferred.id]));
+  });
+
+  it("purge rejected dry run returns dry_run outcomes without modifying log or index", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Rejected purge dry run target.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejected.id, action: "reject", note: "Rejected for dry run." });
+
+    const result = await service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+      dryRun: true,
+    });
+
+    expect(result).toMatchObject({
+      status: "accepted",
+      dryRun: true,
+      outcomes: [{ id: rejected.id, status: "dry_run" }],
+      deletedRecords: [],
+      missingIds: [],
+    });
+    expect((await fixture.logStore.readAll()).map((record) => record.id)).toContain(rejected.id);
+
+    const search = await service.search({
+      query: "Rejected purge dry run target",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+    expect(search.items.map((item) => item.id)).toContain(rejected.id);
+  });
+
+  it("purge rejected invalid confirmation fails before deletion", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Rejected purge confirmation target.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejected.id, action: "reject", note: "Rejected for confirmation." });
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE" as "DELETE REJECTED",
+    })).rejects.toThrow();
+
+    expect((await fixture.logStore.readAll()).map((record) => record.id)).toContain(rejected.id);
+  });
+
+  it("purge rejected validation rejects duplicate ids and invalid scope fields before deletion", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Rejected purge validation target.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejected.id, action: "reject", note: "Rejected for validation coverage." });
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id, rejected.id],
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    })).rejects.toThrow(/ids must be unique/);
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "project",
+      projectId: "project-alpha",
+      confirmation: "DELETE REJECTED",
+    })).rejects.toThrow(/containerId is required/);
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "project",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    })).rejects.toThrow(/projectId is required/);
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "global",
+      projectId: "project-alpha",
+      confirmation: "DELETE REJECTED",
+    })).rejects.toThrow(/projectId must not be provided/);
+
+    await expect(service.purgeRejectedMemories({
+      ids: [rejected.id],
+      scope: "global",
+      containerId: "workspace:project-alpha",
+      confirmation: "DELETE REJECTED",
+    })).rejects.toThrow(/containerId must not be provided/);
+
+    expect((await fixture.logStore.readAll()).map((record) => record.id)).toContain(rejected.id);
+
+    const search = await service.search({
+      query: "Rejected purge validation target",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+    expect(search.items.map((item) => item.id)).toContain(rejected.id);
+  });
+
   it("lists hypothesis memories in review queue order", async () => {
     const fixture = await createFixture();
     const service = new MemoryService(

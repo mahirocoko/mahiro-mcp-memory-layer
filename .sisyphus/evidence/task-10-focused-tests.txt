@@ -1,0 +1,20 @@
+COMMAND: rtk bun run test -- memory-console memory-service
+
+$ vitest run memory-console memory-service
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/memory-console-graph.test.ts (7 tests) 11ms
+ ✓ tests/memory-console-filters.test.ts (10 tests) 4ms
+ ✓ tests/memory-console-render.test.ts (11 tests) 12ms
+ ✓ tests/memory-console-server.test.ts (22 tests) 57ms
+ ✓ tests/memory-console-integration.test.ts (4 tests) 279ms
+ ✓ tests/memory-service.test.ts (44 tests) 412ms
+
+ Test Files  6 passed (6)
+      Tests  98 passed (98)
+   Start at  15:20:13
+   Duration  845ms (transform 326ms, setup 0ms, collect 992ms, tests 774ms, environment 0ms, prepare 276ms)
+
+
+EXIT_STATUS: 0

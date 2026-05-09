@@ -1,28 +1,30 @@
 import { memoryKinds, memoryScopes } from "../memory/constants.js";
 import type { MemoryRecord, MemoryScope, SearchMemoryItem } from "../memory/types.js";
 import type {
-  ViewerFilterState,
-  ViewerKindFilter,
-  ViewerMemory,
-  ViewerNavigationView,
-  ViewerProjectScopeSummary,
-  ViewerReviewStatusFilter,
-  ViewerReviewStatusCountKey,
-  ViewerScopeFilter,
-  ViewerVerificationStatusFilter,
+  ConsoleGraphEdgeTypeFilter,
+  ConsoleFilterState,
+  ConsoleKindFilter,
+  ConsoleMemory,
+  ConsoleNavigationView,
+  ConsoleProjectScopeSummary,
+  ConsoleReviewStatusFilter,
+  ConsoleReviewStatusCountKey,
+  ConsoleScopeFilter,
+  ConsoleVerificationStatusFilter,
 } from "./types.js";
 
-const defaultViewerLimit = 50;
-const minimumViewerLimit = 1;
-const maximumViewerLimit = 50;
+const defaultConsoleLimit = 50;
+const minimumConsoleLimit = 1;
+const maximumConsoleLimit = 50;
 
-export const viewerNavigationViews = ["verified", "inbox", "projects", "firehose"] as const;
-export const viewerScopeFilters = ["all", ...memoryScopes] as const;
-export const viewerKindFilters = ["all", ...memoryKinds] as const;
-export const viewerVerificationStatusFilters = ["all", "hypothesis", "verified"] as const;
-export const viewerReviewStatusFilters = ["all", "active", "none", "pending", "deferred", "rejected"] as const;
+export const consoleNavigationViews = ["verified", "inbox", "projects", "firehose"] as const;
+export const consoleScopeFilters = ["all", ...memoryScopes] as const;
+export const consoleKindFilters = ["all", ...memoryKinds] as const;
+export const consoleVerificationStatusFilters = ["all", "hypothesis", "verified"] as const;
+export const consoleReviewStatusFilters = ["all", "active", "none", "pending", "deferred", "rejected"] as const;
+export const consoleGraphEdgeTypeFilters = ["all", "has_source", "tagged_with", "has_evidence", "reviewed_as", "related_memory"] as const;
 
-export function normalizeViewerFilters(input: URLSearchParams): ViewerFilterState {
+export function normalizeConsoleFilters(input: URLSearchParams): ConsoleFilterState {
   const view = normalizeNavigationView(input.get("view"));
   const scope = normalizeScopeFilter(input.get("scope"));
   const projectId = scope === "global" ? undefined : normalizeOptionalText(input.get("projectId"));
@@ -45,10 +47,11 @@ export function normalizeViewerFilters(input: URLSearchParams): ViewerFilterStat
     containerId,
     selectedId: scope === "global" ? undefined : normalizeOptionalText(input.get("id")),
     limit: normalizeLimit(input.get("limit")),
+    graphEdgeType: normalizeGraphEdgeTypeFilter(input.get("edgeType")),
   };
 }
 
-export function normalizeMemoryRecord(record: MemoryRecord): ViewerMemory {
+export function normalizeMemoryRecord(record: MemoryRecord): ConsoleMemory {
   return {
     id: record.id,
     kind: record.kind,
@@ -76,7 +79,7 @@ export function normalizeSearchMemoryItem(
   scope: MemoryScope,
   projectId?: string,
   containerId?: string,
-): ViewerMemory {
+): ConsoleMemory {
   return {
     id: item.id,
     kind: item.kind,
@@ -99,15 +102,15 @@ export function normalizeSearchMemoryItem(
   };
 }
 
-export function filterViewerMemories(
-  memories: readonly ViewerMemory[],
-  filters: ViewerFilterState,
+export function filterConsoleMemories(
+  memories: readonly ConsoleMemory[],
+  filters: ConsoleFilterState,
   options: { readonly includeQuery?: boolean } = {},
-): readonly ViewerMemory[] {
+): readonly ConsoleMemory[] {
   const includeQuery = options.includeQuery ?? true;
   const query = includeQuery ? filters.query?.toLocaleLowerCase() : undefined;
 
-  return sortViewerMemories(
+  return sortConsoleMemories(
     memories
       .filter((memory) => matchesNavigationView(memory, filters.view))
       .filter((memory) => filters.scope === "all" || memory.scope === filters.scope)
@@ -120,8 +123,8 @@ export function filterViewerMemories(
   );
 }
 
-export function aggregateViewerProjectScopes(memories: readonly ViewerMemory[]): readonly ViewerProjectScopeSummary[] {
-  const summaries = new Map<string, MutableViewerProjectScopeSummary>();
+export function aggregateConsoleProjectScopes(memories: readonly ConsoleMemory[]): readonly ConsoleProjectScopeSummary[] {
+  const summaries = new Map<string, MutableConsoleProjectScopeSummary>();
 
   for (const memory of memories) {
     if (memory.scope !== "project" || !memory.projectId || !memory.containerId) {
@@ -129,7 +132,7 @@ export function aggregateViewerProjectScopes(memories: readonly ViewerMemory[]):
     }
 
     const key = `${memory.projectId}\u0000${memory.containerId}`;
-    const summary = summaries.get(key) ?? createMutableProjectScopeSummary(memory.projectId, memory.containerId);
+    const summary = summaries.get(key) ?? createMutableConsoleProjectScopeSummary(memory.projectId, memory.containerId);
     summary.totalCount += 1;
     summary.kindCounts[memory.kind] += 1;
     summary.verificationStatusCounts[memory.verificationStatus] += 1;
@@ -158,8 +161,8 @@ export function aggregateViewerProjectScopes(memories: readonly ViewerMemory[]):
 }
 
 export function canUseIndexedSearch(
-  filters: ViewerFilterState,
-): filters is ViewerFilterState & { readonly query: string; readonly scope: MemoryScope } {
+  filters: ConsoleFilterState,
+): filters is ConsoleFilterState & { readonly query: string; readonly scope: MemoryScope } {
   if (filters.query === undefined) {
     return false;
   }
@@ -171,7 +174,7 @@ export function canUseIndexedSearch(
   return filters.scope === "project" && filters.projectId !== undefined && filters.containerId !== undefined;
 }
 
-export function filtersToSearchParams(filters: ViewerFilterState, selectedId?: string): URLSearchParams {
+export function filtersToSearchParams(filters: ConsoleFilterState, selectedId?: string): URLSearchParams {
   const params = new URLSearchParams();
   const defaultVerificationStatus = defaultVerificationStatusForView(filters.view);
   const defaultReviewStatus = defaultReviewStatusForView(filters.view);
@@ -191,22 +194,23 @@ export function filtersToSearchParams(filters: ViewerFilterState, selectedId?: s
   );
   appendParam(params, "projectId", filters.projectId);
   appendParam(params, "containerId", filters.containerId);
-  appendParam(params, "limit", filters.limit === defaultViewerLimit ? undefined : String(filters.limit));
+  appendParam(params, "limit", filters.limit === defaultConsoleLimit ? undefined : String(filters.limit));
+  appendParam(params, "edgeType", filters.graphEdgeType === undefined || filters.graphEdgeType === "all" ? undefined : filters.graphEdgeType);
   appendParam(params, "id", selectedId);
   return params;
 }
 
-interface MutableViewerProjectScopeSummary {
+interface MutableConsoleProjectScopeSummary {
   readonly projectId: string;
   readonly containerId: string;
   totalCount: number;
-  readonly kindCounts: Record<ViewerMemory["kind"], number>;
-  readonly verificationStatusCounts: Record<ViewerMemory["verificationStatus"], number>;
-  readonly reviewStatusCounts: Record<ViewerReviewStatusCountKey, number>;
+  readonly kindCounts: Record<ConsoleMemory["kind"], number>;
+  readonly verificationStatusCounts: Record<ConsoleMemory["verificationStatus"], number>;
+  readonly reviewStatusCounts: Record<ConsoleReviewStatusCountKey, number>;
   latestTimestamp?: string;
 }
 
-function createMutableProjectScopeSummary(projectId: string, containerId: string): MutableViewerProjectScopeSummary {
+function createMutableConsoleProjectScopeSummary(projectId: string, containerId: string): MutableConsoleProjectScopeSummary {
   return {
     projectId,
     containerId,
@@ -255,52 +259,58 @@ function normalizeOptionalText(value: string | null): string | undefined {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
-function normalizeNavigationView(value: string | null): ViewerNavigationView {
-  return viewerNavigationViews.includes(value as ViewerNavigationView) ? (value as ViewerNavigationView) : "verified";
+function normalizeNavigationView(value: string | null): ConsoleNavigationView {
+  return consoleNavigationViews.includes(value as ConsoleNavigationView) ? (value as ConsoleNavigationView) : "verified";
 }
 
-function defaultVerificationStatusForView(view: ViewerNavigationView): ViewerVerificationStatusFilter {
+function defaultVerificationStatusForView(view: ConsoleNavigationView): ConsoleVerificationStatusFilter {
   return view === "verified" ? "verified" : "all";
 }
 
-function defaultReviewStatusForView(view: ViewerNavigationView): ViewerReviewStatusFilter {
+function defaultReviewStatusForView(view: ConsoleNavigationView): ConsoleReviewStatusFilter {
   return view === "firehose" ? "all" : "active";
 }
 
-function normalizeScopeFilter(value: string | null): ViewerScopeFilter {
-  return viewerScopeFilters.includes(value as ViewerScopeFilter) ? (value as ViewerScopeFilter) : "all";
+function normalizeScopeFilter(value: string | null): ConsoleScopeFilter {
+  return consoleScopeFilters.includes(value as ConsoleScopeFilter) ? (value as ConsoleScopeFilter) : "all";
 }
 
-function normalizeKindFilter(value: string | null): ViewerKindFilter {
-  return viewerKindFilters.includes(value as ViewerKindFilter) ? (value as ViewerKindFilter) : "all";
+function normalizeKindFilter(value: string | null): ConsoleKindFilter {
+  return consoleKindFilters.includes(value as ConsoleKindFilter) ? (value as ConsoleKindFilter) : "all";
 }
 
-function normalizeVerificationStatusFilter(value: string | null): ViewerVerificationStatusFilter {
-  return viewerVerificationStatusFilters.includes(value as ViewerVerificationStatusFilter)
-    ? (value as ViewerVerificationStatusFilter)
+function normalizeVerificationStatusFilter(value: string | null): ConsoleVerificationStatusFilter {
+  return consoleVerificationStatusFilters.includes(value as ConsoleVerificationStatusFilter)
+    ? (value as ConsoleVerificationStatusFilter)
     : "all";
 }
 
-function normalizeReviewStatusFilter(value: string | null): ViewerReviewStatusFilter {
-  return viewerReviewStatusFilters.includes(value as ViewerReviewStatusFilter)
-    ? (value as ViewerReviewStatusFilter)
+function normalizeReviewStatusFilter(value: string | null): ConsoleReviewStatusFilter {
+  return consoleReviewStatusFilters.includes(value as ConsoleReviewStatusFilter)
+    ? (value as ConsoleReviewStatusFilter)
+    : "all";
+}
+
+function normalizeGraphEdgeTypeFilter(value: string | null): ConsoleGraphEdgeTypeFilter {
+  return consoleGraphEdgeTypeFilters.includes(value as ConsoleGraphEdgeTypeFilter)
+    ? (value as ConsoleGraphEdgeTypeFilter)
     : "all";
 }
 
 function normalizeLimit(value: string | null): number {
   if (!value) {
-    return defaultViewerLimit;
+    return defaultConsoleLimit;
   }
 
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) {
-    return defaultViewerLimit;
+    return defaultConsoleLimit;
   }
 
-  return Math.min(Math.max(parsed, minimumViewerLimit), maximumViewerLimit);
+  return Math.min(Math.max(parsed, minimumConsoleLimit), maximumConsoleLimit);
 }
 
-function matchesReviewStatus(memory: ViewerMemory, filter: ViewerReviewStatusFilter): boolean {
+function matchesReviewStatus(memory: ConsoleMemory, filter: ConsoleReviewStatusFilter): boolean {
   if (filter === "all") {
     return true;
   }
@@ -316,7 +326,7 @@ function matchesReviewStatus(memory: ViewerMemory, filter: ViewerReviewStatusFil
   return memory.reviewStatus === filter;
 }
 
-function matchesNavigationView(memory: ViewerMemory, view: ViewerNavigationView): boolean {
+function matchesNavigationView(memory: ConsoleMemory, view: ConsoleNavigationView): boolean {
   if (view !== "inbox") {
     return true;
   }
@@ -328,7 +338,7 @@ function matchesNavigationView(memory: ViewerMemory, view: ViewerNavigationView)
   );
 }
 
-function searchableText(memory: ViewerMemory): string {
+function searchableText(memory: ConsoleMemory): string {
   return [
     memory.id,
     memory.kind,
@@ -345,7 +355,7 @@ function searchableText(memory: ViewerMemory): string {
   ].join("\n");
 }
 
-function sortViewerMemories(memories: readonly ViewerMemory[]): readonly ViewerMemory[] {
+function sortConsoleMemories(memories: readonly ConsoleMemory[]): readonly ConsoleMemory[] {
   return [...memories].sort((left, right) => {
     const rightTime = Date.parse(right.updatedAt ?? right.createdAt);
     const leftTime = Date.parse(left.updatedAt ?? left.createdAt);

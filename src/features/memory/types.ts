@@ -138,6 +138,35 @@ export interface ReviewMemoryResult {
   readonly verificationEvidence: readonly MemoryVerificationEvidence[];
 }
 
+export interface PurgeRejectedMemoriesInput {
+  readonly ids: readonly string[];
+  readonly scope: MemoryScope;
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly confirmation: "DELETE REJECTED";
+  readonly dryRun?: boolean;
+}
+
+export type PurgeRejectedMemoryOutcomeStatus =
+  | "deleted"
+  | "skipped_not_found"
+  | "skipped_not_rejected"
+  | "skipped_scope_mismatch"
+  | "dry_run";
+
+export interface PurgeRejectedMemoryOutcome {
+  readonly id: string;
+  readonly status: PurgeRejectedMemoryOutcomeStatus;
+}
+
+export interface PurgeRejectedMemoriesResult {
+  readonly status: "accepted";
+  readonly dryRun: boolean;
+  readonly outcomes: readonly PurgeRejectedMemoryOutcome[];
+  readonly deletedRecords: readonly MemoryRecord[];
+  readonly missingIds: readonly string[];
+}
+
 export interface EnqueueMemoryProposalInput {
   readonly conversation?: string;
   readonly projectId?: string;

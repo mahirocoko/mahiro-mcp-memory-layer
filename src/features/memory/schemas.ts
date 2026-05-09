@@ -247,6 +247,57 @@ export const promoteMemoryInputSchema = z.object({
   evidence: z.array(memoryVerificationEvidenceSchema).min(1),
 }).strict();
 
+export const purgeRejectedMemoriesInputSchema = z.object({
+  ids: z.array(z.string().trim().min(1)).min(1),
+  scope: z.enum(memoryScopes),
+  projectId: z.string().trim().min(1).optional(),
+  containerId: z.string().trim().min(1).optional(),
+  confirmation: z.literal("DELETE REJECTED"),
+  dryRun: z.boolean().optional(),
+}).strict().superRefine((data, ctx) => {
+  const uniqueIds = new Set(data.ids);
+  if (uniqueIds.size !== data.ids.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "ids must be unique.",
+      path: ["ids"],
+    });
+  }
+
+  if (data.scope === "project") {
+    if (!data.projectId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "projectId is required when scope is project.",
+        path: ["projectId"],
+      });
+    }
+    if (!data.containerId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "containerId is required when scope is project.",
+        path: ["containerId"],
+      });
+    }
+    return;
+  }
+
+  if (data.projectId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "projectId must not be provided when scope is global.",
+      path: ["projectId"],
+    });
+  }
+  if (data.containerId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "containerId must not be provided when scope is global.",
+      path: ["containerId"],
+    });
+  }
+});
+
 export const listReviewQueueInputSchema = z.object({
   projectId: z.string().trim().min(1).optional(),
   containerId: z.string().trim().min(1).optional(),

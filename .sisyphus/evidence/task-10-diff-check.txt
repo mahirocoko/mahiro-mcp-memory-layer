@@ -1,0 +1,4 @@
+COMMAND: git diff --check
+
+
+EXIT_STATUS: 0

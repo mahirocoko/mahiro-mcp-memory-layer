@@ -1,0 +1,39 @@
+COMMAND: git grep -n "memory-viewer\|Memory viewer\|memory viewer" -- ':!.sisyphus/**'
+NOTE: Uses the shell-correct no-space pathspec form for the requested .sisyphus exclusion. .agent-state is historical local memory/retrospective material, not current product surface.
+
+.agent-state/memory/learnings/2026-05-05_seed-project-memory-after-empty-retrieval.md:13:- Memory viewer served HTTP 200 on localhost.
+.agent-state/memory/learnings/2026-05-09_memory-viewer-filter-simplification.md:3:Tags: memory-viewer, server-rendered-ui, read-only, filters, progressive-enhancement
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:1:# Read-only memory viewer session retrospective
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:4:Built and verified a local read-only memory viewer for the memory-layer package so stored memories can be inspected without introducing mutation flows. Pulse context before writing this note showed 31 local retrospectives, 4 sessions today, 15 active days, a large day size, a 1-day streak, and a -20.0% weekly session change; those numbers were generated before this retrospective hit disk.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:15:- `package.json` — added the memory-viewer script.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:16:- `src/memory-viewer.ts` — new local entrypoint.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:17:- `src/features/memory-viewer/*` — viewer server, renderer, filters, types, and read-only integration.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:18:- `tests/memory-viewer-filters.test.ts` — filtering and normalization coverage.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:19:- `tests/memory-viewer-render.test.ts` — escaping, empty state, and no-mutation-control coverage.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:20:- `tests/memory-viewer-server.test.ts` — local/read-only server boundary coverage.
+.agent-state/memory/retrospectives/2026-05/04/23.21_read-only-memory-viewer.md:37:- Manually run `rtk bun run memory-viewer` and visually inspect `http://127.0.0.1:4317/` with real memory data.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:11:This session started as orientation and turned into a useful continuity repair pass. I first recapped the repo state, listed tracked projects, performed a deep `/learn mempalace --deep`, analyzed the current project, corrected that analysis with `.sisyphus` evidence, ran verification, checked the memory viewer, diagnosed empty retrieval traces, and finally seeded verified project memories so future retrieval has durable context. Pulse before this retrospective showed 32 existing retrospectives, 15 active days, current branch `main`, and a dirty tree caused by learning artifacts.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:15:- Ran `/recap --now deep` and confirmed today was mostly orientation while latest substantive work was the read-only memory viewer.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:21:- Started `bun run memory-viewer --port=4318`, probed HTTP 200, and stopped the process.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:50:I came into this session thinking the next useful action would be straightforward housekeeping, but the session exposed a more subtle continuity problem. I initially summarized the project from the obvious docs, source, git state, and latest retrospective, then the user correctly pushed me to include `.sisyphus`. That was the most important correction: without `.sisyphus`, the analysis over-weighted the memory viewer and under-weighted the completed memory lifecycle contract work. I also saw the danger of treating empty retrieval traces as suspicious in the abstract. Once I checked the actual project scope, durable memories were simply absent, so the system was behaving honestly: no degradation, no hits. The right fix was not code; it was seeding verified project memory. The MemPalace deep learn pass also produced valuable docs, and the user’s instinct to commit them makes sense because repeat learning runs can differ and become a useful historical record. I should remember this pattern: when a repo has both `.sisyphus` and `.agent-state`, the freshest truth may live outside git source, and a good agent has to reconcile all of it before recommending product work.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:55:- Memory viewer was checked practically via localhost HTTP 200 instead of only relying on tests.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:86:2. After commit, discuss next product work: memory viewer polish, retrieval diagnostics UX, or docs explaining empty-but-not-degraded retrieval.
+.agent-state/memory/retrospectives/2026-05/05/13.33_session-continuity-and-mempalace-learn.md:93:- Memory viewer: HTTP 200 on `127.0.0.1:4318`.
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:5:We turned `memory-viewer` from a raw-ish memory firehose into a signal-first, project-aware, read-only local inspection UI. Pulse context before this note showed 38 stored retrospectives, 0 recorded today before writing this one, 19 active days, current branch `main`, and 9 modified files. Those metrics are local derived snapshots, not canonical telemetry.
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:9:- Started by reconstructing prior work: memory wiki materializer was complete, and the active task was the memory-viewer UX revamp.
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:22:- `src/features/memory-viewer/filters.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:23:- `src/features/memory-viewer/reader.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:24:- `src/features/memory-viewer/render.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:25:- `src/features/memory-viewer/server.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:26:- `src/features/memory-viewer/types.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:27:- `tests/memory-viewer-filters.test.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:28:- `tests/memory-viewer-render.test.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:29:- `tests/memory-viewer-server.test.ts`
+.agent-state/memory/retrospectives/2026-05/09/11.21_memory-viewer-signal-ui.md:54:- Keep memory-viewer scoped to read-only local introspection; do not add review/mutation controls without a separate explicit plan.
+
+RAW_EXIT_STATUS: 0
+
+PRODUCT_SURFACE_COMMAND: git grep -n "memory-viewer\|Memory viewer\|memory viewer" -- README.md MCP_USAGE.md ARCHITECTURE.md ARCHITECTURE_BOUNDARIES.md AGENT_NEXT_STEPS.md package.json src tests
+
+RESULT: NO_MATCHES_IN_PRODUCT_SURFACE
+EXIT_STATUS: 0

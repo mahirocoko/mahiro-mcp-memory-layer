@@ -21,9 +21,9 @@
     "src/features/memory/retrieval",
     "src/features/memory/schemas.ts",
     "src/features/memory/types.ts",
-    "src/features/memory-viewer",
+    "src/features/memory-console",
     "src/features/opencode-plugin",
-    "src/memory-viewer.ts",
+    "src/memory-console.ts",
     "src/wiki-materializer.ts",
     "README.md",
     "AGENTS.md",
@@ -43,7 +43,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "memory-viewer": "tsx src/memory-viewer.ts"
+    "memory-console": "tsx src/memory-console.ts"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.22.3",

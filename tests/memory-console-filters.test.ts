@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  aggregateViewerProjectScopes,
+  aggregateConsoleProjectScopes,
   canUseIndexedSearch,
-  filterViewerMemories,
+  filterConsoleMemories,
   normalizeMemoryRecord,
-  normalizeViewerFilters,
-} from "../src/features/memory-viewer/filters.js";
-import type { ViewerMemory } from "../src/features/memory-viewer/types.js";
+  normalizeConsoleFilters,
+} from "../src/features/memory-console/filters.js";
+import type { ConsoleMemory } from "../src/features/memory-console/types.js";
 import type { MemoryRecord } from "../src/features/memory/types.js";
 
 const baseMemory = {
@@ -25,11 +25,11 @@ const baseMemory = {
   importance: 0.5,
   createdAt: "2026-05-04T10:00:00.000Z",
   reasons: [],
-} satisfies ViewerMemory;
+} satisfies ConsoleMemory;
 
-describe("memory viewer filters", () => {
-  it("defaults the root viewer to verified active memories", () => {
-    const filters = normalizeViewerFilters(new URLSearchParams());
+describe("memory console filters", () => {
+  it("defaults the root console to verified active memories", () => {
+    const filters = normalizeConsoleFilters(new URLSearchParams());
 
     expect(filters).toMatchObject({
       view: "verified",
@@ -41,7 +41,7 @@ describe("memory viewer filters", () => {
   });
 
   it("normalizes invalid filter values and clamps the result limit", () => {
-    const filters = normalizeViewerFilters(new URLSearchParams({
+    const filters = normalizeConsoleFilters(new URLSearchParams({
       q: "  memory  ",
       scope: "invalid",
       kind: "nope",
@@ -62,7 +62,7 @@ describe("memory viewer filters", () => {
   });
 
   it("clears project, container, and selected memory filters for global navigation", () => {
-    const filters = normalizeViewerFilters(new URLSearchParams({
+    const filters = normalizeConsoleFilters(new URLSearchParams({
       scope: "global",
       projectId: "stale-project",
       containerId: "stale-container",
@@ -103,9 +103,9 @@ describe("memory viewer filters", () => {
         kind: "task",
         verificationStatus: "verified",
         reviewStatus: "deferred",
-        content: "Follow up on viewer tests.",
+        content: "Follow up on console tests.",
         createdAt: "2026-05-04T12:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-3",
@@ -113,12 +113,12 @@ describe("memory viewer filters", () => {
         projectId: undefined,
         containerId: undefined,
         content: "Global profile memory.",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
     ];
 
-    const filtered = filterViewerMemories(memories, {
+    const filtered = filterConsoleMemories(memories, {
       view: "verified",
-      query: "viewer",
+      query: "console",
       scope: "project",
       kind: "task",
       verificationStatus: "verified",
@@ -139,17 +139,17 @@ describe("memory viewer filters", () => {
         id: "mem-pending",
         reviewStatus: "pending",
         createdAt: "2026-05-04T11:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-deferred",
         reviewStatus: "deferred",
         createdAt: "2026-05-04T12:00:00.000Z",
-      } satisfies ViewerMemory,
-      { ...baseMemory, id: "mem-rejected", reviewStatus: "rejected" } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
+      { ...baseMemory, id: "mem-rejected", reviewStatus: "rejected" } satisfies ConsoleMemory,
     ];
 
-    const filtered = filterViewerMemories(memories, {
+    const filtered = filterConsoleMemories(memories, {
       view: "verified",
       scope: "all",
       kind: "all",
@@ -170,23 +170,23 @@ describe("memory viewer filters", () => {
         verificationStatus: "verified",
         reviewStatus: "pending",
         createdAt: "2026-05-04T12:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-verified-deferred",
         verificationStatus: "verified",
         reviewStatus: "deferred",
         createdAt: "2026-05-04T13:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-rejected-hypothesis",
         reviewStatus: "rejected",
         createdAt: "2026-05-04T14:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
     ];
 
-    const filtered = filterViewerMemories(memories, {
+    const filtered = filterConsoleMemories(memories, {
       view: "inbox",
       scope: "all",
       kind: "all",
@@ -199,7 +199,7 @@ describe("memory viewer filters", () => {
   });
 
   it("keeps firehose as the raw view that includes rejected memories by default", () => {
-    const filters = normalizeViewerFilters(new URLSearchParams({ view: "firehose" }));
+    const filters = normalizeConsoleFilters(new URLSearchParams({ view: "firehose" }));
     const memories = [
       baseMemory,
       {
@@ -207,17 +207,17 @@ describe("memory viewer filters", () => {
         id: "mem-rejected",
         reviewStatus: "rejected",
         createdAt: "2026-05-04T12:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
     ];
 
-    const filtered = filterViewerMemories(memories, filters);
+    const filtered = filterConsoleMemories(memories, filters);
 
     expect(filters).toMatchObject({ verificationStatus: "all", reviewStatus: "all" });
     expect(filtered.map((memory) => memory.id)).toEqual(["mem-rejected", "mem-1"]);
   });
 
   it("aggregates complete project and container scopes from canonical records", () => {
-    const summaries = aggregateViewerProjectScopes([
+    const summaries = aggregateConsoleProjectScopes([
       baseMemory,
       {
         ...baseMemory,
@@ -226,7 +226,7 @@ describe("memory viewer filters", () => {
         verificationStatus: "verified",
         reviewStatus: "pending",
         updatedAt: "2026-05-04T12:30:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-3",
@@ -235,19 +235,19 @@ describe("memory viewer filters", () => {
         kind: "task",
         reviewStatus: "rejected",
         createdAt: "2026-05-04T08:00:00.000Z",
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-missing-container",
         containerId: undefined,
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
       {
         ...baseMemory,
         id: "mem-global",
         scope: "global",
         projectId: undefined,
         containerId: undefined,
-      } satisfies ViewerMemory,
+      } satisfies ConsoleMemory,
     ]);
 
     expect(summaries).toHaveLength(2);

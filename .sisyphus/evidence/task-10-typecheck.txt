@@ -1,0 +1,5 @@
+COMMAND: rtk bun run typecheck
+
+$ tsc -p tsconfig.json --noEmit
+
+EXIT_STATUS: 0

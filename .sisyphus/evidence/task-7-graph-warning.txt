@@ -1,0 +1,18 @@
+Task 7 graph warning verification
+Date: 2026-05-09
+
+Command: rtk bun run test -- memory-console-render -t "graph warnings"
+Result: PASS
+Output summary:
+- Test file: tests/memory-console-render.test.ts
+- Tests: 1 passed, 10 skipped
+- Assertion coverage: renderGraphConsolePage includes graph summary counts, grouped memory/source/tag/evidence node sections, grouped has_source/tagged_with/has_evidence/reviewed_as edge sections, escaped missing_related_memory warning copy, selected memory node details, GET-only graph filter controls, and no POST/action mutation controls.
+
+Command: rtk bun run test -- memory-console-graph memory-console-render memory-console-server
+Result: PASS
+Output summary:
+- Test files: 3 passed
+- Tests: 40 passed
+
+Command: rtk bun run typecheck
+Result: PASS

@@ -1,0 +1,11 @@
+$ vitest run memory-console-server -t "blocks GET /actions/review without reading or mutating"
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/memory-console-server.test.ts (17 tests | 16 skipped) 36ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 16 skipped (17)
+   Start at  13:26:20
+   Duration  671ms (transform 99ms, setup 0ms, collect 125ms, tests 36ms, environment 0ms, prepare 140ms)
+

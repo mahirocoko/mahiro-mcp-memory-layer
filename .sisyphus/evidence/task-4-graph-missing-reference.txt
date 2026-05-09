@@ -1,0 +1,7 @@
+Task 4 graph missing-reference evidence.
+
+Implemented missing related-memory handling in `buildMemoryGraph()`: supplied `MemoryReviewHint.relatedMemoryIds` and `ReviewAssistSuggestion.relatedMemoryIds` are checked against included memory node ids before creating `related_memory` edges.
+
+Focused coverage: `tests/memory-console-graph.test.ts` asserts that a missing related id emits a deterministic `missing_related_memory` warning, does not throw, and does not create a dangling `related_memory` edge.
+
+Safety check passed: grep found no `node:fs`, `node:path`, `JsonlLogStore`, `MemoryRecordsTable`, `lancedb`, `retrieval`, `persistence`, `log-store`, or `canonical-log` references in `src/features/memory-console/graph.ts`.

@@ -1,0 +1,9 @@
+Task 5 browse safety evidence
+
+- Route verified: GET /
+- Result: browse page keeps GET-only search and advanced filter controls.
+- Result: browse HTML contains no method="post" forms and no review/promote/reject buttons.
+- Result: navigation labels render as Browse, Review Queue, Rejected, Graph.
+- Result: the default local CLI backend now includes review/promote capabilities without changing browse GET behavior.
+- Focused check: `rtk bun run test -- memory-console-server -t "serves GET / as browse mode"`
+- Suite check: `rtk bun run test -- memory-console-render memory-console-server`

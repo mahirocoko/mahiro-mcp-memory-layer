@@ -1,0 +1,11 @@
+$ vitest run memory-console-server -t "serves GET / as browse mode"
+
+ RUN  v3.2.4 /Users/mahiro/ghq/github.com/mahirocoko/mahiro-mcp-memory-layer
+
+ ✓ tests/memory-console-server.test.ts (17 tests | 16 skipped) 65ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 16 skipped (17)
+   Start at  13:26:20
+   Duration  675ms (transform 71ms, setup 0ms, collect 88ms, tests 65ms, environment 0ms, prepare 210ms)
+

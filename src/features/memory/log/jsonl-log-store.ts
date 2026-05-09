@@ -80,6 +80,28 @@ export class JsonlLogStore implements CanonicalLogStore {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     await writeFile(this.filePath, `${next.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
   }
+
+  public async deleteRecordsByIds(ids: readonly string[]): Promise<{
+    readonly deletedRecords: readonly MemoryRecord[];
+    readonly missingIds: readonly string[];
+  }> {
+    const records = await this.readAll();
+    const requestedIds = new Set(ids);
+    const deletedRecords = records.filter((record) => requestedIds.has(record.id));
+    const deletedIds = new Set(deletedRecords.map((record) => record.id));
+    const missingIds = ids.filter((id) => !deletedIds.has(id));
+
+    if (deletedRecords.length === 0) {
+      return { deletedRecords, missingIds };
+    }
+
+    const next = records.filter((record) => !requestedIds.has(record.id));
+
+    await mkdir(path.dirname(this.filePath), { recursive: true });
+    await writeFile(this.filePath, next.length > 0 ? `${next.map((line) => JSON.stringify(line)).join("\n")}\n` : "", "utf8");
+
+    return { deletedRecords, missingIds };
+  }
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

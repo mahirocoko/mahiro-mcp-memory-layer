@@ -46,7 +46,22 @@ bun run dev
 bun run start
 ```
 
-### 3. Wiki materialization
+### 3. Local memory console
+
+Run the local memory management UI with:
+
+```bash
+bun run memory-console
+```
+
+`memory-console` is a localhost-only memory management UI inside this memory-only package boundary. It is for browse, review, quarantine, guarded rejected cleanup, and graph inspection.
+
+- Browse mode stays read-only.
+- Review management lives in management routes.
+- The graph is derived from memory metadata, read-only, and not persisted as canonical source data.
+- Rejected purge is guarded, rejected-only, and requires explicit confirmation. It is not the default cleanup path.
+
+### 4. Wiki materialization
 
 The repo also ships a standalone wiki projection command:
 
@@ -116,6 +131,7 @@ Review hints are advisory. Supersession freshness uses evidence-origin time (`ve
 bun install
 bun run dev
 bun run start
+bun run memory-console
 bun run typecheck
 bun run test
 bun run build
