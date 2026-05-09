@@ -10,7 +10,7 @@ export async function searchMemories(input: {
   readonly payload: SearchMemoriesInput;
   readonly table: MemoryRecordsTable;
   readonly embeddingProvider: EmbeddingProvider;
-  readonly traceStore: RetrievalTraceStore;
+  readonly traceStore?: RetrievalTraceStore;
   readonly traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">;
 }): Promise<SearchMemoriesResult> {
   const payload = searchMemoriesInputSchema.parse(input.payload);
@@ -34,7 +34,7 @@ export async function searchMemories(input: {
       : {}),
   });
 
-  await input.traceStore.append(trace);
+  await input.traceStore?.append(trace);
 
   return result;
 }

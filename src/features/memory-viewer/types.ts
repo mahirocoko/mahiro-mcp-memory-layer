@@ -12,13 +12,15 @@ import type {
   SearchMemoriesResult,
 } from "../memory/types.js";
 
+export type ViewerNavigationView = "verified" | "inbox" | "projects" | "firehose";
 export type ViewerScopeFilter = "all" | MemoryScope;
 export type ViewerKindFilter = "all" | MemoryKind;
 export type ViewerVerificationStatusFilter = "all" | MemoryVerificationStatus;
-export type ViewerReviewStatusFilter = "all" | "none" | MemoryReviewStatus;
+export type ViewerReviewStatusFilter = "all" | "active" | "none" | MemoryReviewStatus;
 export type ViewerFetchMode = "list" | "search";
 
 export interface ViewerFilterState {
+  readonly view: ViewerNavigationView;
   readonly query?: string;
   readonly scope: ViewerScopeFilter;
   readonly kind: ViewerKindFilter;
@@ -52,9 +54,22 @@ export interface ViewerMemory {
   readonly reasons: readonly string[];
 }
 
+export type ViewerReviewStatusCountKey = "none" | MemoryReviewStatus;
+
+export interface ViewerProjectScopeSummary {
+  readonly projectId: string;
+  readonly containerId: string;
+  readonly totalCount: number;
+  readonly kindCounts: Readonly<Record<MemoryKind, number>>;
+  readonly verificationStatusCounts: Readonly<Record<MemoryVerificationStatus, number>>;
+  readonly reviewStatusCounts: Readonly<Record<ViewerReviewStatusCountKey, number>>;
+  readonly latestTimestamp?: string;
+}
+
 export interface ViewerLoadResult {
   readonly filters: ViewerFilterState;
   readonly memories: readonly ViewerMemory[];
+  readonly projectScopes: readonly ViewerProjectScopeSummary[];
   readonly selectedMemory?: ViewerMemory;
   readonly fetchedCount: number;
   readonly fetchMode: ViewerFetchMode;
@@ -63,6 +78,7 @@ export interface ViewerLoadResult {
 }
 
 export interface ReadOnlyMemoryReader {
+  readAll(): Promise<readonly MemoryRecord[]>;
   list(input: ListMemoriesInput): Promise<readonly MemoryRecord[]>;
   search(input: SearchMemoriesInput): Promise<SearchMemoriesResult>;
 }

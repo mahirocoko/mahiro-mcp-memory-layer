@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 
 import {
+  aggregateViewerProjectScopes,
   canUseIndexedSearch,
   filterViewerMemories,
   normalizeMemoryRecord,
@@ -17,7 +18,10 @@ export async function loadViewerMemories(
   reader: ReadOnlyMemoryReader,
   filters: ViewerFilterState,
 ): Promise<ViewerLoadResult> {
+  const canonicalRecordsPromise = reader.readAll();
+
   if (canUseIndexedSearch(filters)) {
+    const projectScopesPromise = loadProjectScopes(canonicalRecordsPromise);
     const result = await reader.search({
       query: filters.query,
       mode: "full",
@@ -28,13 +32,13 @@ export async function loadViewerMemories(
     });
     const fetched = result.items.map((item) => normalizeSearchMemoryItem(item, filters.scope, filters.projectId, filters.containerId));
     const memories = filterViewerMemories(fetched, filters, { includeQuery: false });
-    return toLoadResult(filters, memories, fetched.length, "search", result.degraded);
+    return toLoadResult(filters, memories, fetched.length, "search", result.degraded, await projectScopesPromise);
   }
 
-  const records = await reader.list({ limit: filters.limit });
-  const fetched = records.map(normalizeMemoryRecord);
-  const memories = filterViewerMemories(fetched, filters);
-  return toLoadResult(filters, memories, fetched.length, "list", false);
+  const canonicalRecords = await canonicalRecordsPromise;
+  const fetched = canonicalRecords.map(normalizeMemoryRecord);
+  const memories = filterViewerMemories(fetched, filters).slice(0, filters.limit);
+  return toLoadResult(filters, memories, fetched.length, "list", false, aggregateViewerProjectScopes(fetched));
 }
 
 export function createMemoryViewerServer(reader: ReadOnlyMemoryReader): Server {
@@ -121,15 +125,22 @@ function toLoadResult(
   fetchedCount: number,
   fetchMode: ViewerLoadResult["fetchMode"],
   degraded: boolean,
+  projectScopes: ViewerLoadResult["projectScopes"],
 ): ViewerLoadResult {
   const selectedMemory = memories.find((memory) => memory.id === filters.selectedId) ?? memories[0];
   return {
     filters,
     memories,
+    projectScopes,
     selectedMemory,
     fetchedCount,
     fetchMode,
     degraded,
     refreshedAt: new Date().toISOString(),
   };
+}
+
+async function loadProjectScopes(canonicalRecordsPromise: Promise<readonly import("../memory/types.js").MemoryRecord[]>): Promise<ViewerLoadResult["projectScopes"]> {
+  const canonicalRecords = await canonicalRecordsPromise;
+  return aggregateViewerProjectScopes(canonicalRecords.map(normalizeMemoryRecord));
 }

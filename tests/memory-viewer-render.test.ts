@@ -4,11 +4,12 @@ import { renderMemoryViewerPage } from "../src/features/memory-viewer/render.js"
 import type { ViewerFilterState, ViewerLoadResult, ViewerMemory } from "../src/features/memory-viewer/types.js";
 
 const filters = {
+  view: "verified",
   scope: "all",
   kind: "all",
-  verificationStatus: "all",
-  reviewStatus: "all",
-  limit: 100,
+  verificationStatus: "verified",
+  reviewStatus: "active",
+  limit: 50,
 } satisfies ViewerFilterState;
 
 describe("memory viewer rendering", () => {
@@ -48,6 +49,15 @@ describe("memory viewer rendering", () => {
     expect(html).toContain("file:///tmp/&lt;guide&gt;.md");
     expect(html).toContain("Needs &lt;review&gt;");
     expect(html).toContain("quoted &quot;note&quot;");
+    expect(html).toContain("<h2>Memory details</h2>");
+    expect(html).toContain('<span class="signal-badge verification-verified">verified</span>');
+    expect(html).toContain('<span class="signal-badge review-pending">pending</span>');
+    expect(html).toContain('<details class="technical-details">');
+    expect(html).toContain("<summary>Technical metadata</summary>");
+    expect(html).toContain("<h3>Summary</h3>");
+    expect(html).toContain("Unsafe &lt;summary&gt;");
+    expect(html).toContain("Evidence: human: &lt;ok&gt; — quoted &quot;note&quot;");
+    expect(html).not.toContain("Decision evidence");
   });
 
   it("renders a clear empty state when no memories match", () => {
@@ -55,6 +65,91 @@ describe("memory viewer rendering", () => {
 
     expect(html).toContain("No memories matched the current filters.");
     expect(html).toContain("Select a memory to inspect its source, evidence, and review decisions.");
+  });
+
+  it("renders signal-first navigation links without stale scoped ids", () => {
+    const html = renderMemoryViewerPage({
+      ...createResult([], undefined),
+      filters: {
+        ...filters,
+        query: "profile",
+        scope: "project",
+        projectId: "project-a",
+        containerId: "container-a",
+        selectedId: "mem-1",
+      },
+    });
+
+    expect(html).toContain('href="/"');
+    expect(html).toContain('>Verified</a>');
+    expect(html).toContain('href="/?view=inbox"');
+    expect(html).toContain('href="/?view=projects"');
+    expect(html).toContain('href="/?view=firehose"');
+    expect(html).not.toContain('projectId=project-a&amp;containerId=container-a&amp;id=mem-1');
+  });
+
+  it("renders project scope summaries with detail links that populate project filters", () => {
+    const html = renderMemoryViewerPage({
+      ...createResult([], undefined),
+      filters: {
+        ...filters,
+        view: "projects",
+      },
+      projectScopes: [
+        {
+          projectId: "project-a",
+          containerId: "container-a",
+          totalCount: 2,
+          kindCounts: { fact: 1, conversation: 0, decision: 0, doc: 1, task: 0 },
+          verificationStatusCounts: { hypothesis: 1, verified: 1 },
+          reviewStatusCounts: { none: 1, pending: 1, deferred: 0, rejected: 0 },
+          latestTimestamp: "2026-05-04T12:30:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("<strong>1</strong> project/container scope discovered from canonical records");
+    expect(html).toContain('href="/?scope=project&amp;projectId=project-a&amp;containerId=container-a"');
+    expect(html).toContain("fact 1");
+    expect(html).toContain("doc 1");
+    expect(html).toContain("verified 1");
+    expect(html).toContain("pending 1");
+    expect(html).not.toContain("conversation 0");
+    expect(html).not.toContain("deferred 0");
+    expect(html).not.toContain("count-stack");
+    expect(html).toContain("latest 2026-05-04T12:30:00.000Z");
+  });
+
+  it("renders scoped project filters as read-only context with hidden inputs", () => {
+    const html = renderMemoryViewerPage({
+      ...createResult([], undefined),
+      filters: {
+        ...filters,
+        scope: "project",
+        projectId: "project-a",
+        containerId: "container-a",
+      },
+    });
+
+    expect(html).toContain('class="scope-context"');
+    expect(html).toContain('<input type="hidden" name="scope" value="project">');
+    expect(html).toContain('<input type="hidden" name="projectId" value="project-a">');
+    expect(html).toContain('<input type="hidden" name="containerId" value="container-a">');
+    expect(html).not.toContain('<span>Project ID</span>');
+    expect(html).not.toContain('<span>Container ID</span>');
+  });
+
+  it("renders the limit control as a 25 or 50 select", () => {
+    const html = renderMemoryViewerPage(createResult([], undefined));
+
+    expect(html).toContain('<button type="submit">Search</button>');
+    expect(html).toContain('<details class="advanced-filters">');
+    expect(html).toContain('<summary>Advanced filters</summary>');
+    expect(html).toContain('<select name="limit">');
+    expect(html).toContain('<option value="25">25</option>');
+    expect(html).toContain('<option value="50" selected>50</option>');
+    expect(html).not.toContain('max="100"');
+    expect(html).not.toContain('<button type="submit">Apply</button>');
   });
 
   it("does not render mutation controls", () => {
@@ -70,6 +165,7 @@ function createResult(memories: readonly ViewerMemory[], selectedMemory: ViewerM
   return {
     filters,
     memories,
+    projectScopes: [],
     selectedMemory,
     fetchedCount: memories.length,
     fetchMode: "list",
