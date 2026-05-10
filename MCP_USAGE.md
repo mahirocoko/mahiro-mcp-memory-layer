@@ -51,6 +51,14 @@ Memory lifecycle contract:
 
 Compaction continuity is append-only and fail-open. It keeps memory continuity moving forward even when a backend write cannot complete.
 
+Scope identity policy:
+
+- Plugin-generated project scope uses `projectId = context.project.name ?? context.project.id`.
+- Plugin-generated container scope uses `containerId = workspace:/absolute/path` for the resolved worktree or directory path.
+- Legacy `worktree:/absolute/path` and `directory:/absolute/path` values stay read-compatible with `workspace:/absolute/path`.
+- `rewrite-scope-identity` is a guarded maintenance command: dry-run by default, `-- --apply` rewrites canonical log scope metadata and reindexes LanceDB.
+- Public memory tool inputs remain opaque durable keys; compatibility happens at scoped read/filter boundaries rather than by silently rewriting caller input.
+
 ### Standalone MCP path
 
 On a source checkout or standalone server path, the repo can also expose the same memory-focused tools through the standalone MCP server.
@@ -61,7 +69,7 @@ On a source checkout or standalone server path, the repo can also expose the sam
 
 This UI stays inside the memory-only package boundary. It is for local browse, review management, rejected quarantine, guarded rejected cleanup, and graph inspection.
 
-- Browse mode is read-only.
+- Browse mode is read-mostly: verified active memories can be rejected from the details pane, but browse does not promote, edit, or purge records.
 - The graph is derived from memory metadata, read-only, and not canonical storage.
 - Rejected purge is rejected-only, guarded, and requires explicit confirmation. It is not the default cleanup path.
 - The console is not a hosted admin plane, workflow controller, or executor surface.

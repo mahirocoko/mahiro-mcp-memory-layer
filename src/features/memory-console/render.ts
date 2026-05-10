@@ -38,6 +38,12 @@ interface RejectedPurgeScopeGroup {
   readonly memories: ConsoleMemory[];
 }
 
+interface RowMetaScopeIdentity {
+  readonly kind: string;
+  readonly scope?: string;
+  readonly projectId?: string;
+}
+
 export function renderMemoryConsolePage(result: ConsoleLoadResult): string {
   const title = "Local memory console";
   return `<!doctype html>
@@ -318,7 +324,7 @@ function renderReviewQueueList(
     const activeClass = selectedReviewItem?.id === item.id ? " active" : "";
     return `<a class="memory-row review-row${activeClass}" href="/review?${escapeAttribute(params.toString())}">
       <span class="row-title">${escapeHtml(item.summary ?? item.content)}</span>
-      <span class="row-meta">${escapeHtml(item.kind)} · ${escapeHtml(item.scope)} · priority ${escapeHtml(item.priorityScore.toFixed(2))}</span>
+      <span class="row-meta">${renderRowMetaScopeIdentity(item, "unknown scope")} · priority ${escapeHtml(item.priorityScore.toFixed(2))}</span>
       <span class="signal-badges">${renderBadge(item.verificationStatus, `verification-${item.verificationStatus}`)}${renderBadge(item.reviewStatus ?? "unreviewed", `review-${item.reviewStatus ?? "unreviewed"}`)}</span>
       ${item.priorityReasons.length > 0 ? `<span class="review-reasons">${item.priorityReasons.map(escapeHtml).join(" · ")}</span>` : ""}
       ${item.hints.length > 0 ? `<span class="review-reasons">Hints: ${item.hints.map((hint) => escapeHtml(hint.type)).join(" · ")}</span>` : ""}
@@ -943,7 +949,7 @@ function renderMemoryList(
     const summary = memory.summary ?? memory.content;
     return `<a class="memory-row${activeClass}" href="/?${escapeAttribute(params.toString())}">
       <span class="row-title">${escapeHtml(summary)}</span>
-      <span class="row-meta">${escapeHtml(memory.kind)} · ${escapeHtml(memory.scope ?? "search result")}</span>
+      <span class="row-meta">${renderRowMetaScopeIdentity(memory, "search result")}</span>
       <span class="signal-badges">${renderStatusBadges(memory)}</span>
     </a>`;
   });
@@ -951,9 +957,15 @@ function renderMemoryList(
   return `<section class="list-panel" aria-label="Memory list">${items.join("")}</section>`;
 }
 
+function renderRowMetaScopeIdentity(item: RowMetaScopeIdentity, fallbackScopeLabel: string): string {
+  const scopeLabel = item.scope ?? fallbackScopeLabel;
+  const parts = item.scope === "project" && item.projectId ? [item.kind, scopeLabel, item.projectId] : [item.kind, scopeLabel];
+  return parts.map(escapeHtml).join(" · ");
+}
+
 function renderDetailsPane(memory: ConsoleMemory | undefined): string {
   if (!memory) {
-    return `<aside class="details">${renderEmptyState("Select a memory to inspect its source, evidence, and review decisions.", "Browse is read-only; use the Review Queue for review decisions or Rejected for guarded cleanup.", undefined, undefined)}</aside>`;
+    return `<aside class="details">${renderEmptyState("Select a memory to inspect its source, evidence, and review decisions.", "Verified active records can be rejected here; use Rejected for guarded cleanup.", undefined, undefined)}</aside>`;
   }
 
   return `<aside class="details" aria-label="Memory details">
@@ -995,7 +1007,26 @@ function renderDetailsPane(memory: ConsoleMemory | undefined): string {
     </section>
     ${renderEvidence("Verification evidence", memory.verificationEvidence)}
     ${renderReviewDecisions(memory.reviewDecisions)}
+    ${renderBrowseRejectAction(memory)}
   </aside>`;
+}
+
+function renderBrowseRejectAction(memory: ConsoleMemory): string {
+  if (memory.verificationStatus !== "verified" || memory.reviewStatus === "rejected") {
+    return "";
+  }
+
+  return `<section class="detail-section review-actions" aria-label="Browse review actions">
+    <h3>Review decision</h3>
+    <p class="action-guidance">Rejecting a verified memory keeps the record but moves it into rejected quarantine.</p>
+    <form class="action-form secondary danger-action" method="post" action="/actions/review">
+      <input type="hidden" name="id" value="${escapeAttribute(memory.id)}">
+      <input type="hidden" name="action" value="reject">
+      <input type="hidden" name="redirectTo" value="/">
+      <label><span>Reject note</span><input name="note" placeholder="Optional reviewer note"></label>
+      <button type="submit">Reject verified memory</button>
+    </form>
+  </section>`;
 }
 
 function renderStatusBadges(memory: ConsoleMemory): string {

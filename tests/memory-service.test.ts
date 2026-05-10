@@ -15,6 +15,7 @@ import { upsertDocumentInputSchema } from "../src/features/memory/schemas.js";
 import { searchMemories } from "../src/features/memory/core/search-memories.js";
 import { buildContextForTask } from "../src/features/memory/core/build-context-for-task.js";
 import { reindexMemoryRecords } from "../src/features/memory/index/reindex.js";
+import { rewriteScopeIdentityRecords } from "../src/features/memory/core/rewrite-scope-identity.js";
 import { toRetrievalRow } from "../src/features/memory/retrieval/rank.js";
 import { MemoryService } from "../src/features/memory/memory-service.js";
 import type { RetrievalTraceEntry } from "../src/features/memory/types.js";
@@ -118,6 +119,94 @@ describe("memory service core", () => {
     expect(result.items[0]?.scope).toBe("project");
     expect((await fixture.logStore.readAll())[0]?.verificationStatus).toBe("hypothesis");
     expect(result.items[0]?.verificationStatus).toBe("hypothesis");
+  });
+
+
+  it("matches legacy container ids when reading with canonical workspace scope", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const legacyWorktree = await service.remember({
+      content: "Legacy worktree scope remains readable through canonical workspace scope.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "worktree:/repo/alpha",
+      source: { type: "manual" },
+    });
+    const legacyDirectory = await service.remember({
+      content: "Legacy directory scope remains readable through canonical workspace scope.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "directory:/repo/alpha",
+      source: { type: "manual" },
+    });
+    await service.remember({
+      content: "Different legacy workspace should not match canonical alpha scope.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "worktree:/repo/beta",
+      source: { type: "manual" },
+    });
+
+    const list = await service.list({
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:/repo/alpha",
+    });
+    const search = await service.search({
+      query: "legacy canonical workspace readable",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:/repo/alpha",
+    });
+
+    expect(list.map((item) => item.id)).toEqual(expect.arrayContaining([legacyWorktree.id, legacyDirectory.id]));
+    expect(search.items.map((item) => item.id)).toEqual(expect.arrayContaining([legacyWorktree.id, legacyDirectory.id]));
+    expect(list.map((item) => item.containerId)).not.toContain("worktree:/repo/beta");
+  });
+
+  it("finds latest legacy retrieval traces from canonical workspace scope filters", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    await service.remember({
+      content: "Legacy trace lookup target.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "worktree:/repo/alpha",
+      source: { type: "manual" },
+    });
+    await service.search({
+      query: "Legacy trace lookup target",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "worktree:/repo/alpha",
+    });
+
+    await expect(service.inspectMemoryRetrieval({
+      latestScopeFilter: {
+        projectId: "project-alpha",
+        containerId: "workspace:/repo/alpha",
+      },
+    })).resolves.toMatchObject({
+      status: "found",
+      lookup: "latest",
+    });
   });
 
   it("excludes rejected memories from normal search", async () => {
@@ -1587,6 +1676,92 @@ describe("memory service core", () => {
     expect(result.items).toContain(strongerProjectMem.id);
     expect(result.items).toContain(projectMem.id);
     expect(result.context).toContain("prioritize LanceDB index tuning");
+  });
+
+
+  it("plans scope identity rewrites without mutating records", () => {
+    const records = [
+      {
+        id: "mem-legacy",
+        kind: "fact",
+        scope: "project",
+        projectId: "project-alpha",
+        containerId: "worktree:/repo/alpha",
+        source: { type: "manual" },
+        content: "Legacy worktree record.",
+        tags: [],
+        importance: 0.5,
+        createdAt: "2026-05-10T00:00:00.000Z",
+      },
+      {
+        id: "mem-current",
+        kind: "fact",
+        scope: "project",
+        projectId: "project-alpha",
+        containerId: "workspace:/repo/alpha",
+        source: { type: "manual" },
+        content: "Current workspace record.",
+        tags: [],
+        importance: 0.5,
+        createdAt: "2026-05-10T00:00:00.000Z",
+      },
+    ] as const;
+
+    const result = rewriteScopeIdentityRecords(records);
+
+    expect(result.changes).toEqual([{
+      id: "mem-legacy",
+      projectId: "project-alpha",
+      fromContainerId: "worktree:/repo/alpha",
+      toContainerId: "workspace:/repo/alpha",
+    }]);
+    expect(result.records[0]?.containerId).toBe("workspace:/repo/alpha");
+    expect(records[0].containerId).toBe("worktree:/repo/alpha");
+  });
+
+  it("applies scope identity rewrites and reindexes retrieval rows", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+    const remembered = await service.remember({
+      content: "Rewrite scope identity target remains searchable after reindex.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "worktree:/repo/alpha",
+      source: { type: "manual" },
+    });
+
+    const dryRun = await service.rewriteScopeIdentity(false);
+    expect(dryRun).toMatchObject({
+      status: "dry_run",
+      scannedRecords: 1,
+      changedRecords: 1,
+      reindexed: false,
+    });
+    expect((await fixture.logStore.readById(remembered.id))?.containerId).toBe("worktree:/repo/alpha");
+
+    const applied = await service.rewriteScopeIdentity(true);
+    expect(applied).toMatchObject({
+      status: "applied",
+      scannedRecords: 1,
+      changedRecords: 1,
+      reindexed: true,
+    });
+    expect((await fixture.logStore.readById(remembered.id))?.containerId).toBe("workspace:/repo/alpha");
+
+    const search = await service.search({
+      query: "scope identity target searchable",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:/repo/alpha",
+    });
+    expect(search.items.map((item) => item.id)).toContain(remembered.id);
   });
 
   it("rebuilds the LanceDB index from the canonical log", async () => {

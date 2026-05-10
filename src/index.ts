@@ -12,6 +12,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (process.argv.includes("--rewrite-scope-identity")) {
+    const result = await memoryService.rewriteScopeIdentity(process.argv.includes("--apply"));
+    console.error(JSON.stringify(result, null, 2));
+    return;
+  }
+
   const server = createMemoryMcpServer(memoryService);
   const transport = new StdioServerTransport();
 

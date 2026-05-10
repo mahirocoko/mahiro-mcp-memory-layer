@@ -2,6 +2,7 @@ import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { memoryRecordSchema } from "../schemas.js";
+import { matchesProjectScopeIdentity } from "../lib/scope.js";
 import type { ListMemoriesInput, ListReviewQueueInput, MemoryRecord } from "../types.js";
 import type { CanonicalLogStore } from "./canonical-log.js";
 
@@ -19,8 +20,7 @@ export class JsonlLogStore implements CanonicalLogStore {
     return records
       .filter((record) => !input.scope || record.scope === input.scope)
       .filter((record) => !input.kind || record.kind === input.kind)
-      .filter((record) => !input.projectId || record.projectId === input.projectId)
-      .filter((record) => !input.containerId || record.containerId === input.containerId)
+      .filter((record) => matchesProjectScopeIdentity(record, input))
       .slice(0, input.limit ?? 100);
   }
 
@@ -30,8 +30,7 @@ export class JsonlLogStore implements CanonicalLogStore {
     return records
       .filter((record) => record.verificationStatus !== "verified")
       .filter((record) => record.reviewStatus !== "rejected")
-      .filter((record) => !input.projectId || record.projectId === input.projectId)
-      .filter((record) => !input.containerId || record.containerId === input.containerId)
+      .filter((record) => matchesProjectScopeIdentity(record, input))
       .sort((left, right) => {
         const leftTime = Date.parse(left.updatedAt ?? left.createdAt);
         const rightTime = Date.parse(right.updatedAt ?? right.createdAt);
@@ -77,8 +76,12 @@ export class JsonlLogStore implements CanonicalLogStore {
     const next = records.slice();
     next[index] = record;
 
+    await this.replaceAll(next);
+  }
+
+  public async replaceAll(records: readonly MemoryRecord[]): Promise<void> {
     await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${next.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
+    await writeFile(this.filePath, records.length > 0 ? `${records.map((line) => JSON.stringify(line)).join("\n")}\n` : "", "utf8");
   }
 
   public async deleteRecordsByIds(ids: readonly string[]): Promise<{
@@ -97,8 +100,7 @@ export class JsonlLogStore implements CanonicalLogStore {
 
     const next = records.filter((record) => !requestedIds.has(record.id));
 
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, next.length > 0 ? `${next.map((line) => JSON.stringify(line)).join("\n")}\n` : "", "utf8");
+    await this.replaceAll(next);
 
     return { deletedRecords, missingIds };
   }

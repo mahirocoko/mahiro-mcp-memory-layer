@@ -1,4 +1,5 @@
-import type { MemoryScope, ScopeFilter } from "../types.js";
+import type { MemoryRecord, MemoryScope, RetrievalRow, ScopeFilter } from "../types.js";
+import { containerIdMatchesFilter, containerIdReadAliases } from "./scope-identity.js";
 
 const scopeRequirementByName: Record<MemoryScope, readonly (keyof ScopeFilter)[]> = {
   global: [],
@@ -20,6 +21,23 @@ export function toScopeFilter(input: ScopeFilter): ScopeFilter {
   return input;
 }
 
+export function matchesScopeFilter(
+  record: Pick<MemoryRecord | RetrievalRow, "scope" | "projectId" | "containerId">,
+  filter: ScopeFilter,
+): boolean {
+  return record.scope === filter.scope
+    && (!filter.projectId || record.projectId === filter.projectId)
+    && containerIdMatchesFilter(record.containerId, filter.containerId);
+}
+
+export function matchesProjectScopeIdentity(
+  record: Pick<MemoryRecord, "projectId" | "containerId">,
+  filter: { readonly projectId?: string; readonly containerId?: string },
+): boolean {
+  return (!filter.projectId || record.projectId === filter.projectId)
+    && containerIdMatchesFilter(record.containerId, filter.containerId);
+}
+
 export function toSqlScopeWhereClause(filter: ScopeFilter): string {
   const parts = [`scope = '${escapeSqlValue(filter.scope)}'`];
 
@@ -28,7 +46,11 @@ export function toSqlScopeWhereClause(filter: ScopeFilter): string {
   }
 
   if (filter.containerId) {
-    parts.push(`container_id = '${escapeSqlValue(filter.containerId)}'`);
+    const containerIds = containerIdReadAliases(filter.containerId);
+    const containerClause = containerIds
+      .map((containerId) => `container_id = '${escapeSqlValue(containerId)}'`)
+      .join(" OR ");
+    parts.push(`(${containerClause})`);
   }
 
   return parts.join(" AND ");

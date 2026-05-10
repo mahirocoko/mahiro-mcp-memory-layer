@@ -14,6 +14,11 @@ const filters = {
   limit: 50,
 } satisfies ConsoleFilterState;
 
+type ReviewQueueOverviewItemWithScopeIdentity = ReviewQueueOverviewItem & {
+  readonly projectId?: string;
+  readonly containerId?: string;
+};
+
 describe("memory console rendering", () => {
   it("escapes memory content, source fields, evidence, and review decisions", () => {
     const memory = {
@@ -69,7 +74,31 @@ describe("memory console rendering", () => {
     expect(html).toContain("Try removing search text, broadening scope, or resetting to verified active records.");
     expect(html).toContain('href="/">Reset browse filters</a>');
     expect(html).toContain("Select a memory to inspect its source, evidence, and review decisions.");
-    expect(html).toContain("Browse is read-only; use the Review Queue for review decisions or Rejected for guarded cleanup.");
+    expect(html).toContain("Verified active records can be rejected here; use Rejected for guarded cleanup.");
+  });
+
+  it("shows project identity in project-scoped browse row metadata only", () => {
+    const projectMemory = createMemory("mem-project", "Project memory.", {
+      projectId: "project-<a>\"",
+      containerId: "container-a",
+    });
+    const globalMemory = createMemory("mem-global", "Global memory.", {
+      scope: "global",
+      projectId: undefined,
+      containerId: undefined,
+    });
+    const searchResultMemory = createMemory("mem-search", "Search result memory.", {
+      scope: undefined,
+      projectId: undefined,
+      containerId: undefined,
+    });
+
+    const html = renderMemoryConsolePage(createResult([projectMemory, globalMemory, searchResultMemory], undefined));
+
+    expect(html).toContain('<span class="row-meta">fact · project · project-&lt;a&gt;&quot;</span>');
+    expect(html).toContain('<span class="row-meta">fact · global</span>');
+    expect(html).toContain('<span class="row-meta">fact · search result</span>');
+    expect(html).not.toContain('project-<a>"');
   });
 
   it("renders console navigation labels without stale scoped ids", () => {
@@ -348,6 +377,26 @@ describe("memory console rendering", () => {
     expect(html).not.toContain("mem-<rejected>");
   });
 
+  it("shows project identity in project-scoped review queue row metadata only", () => {
+    const projectItem = createReviewItem({
+      id: "review-project",
+      projectId: "project-<a>\"",
+      containerId: "container-a",
+    });
+    const globalItem = createReviewItem({
+      id: "review-global",
+      scope: "global",
+      projectId: undefined,
+      containerId: undefined,
+    });
+
+    const html = renderReviewConsolePage(createReviewResult([projectItem, globalItem], undefined, undefined));
+
+    expect(html).toContain('<span class="row-meta">fact · project · project-&lt;a&gt;&quot; · priority 8.75</span>');
+    expect(html).toContain('<span class="row-meta">fact · global · priority 8.75</span>');
+    expect(html).not.toContain('project-<a>"');
+  });
+
   it("renders review queue overview, advisory assist, and explicit POST actions", () => {
     const reviewItem = createReviewItem();
     const assist = {
@@ -474,7 +523,7 @@ function createReviewResult(
   };
 }
 
-function createReviewItem(): ReviewQueueOverviewItem {
+function createReviewItem(overrides: Partial<ReviewQueueOverviewItemWithScopeIdentity> = {}): ReviewQueueOverviewItemWithScopeIdentity {
   return {
     id: "review-1",
     kind: "fact",
@@ -497,5 +546,6 @@ function createReviewItem(): ReviewQueueOverviewItem {
         note: "Conflicts with existing memory <id>",
       },
     ],
-  };
+    ...overrides,
+  } satisfies ReviewQueueOverviewItemWithScopeIdentity;
 }

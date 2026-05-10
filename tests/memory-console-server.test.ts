@@ -217,7 +217,10 @@ describe("memory console server", () => {
       expect(body).toContain("Browseable memory.");
       expect(body).toContain('<span class="nav-label">Browse</span>');
       expect(body).toContain("Read verified and active records");
-      expect(body).not.toContain('method="post"');
+      expect(body).toContain('method="post" action="/actions/review"');
+      expect(body).toContain('name="redirectTo" value="/"');
+      expect(body).toContain("Reject verified memory");
+      expect(body).not.toContain('action="/actions/promote"');
       expect(reviewMemory).not.toHaveBeenCalled();
       expect(promoteMemory).not.toHaveBeenCalled();
     });
@@ -474,6 +477,27 @@ describe("memory console server", () => {
       expect(response.status).toBe(400);
       expect(response.headers.get("content-type")).toContain("text/plain");
       expect(body).toBe("Invalid review action: memoryId is required.");
+    });
+  });
+
+  it("redirects browse reject actions back to browse", async () => {
+    const reviewMemory = vi.fn(async () => createReviewAcceptedResult("mem-verified", "reject"));
+    const reader = createReader({ records: [], searchResult: { items: [], degraded: false }, reviewMemory });
+
+    await withConsoleServer(reader, async (baseUrl) => {
+      const response = await fetch(new URL("/actions/review", baseUrl), {
+        method: "POST",
+        body: new URLSearchParams({ id: "mem-verified", action: "reject", redirectTo: "/", note: "No longer true." }),
+        redirect: "manual",
+      });
+
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe("/");
+      expect(reviewMemory).toHaveBeenCalledWith({
+        id: "mem-verified",
+        action: "reject",
+        note: "No longer true.",
+      });
     });
   });
 

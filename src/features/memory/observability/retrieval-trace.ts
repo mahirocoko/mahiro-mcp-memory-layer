@@ -1,6 +1,7 @@
 import { mkdir, appendFile, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { containerIdMatchesFilter } from "../lib/scope-identity.js";
 import type { RetrievalTraceEntry } from "../types.js";
 
 export class RetrievalTraceStore {
@@ -67,11 +68,7 @@ function matchesLatestScopeFilter(
     return false;
   }
 
-  if (filter.containerId && entry.enforcedFilters.containerId !== filter.containerId) {
-    return false;
-  }
-
-  return true;
+  return containerIdMatchesFilter(entry.enforcedFilters.containerId, filter.containerId);
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

@@ -3,6 +3,7 @@ import type { Connection, Table } from "@lancedb/lancedb";
 import { retrievalRowSchema } from "../schemas.js";
 import type { RetrievalRow, ScopeFilter } from "../types.js";
 import { extractLexicalTokensForCandidateQuery } from "../lib/lexical-tokens.js";
+import { matchesScopeFilter } from "../lib/scope.js";
 
 const tableName = "memory_records";
 
@@ -135,12 +136,6 @@ export class MemoryRecordsTable {
 
 function escapeSqlPredicateValue(value: string): string {
   return value.replaceAll("'", "''");
-}
-
-function matchesScopeFilter(row: RetrievalRow, filter: ScopeFilter): boolean {
-  return row.scope === filter.scope
-    && (!filter.projectId || row.projectId === filter.projectId)
-    && (!filter.containerId || row.containerId === filter.containerId);
 }
 
 function matchesLexicalCandidate(row: RetrievalRow, tokens: readonly string[]): boolean {

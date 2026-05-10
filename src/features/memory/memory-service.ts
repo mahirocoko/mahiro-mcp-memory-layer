@@ -14,8 +14,10 @@ import { applyConservativeMemoryPolicy as runApplyConservativeMemoryPolicy } fro
 import { suggestMemoryCandidates } from "./core/suggest-memory-candidates.js";
 import { upsertDocument } from "./core/upsert-document.js";
 import { reindexMemoryRecords } from "./index/reindex.js";
+import { rewriteScopeIdentity, type RewriteScopeIdentityResult } from "./core/rewrite-scope-identity.js";
 import { createMemoryFacade, type MemoryFacade } from "./memory-facade.js";
 import { applyConservativeMemoryPolicyInputSchema, enqueueMemoryProposalInputSchema, getReviewAssistInputSchema, listReviewQueueInputSchema, listReviewQueueOverviewInputSchema, promoteMemoryInputSchema, purgeRejectedMemoriesInputSchema, reviewMemoryInputSchema } from "./schemas.js";
+import { matchesProjectScopeIdentity } from "./lib/scope.js";
 import { toRetrievalRow } from "./retrieval/rank.js";
 import { nowIso } from "./lib/time.js";
 import type {
@@ -361,8 +363,7 @@ export class MemoryService {
     const records = await this.logStore.readAll();
     const relevantVerified = records.filter((record) =>
       record.verificationStatus === "verified"
-      && (!parsed.projectId || record.projectId === parsed.projectId)
-      && (!parsed.containerId || record.containerId === parsed.containerId)
+      && matchesProjectScopeIdentity(record, parsed)
     );
 
     return queue
@@ -389,8 +390,7 @@ export class MemoryService {
     const verifiedRecords = (await this.logStore.readAll()).filter((item) =>
       item.verificationStatus === "verified"
       && item.id !== record.id
-      && item.projectId === record.projectId
-      && item.containerId === record.containerId
+      && isSameMemoryScope(item, record)
     );
 
     const hints = collectReviewHints(record, verifiedRecords);
@@ -506,6 +506,15 @@ export class MemoryService {
 
   public reindex(): Promise<void> {
     return reindexMemoryRecords({
+      logStore: this.logStore,
+      table: this.table,
+      embeddingProvider: this.embeddingProvider,
+    });
+  }
+
+  public rewriteScopeIdentity(apply: boolean): Promise<RewriteScopeIdentityResult> {
+    return rewriteScopeIdentity({
+      apply,
       logStore: this.logStore,
       table: this.table,
       embeddingProvider: this.embeddingProvider,
@@ -695,8 +704,7 @@ function isPossibleSupersession(
 
 function isSameMemoryScope(left: MemoryRecord, right: MemoryRecord): boolean {
   return left.scope === right.scope
-    && left.projectId === right.projectId
-    && left.containerId === right.containerId;
+    && matchesProjectScopeIdentity(left, { projectId: right.projectId, containerId: right.containerId });
 }
 
 function matchesPurgeScope(record: MemoryRecord, scope: Pick<PurgeRejectedMemoriesInput, "scope" | "projectId" | "containerId">): boolean {
@@ -708,7 +716,7 @@ function matchesPurgeScope(record: MemoryRecord, scope: Pick<PurgeRejectedMemori
     return true;
   }
 
-  return record.projectId === scope.projectId && record.containerId === scope.containerId;
+  return matchesProjectScopeIdentity(record, scope);
 }
 
 function getEvidenceTime(record: MemoryRecord): number {

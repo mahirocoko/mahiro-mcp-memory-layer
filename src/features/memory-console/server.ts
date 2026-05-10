@@ -373,6 +373,7 @@ function validateReviewAction(form: URLSearchParams): ConsoleActionResult | Cons
     content: getOptionalFormValue(form, "content"),
     summary: getOptionalFormValue(form, "summary"),
     tags: getOptionalTags(form),
+    redirectTo: getOptionalReviewRedirect(form),
   };
 
   if (!input.id) {
@@ -394,7 +395,16 @@ function validateReviewAction(form: URLSearchParams): ConsoleActionResult | Cons
     ...(input.summary ? { summary: input.summary } : {}),
     ...(input.tags ? { tags: input.tags } : {}),
   };
-  return actionAccepted("review", validatedInput, "/review");
+  return actionAccepted("review", validatedInput, input.redirectTo ?? "/review");
+}
+
+function getOptionalReviewRedirect(form: URLSearchParams): "/" | "/review" | undefined {
+  const value = getOptionalFormValue(form, "redirectTo");
+  if (value === "/" || value === "/review") {
+    return value;
+  }
+
+  return undefined;
 }
 
 function validatePromoteAction(form: URLSearchParams): ConsoleActionResult | ConsoleActionError {

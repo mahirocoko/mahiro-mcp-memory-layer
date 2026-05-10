@@ -39,6 +39,7 @@
     "start": "tsx src/index.ts",
     "eval-retrieval": "tsx src/eval-retrieval.ts",
     "reindex": "tsx src/index.ts --reindex",
+    "rewrite-scope-identity": "tsx src/index.ts --rewrite-scope-identity",
     "wiki:materialize": "tsx src/wiki-materializer.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -1,6 +1,6 @@
-import path from "node:path";
-
 import type { PluginInput } from "@opencode-ai/plugin";
+
+import { resolveCanonicalProjectScopeIdentity } from "../memory/lib/scope-identity.js";
 
 export const openCodeScopeFieldNames = ["projectId", "containerId", "sessionId"] as const;
 
@@ -90,7 +90,10 @@ export function resolveOpenCodeScope(input: ResolveOpenCodeScopeInput): OpenCode
 }
 
 function resolveProjectId(context: OpenCodePluginContext): string | undefined {
-  return toNonEmptyString(context.project?.name) ?? toNonEmptyString(context.project?.id);
+  return resolveCanonicalProjectScopeIdentity({
+    projectName: context.project?.name,
+    projectId: context.project?.id,
+  }).projectId;
 }
 
 function resolveProjectSource(
@@ -108,21 +111,11 @@ function resolveProjectSource(
 }
 
 function resolveContainerId(context: OpenCodePluginContext): string | undefined {
-  const worktreePath = toNonEmptyString(context.worktree);
-
-  if (worktreePath) {
-    return `worktree:${normalizePath(worktreePath)}`;
-  }
-
-  const directoryPath =
-    toNonEmptyString(context.directory) ??
-    toNonEmptyString(context.project?.directory);
-
-  if (directoryPath) {
-    return `directory:${normalizePath(directoryPath)}`;
-  }
-
-  return undefined;
+  return resolveCanonicalProjectScopeIdentity({
+    worktreePath: context.worktree,
+    directoryPath: context.directory,
+    projectDirectoryPath: context.project?.directory,
+  }).containerId;
 }
 
 function resolveContainerSource(
@@ -163,10 +156,6 @@ function resolveSessionSource(
   }
 
   return {};
-}
-
-function normalizePath(filePath: string): string {
-  return path.resolve(filePath);
 }
 
 function toNonEmptyString(value: unknown): string | undefined {

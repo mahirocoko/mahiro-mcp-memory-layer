@@ -29,7 +29,7 @@ describe("resolveOpenCodeScope", () => {
       status: "complete",
       scope: {
         projectId: "project-name",
-        containerId: `worktree:${path.resolve("/workspace/project/./")}`,
+        containerId: `workspace:${path.resolve("/workspace/project/./")}`,
         sessionId: "session-1",
       },
       missing: [],
@@ -64,7 +64,7 @@ describe("resolveOpenCodeScope", () => {
       status: "complete",
       scope: {
         projectId: "project-id-fallback",
-        containerId: `directory:${path.resolve("/workspace/project")}`,
+        containerId: `workspace:${path.resolve("/workspace/project")}`,
         sessionId: "session-1",
       },
       missing: [],
@@ -99,7 +99,7 @@ describe("resolveOpenCodeScope", () => {
       status: "complete",
       scope: {
         projectId: "project-name",
-        containerId: `directory:${path.resolve("./repo/project-name")}`,
+        containerId: `workspace:${path.resolve("./repo/project-name")}`,
         sessionId: "session-2",
       },
       missing: [],

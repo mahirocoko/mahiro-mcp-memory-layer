@@ -7,4 +7,5 @@ export interface CanonicalLogStore {
   readAll(): Promise<readonly MemoryRecord[]>;
   readById(id: string): Promise<MemoryRecord | undefined>;
   replaceRecordById(id: string, record: MemoryRecord): Promise<void>;
+  replaceAll(records: readonly MemoryRecord[]): Promise<void>;
 }

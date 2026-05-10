@@ -52,8 +52,8 @@ describe("memory console integration", () => {
       expect(browseResponse.headers.get("content-type")).toContain("text/html");
       expect(browseHtml).toContain("Local memory console");
       expect(browseHtml).toContain("Browse integration verified memory.");
-      expect(browseHtml).not.toContain('method="post"');
-      expect(browseHtml).not.toContain('action="/actions/review"');
+      expect(browseHtml).toContain('method="post" action="/actions/review"');
+      expect(browseHtml).toContain("Reject verified memory");
       expect(browseHtml).not.toContain('action="/actions/promote"');
       expect(browseHtml).not.toContain('action="/actions/purge-rejected"');
 

@@ -439,7 +439,7 @@ describe("product memory plugin", () => {
               reasonCode: "cache_write_completed",
               scopeUsed: {
                 projectId: "mahiro-mcp-memory-layer",
-                containerId: `directory:${repoRoot}`,
+                containerId: `workspace:${repoRoot}`,
                 sessionId,
               },
               summaryCounts: { retrieved: 0 },
@@ -466,7 +466,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.wakeUpMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           trigger: "session-start",
@@ -507,7 +507,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.prepareTurnMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           trigger: "message.updated",
@@ -534,7 +534,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.prepareTurnMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           trigger: "message.part.updated",
@@ -558,7 +558,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.prepareHostTurnMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           trigger: "session.idle",
@@ -639,7 +639,7 @@ describe("product memory plugin", () => {
               reasonCode: "preflight_not_needed",
               scopeUsed: {
                 projectId: "mahiro-mcp-memory-layer",
-                containerId: `directory:${repoRoot}`,
+                containerId: `workspace:${repoRoot}`,
                 sessionId,
               },
               summaryCounts: { skipped: 1 },
@@ -673,7 +673,7 @@ describe("product memory plugin", () => {
         expect.objectContaining({
           recentConversation: "Continue the compaction checkpoint memory lifecycle.",
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           trigger: "experimental.session.compacting",
@@ -837,7 +837,7 @@ describe("product memory plugin", () => {
               reasonCode: "deduped_turn",
               scopeUsed: {
                 projectId: "mahiro-mcp-memory-layer",
-                containerId: `directory:${repoRoot}`,
+                containerId: `workspace:${repoRoot}`,
                 sessionId,
               },
               summaryCounts: { skipped: 1 },
@@ -1217,7 +1217,7 @@ describe("product memory plugin", () => {
               reasonCode: "empty_recent_conversation",
               scopeUsed: {
                 projectId: "mahiro-mcp-memory-layer",
-                containerId: `directory:${repoRoot}`,
+                containerId: `workspace:${repoRoot}`,
                 sessionId,
               },
               summaryCounts: { skipped: 1 },
@@ -1256,7 +1256,7 @@ describe("product memory plugin", () => {
             reasonCode: "backend_error",
             scopeUsed: {
               projectId: "mahiro-mcp-memory-layer",
-              containerId: `directory:${repoRoot}`,
+              containerId: `workspace:${repoRoot}`,
               sessionId,
             },
           },
@@ -1302,7 +1302,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.wakeUpMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           phase: "wake-up",
@@ -1311,7 +1311,7 @@ describe("product memory plugin", () => {
       expect(harness.backend.prepareHostTurnMemory).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "mahiro-mcp-memory-layer",
-          containerId: `directory:${repoRoot}`,
+          containerId: `workspace:${repoRoot}`,
         }),
         expect.objectContaining({
           phase: "host-turn-persistence",
