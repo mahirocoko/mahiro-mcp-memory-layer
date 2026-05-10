@@ -40,7 +40,8 @@ export async function runHybridSearch(input: {
       ? input.table.vectorSearch(input.filter, queryVector, Math.max(limit * 3, defaultVectorCandidateLimit))
       : Promise.resolve([]),
   ]);
-  const keywordRows = mergeRetrievalRowsById(keywordBaseline, keywordLexical);
+  const keywordRows = mergeRetrievalRowsById(keywordBaseline, keywordLexical).filter(isNormalRetrievalRow);
+  const eligibleVectorRows = vectorRows.filter(isNormalRetrievalRow);
 
   const rowsById = new Map<string, {
     row: (typeof keywordRows)[number];
@@ -77,7 +78,7 @@ export async function runHybridSearch(input: {
     });
   }
 
-  for (const row of vectorRows) {
+  for (const row of eligibleVectorRows) {
     const vectorScore = queryVector ? scoreVectorMatch(queryVector, row.embedding) : 0;
 
     if (vectorScore <= 0) {
@@ -164,6 +165,10 @@ export async function runHybridSearch(input: {
     },
     trace,
   };
+}
+
+function isNormalRetrievalRow(row: RetrievalRow): boolean {
+  return row.reviewStatus !== "rejected";
 }
 
 function contextSizeForItems(items: readonly { readonly content: string; readonly summary?: string }[]): number {

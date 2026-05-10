@@ -34,3 +34,39 @@ describe("wiki materializer docs", () => {
     expect(mcpUsage).toContain("Generated wiki files are derived artifacts");
   });
 });
+
+
+describe("memory boundary docs", () => {
+  it("documents that source, docs, and code corpus indexing belongs outside this curated memory package", async () => {
+    const [readme, architecture, boundaries, mcpUsage, nextSteps] = await Promise.all([
+      readFile(path.join(repoRoot, "README.md"), "utf8"),
+      readFile(path.join(repoRoot, "ARCHITECTURE.md"), "utf8"),
+      readFile(path.join(repoRoot, "ARCHITECTURE_BOUNDARIES.md"), "utf8"),
+      readFile(path.join(repoRoot, "MCP_USAGE.md"), "utf8"),
+      readFile(path.join(repoRoot, "AGENT_NEXT_STEPS.md"), "utf8"),
+    ]);
+    const combined = [readme, architecture, boundaries, mcpUsage, nextSteps].join("\n");
+
+    expect(combined).toContain("cocoindex-code owns source, docs, and code corpus indexing");
+    expect(combined).toContain("`mahiro-mcp-memory-layer` owns curated memory only");
+    expect(combined).toContain("Do not use this package as a source, docs, or code corpus indexer");
+    expect(combined).toContain("`upsert_document` stores curated document-shaped memory only");
+    expect(combined).toContain("It is not a source, docs, or code corpus indexing API");
+  });
+
+  it("documents authority, evidence, rejected quarantine, and lifecycle boundaries", async () => {
+    const [architecture, boundaries, mcpUsage] = await Promise.all([
+      readFile(path.join(repoRoot, "ARCHITECTURE.md"), "utf8"),
+      readFile(path.join(repoRoot, "ARCHITECTURE_BOUNDARIES.md"), "utf8"),
+      readFile(path.join(repoRoot, "MCP_USAGE.md"), "utf8"),
+    ]);
+    const combined = [architecture, boundaries, mcpUsage].join("\n");
+
+    expect(combined).toContain("Ownership, truth status, freshness, and retrieval eligibility are separate axes");
+    expect(combined).toContain("Preferences may be authoritative as user intent");
+    expect(combined).toContain("Retrieval traces are diagnostics");
+    expect(combined).toContain("Rejected records stay out of normal retrieval/context");
+    expect(combined).toContain("Lifecycle helpers are trusted memory persistence and continuity triggers only");
+    expect(combined).toContain("They must not expose task execution, worker routing, supervision, executor ownership, or workflow-control state");
+  });
+});

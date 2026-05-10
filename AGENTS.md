@@ -32,3 +32,4 @@ Start here, then load the narrower doc that matches your task.
 - Verify before declaring done.
 - Default verification order: `bun run typecheck`, `bun run test`, `bun run build`.
 - Preserve history and never force-push.
+- The user grants permission to inspect memory across all available scopes when reviewing, debugging, or managing memory. Prefer the active project scope first when sufficient, but cross-scope lookup is allowed for continuity, duplicate, contradiction, and hygiene work.

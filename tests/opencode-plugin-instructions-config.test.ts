@@ -1,22 +1,23 @@
 import type { Config } from "@opencode-ai/plugin";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-const instructionsConfigAdapterModulePath = "../src/features/opencode-plugin/instructions-config-adapter.js";
+import {
+  applyOpenCodePluginInstructionsConfig,
+  applyOpenCodePluginInstructionsConfigWithAccess,
+} from "../src/features/opencode-plugin/instructions-config-adapter.js";
 
-afterEach(() => {
-  vi.resetModules();
-  vi.doUnmock("node:fs/promises");
-});
+type InstructionPathAccess = (path: string) => Promise<void>;
 
-async function loadApplyOpenCodePluginInstructionsConfig() {
-  const module = await import(instructionsConfigAdapterModulePath);
-
-  return module.applyOpenCodePluginInstructionsConfig;
+function missingPackagedDocsAccess(missingSuffixes: readonly string[]): InstructionPathAccess {
+  return async (path: string) => {
+    if (missingSuffixes.some((suffix) => path.endsWith(suffix))) {
+      throw new Error(`missing packaged doc: ${path}`);
+    }
+  };
 }
 
 describe("applyOpenCodePluginInstructionsConfig", () => {
   it("injects the packaged MCP_USAGE and CONTINUITY_DEBUGGING instruction paths in order", async () => {
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
     await applyOpenCodePluginInstructionsConfig(config);
@@ -28,7 +29,6 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
   });
 
   it("appends the packaged instructions after existing user instructions", async () => {
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {
       instructions: ["/tmp/user-instructions.md"],
     } as Config;
@@ -43,7 +43,6 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
   });
 
   it("does not duplicate the packaged instruction paths", async () => {
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
     await applyOpenCodePluginInstructionsConfig(config);
@@ -56,57 +55,35 @@ describe("applyOpenCodePluginInstructionsConfig", () => {
   });
 
   it("does not append packaged instructions when any packaged doc is missing", async () => {
-    vi.doMock("node:fs/promises", () => ({
-      access: async (path: string) => {
-        if (
-          path.endsWith("/MCP_USAGE.md") ||
-          path.endsWith("/CONTINUITY_DEBUGGING.md")
-        ) {
-          throw new Error("missing packaged doc");
-        }
-      },
-    }));
-
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
-    await applyOpenCodePluginInstructionsConfig(config);
+    await applyOpenCodePluginInstructionsConfigWithAccess(
+      config,
+      missingPackagedDocsAccess(["/MCP_USAGE.md", "/CONTINUITY_DEBUGGING.md"]),
+    );
 
     expect(config.instructions).toBeUndefined();
   });
 
   it("does not append packaged instructions when CONTINUITY_DEBUGGING is missing", async () => {
-    vi.doMock("node:fs/promises", () => ({
-      access: async (path: string) => {
-        if (path.endsWith("/CONTINUITY_DEBUGGING.md")) {
-          throw new Error("missing CONTINUITY_DEBUGGING");
-        }
-      },
-    }));
-
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
-    await applyOpenCodePluginInstructionsConfig(config);
+    await applyOpenCodePluginInstructionsConfigWithAccess(
+      config,
+      missingPackagedDocsAccess(["/CONTINUITY_DEBUGGING.md"]),
+    );
 
     expect(config.instructions).toBeUndefined();
   });
 
   it("does not append packaged instructions when MCP_USAGE is missing", async () => {
-    vi.doMock("node:fs/promises", () => ({
-      access: async (path: string) => {
-        if (path.endsWith("/MCP_USAGE.md")) {
-          throw new Error("missing MCP_USAGE");
-        }
-      },
-    }));
-
-    const applyOpenCodePluginInstructionsConfig = await loadApplyOpenCodePluginInstructionsConfig();
     const config = {} as Config;
 
-    await applyOpenCodePluginInstructionsConfig(config);
+    await applyOpenCodePluginInstructionsConfigWithAccess(
+      config,
+      missingPackagedDocsAccess(["/MCP_USAGE.md"]),
+    );
 
     expect(config.instructions).toBeUndefined();
   });
-
 });

@@ -37,11 +37,14 @@ export class MemoryRecordsTable {
       return;
     }
 
+    await this.deleteRowsByIds(rows.map((row) => row.id));
     await existingTable.add(databaseRows);
   }
 
   public async replaceAll(rows: readonly RetrievalRow[]): Promise<void> {
     if (rows.length === 0) {
+      const existingTable = await this.tryOpenTable();
+      await existingTable?.delete("id IS NOT NULL");
       return;
     }
 

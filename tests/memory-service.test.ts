@@ -19,6 +19,20 @@ import { toRetrievalRow } from "../src/features/memory/retrieval/rank.js";
 import { MemoryService } from "../src/features/memory/memory-service.js";
 import type { RetrievalTraceEntry } from "../src/features/memory/types.js";
 
+const realDateNow = Date.now.bind(Date);
+let testNowMs: number | undefined;
+
+function setTestSystemTime(date: Date): void {
+  testNowMs = date.getTime();
+  vi.spyOn(Date, "now").mockImplementation(() => testNowMs ?? realDateNow());
+}
+
+function useRealTestTimers(): void {
+  testNowMs = undefined;
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+}
+
 async function createFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "mahiro-mcp-memory-layer-"));
   await Promise.all([
@@ -101,8 +115,44 @@ describe("memory service core", () => {
 
     expect(remembered.status).toBe("accepted");
     expect(result.items.some((item) => item.id === remembered.id)).toBe(true);
+    expect(result.items[0]?.scope).toBe("project");
     expect((await fixture.logStore.readAll())[0]?.verificationStatus).toBe("hypothesis");
     expect(result.items[0]?.verificationStatus).toBe("hypothesis");
+  });
+
+  it("excludes rejected memories from normal search", async () => {
+    const fixture = await createFixture();
+    const service = new MemoryService(
+      fixture.logStore,
+      fixture.table,
+      fixture.embeddingProvider,
+      fixture.traceStore,
+    );
+
+    const rejected = await service.remember({
+      content: "Rejected normal search target.",
+      kind: "fact",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+      source: { type: "manual" },
+    });
+    await service.reviewMemory({ id: rejected.id, action: "reject", note: "Rejected for normal context." });
+
+    const result = await service.search({
+      query: "Rejected normal search target",
+      mode: "full",
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    });
+
+    expect(result.items.map((item) => item.id)).not.toContain(rejected.id);
+    expect((await service.list({
+      scope: "project",
+      projectId: "project-alpha",
+      containerId: "workspace:project-alpha",
+    })).map((item) => item.id)).toContain(rejected.id);
   });
 
   it("does not leak results across project scope", async () => {
@@ -175,7 +225,60 @@ describe("memory service core", () => {
 
     expect(result.context).toContain("Relevant memories");
     expect(result.items.length).toBeGreaterThan(0);
+    expect(result.context).toContain("project · hypothesis");
     expect(result.context.length).toBeLessThanOrEqual(500);
+  });
+
+  it("combines scoped project context with verified global context while preserving authority labels", async () => {
+    const fixture = await createFixture();
+
+    const global = await rememberMemory({
+      payload: {
+        content: "Always verify source-backed claims before changing memory retrieval.",
+        kind: "decision",
+        scope: "global",
+        source: { type: "manual", title: "Global verification rule" },
+        verificationStatus: "verified",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+    const project = await rememberMemory({
+      payload: {
+        content: "This project uses LanceDB for memory retrieval.",
+        kind: "decision",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        source: { type: "manual", title: "Project retrieval decision" },
+        verificationStatus: "verified",
+      },
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const result = await buildContextForTask({
+      payload: {
+        task: "verify memory retrieval",
+        mode: "full",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+        maxItems: 5,
+        maxChars: 1000,
+      },
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+      traceStore: fixture.traceStore,
+    });
+
+    expect(result.items).toEqual(expect.arrayContaining([project.id, global.id]));
+    expect(result.items.indexOf(project.id)).toBeLessThan(result.items.indexOf(global.id));
+    expect(result.context).toContain("project · verified");
+    expect(result.context).toContain("global · verified");
+    expect(result.context).toContain("Project retrieval decision");
+    expect(result.context).toContain("Global verification rule");
   });
 
   it("optionally attaches memory suggestions when includeMemorySuggestions is set", async () => {
@@ -459,7 +562,7 @@ describe("memory service core", () => {
       projectId: "project-alpha",
       containerId: "workspace:project-alpha",
     });
-    expect(beforeSearch.items.map((item) => item.id)).toContain(rejected.id);
+    expect(beforeSearch.items.map((item) => item.id)).not.toContain(rejected.id);
 
     const result = await service.purgeRejectedMemories({
       ids: [rejected.id],
@@ -668,7 +771,7 @@ describe("memory service core", () => {
       projectId: "project-alpha",
       containerId: "workspace:project-alpha",
     });
-    expect(search.items.map((item) => item.id)).toContain(rejected.id);
+    expect(search.items.map((item) => item.id)).not.toContain(rejected.id);
   });
 
   it("purge rejected invalid confirmation fails before deletion", async () => {
@@ -765,7 +868,7 @@ describe("memory service core", () => {
       projectId: "project-alpha",
       containerId: "workspace:project-alpha",
     });
-    expect(search.items.map((item) => item.id)).toContain(rejected.id);
+    expect(search.items.map((item) => item.id)).not.toContain(rejected.id);
   });
 
   it("lists hypothesis memories in review queue order", async () => {
@@ -909,10 +1012,8 @@ describe("memory service core", () => {
       fixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       const verified = await service.remember({
         content: "We run smoke tests before deploy.",
         kind: "decision",
@@ -925,7 +1026,7 @@ describe("memory service core", () => {
         verificationEvidence: [{ type: "human", value: "release-review" }],
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       const supersession = await service.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -971,7 +1072,7 @@ describe("memory service core", () => {
 
       expect(verifiedAfter).toEqual(verifiedBefore);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -984,10 +1085,8 @@ describe("memory service core", () => {
       fixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       await service.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -999,7 +1098,7 @@ describe("memory service core", () => {
         verifiedAt: "2026-04-22T00:00:00.000Z",
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       const pending = await service.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -1020,7 +1119,7 @@ describe("memory service core", () => {
 
       expect(overview.find((item) => item.id === pending.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -1033,10 +1132,8 @@ describe("memory service core", () => {
       fixtureNoVerified.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       const pendingNoVerified = await serviceNoVerified.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -1057,7 +1154,7 @@ describe("memory service core", () => {
 
       expect(overviewNoVerified.find((item) => item.id === pendingNoVerified.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
 
     const fixtureNoSignal = await createFixture();
@@ -1068,10 +1165,8 @@ describe("memory service core", () => {
       fixtureNoSignal.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       await serviceNoSignal.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -1083,7 +1178,7 @@ describe("memory service core", () => {
         verifiedAt: "2026-04-22T00:00:00.000Z",
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       const pendingNoSignal = await serviceNoSignal.remember({
         content: "We run smoke tests before deploy.",
         kind: "decision",
@@ -1104,7 +1199,7 @@ describe("memory service core", () => {
 
       expect(overviewNoSignal.find((item) => item.id === pendingNoSignal.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -1117,10 +1212,8 @@ describe("memory service core", () => {
       olderFixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       const olderPending = await olderService.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -1134,7 +1227,7 @@ describe("memory service core", () => {
         importance: 0.8,
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       await olderService.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -1153,7 +1246,7 @@ describe("memory service core", () => {
 
       expect(olderOverview.find((item) => item.id === olderPending.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
 
     const sameTimeFixture = await createFixture();
@@ -1164,10 +1257,8 @@ describe("memory service core", () => {
       sameTimeFixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       await sameTimeService.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -1199,7 +1290,7 @@ describe("memory service core", () => {
 
       expect(sameTimeOverview.find((item) => item.id === sameTimePending.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -1212,10 +1303,8 @@ describe("memory service core", () => {
       fixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       const pending = await service.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -1229,7 +1318,7 @@ describe("memory service core", () => {
         importance: 0.8,
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       await service.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -1241,7 +1330,7 @@ describe("memory service core", () => {
         verifiedAt: "2026-04-23T00:00:00.000Z",
       });
 
-      vi.setSystemTime(new Date("2026-04-24T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-24T00:00:00.000Z"));
       await service.reviewMemory({
         id: pending.id,
         action: "defer",
@@ -1256,7 +1345,7 @@ describe("memory service core", () => {
       expect(overview.find((item) => item.id === pending.id)?.updatedAt).toBe("2026-04-24T00:00:00.000Z");
       expect(overview.find((item) => item.id === pending.id)?.hints).toEqual([]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -1269,10 +1358,8 @@ describe("memory service core", () => {
       fixture.traceStore,
     );
 
-    vi.useFakeTimers();
-
     try {
-      vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-22T00:00:00.000Z"));
       const verified = await service.remember({
         content: "Run smoke tests before deploy.",
         kind: "decision",
@@ -1283,7 +1370,7 @@ describe("memory service core", () => {
         verificationStatus: "verified",
       });
 
-      vi.setSystemTime(new Date("2026-04-23T00:00:00.000Z"));
+      setTestSystemTime(new Date("2026-04-23T00:00:00.000Z"));
       const pending = await service.remember({
         content: "We now run smoke tests before deploy instead of skipping them.",
         kind: "decision",
@@ -1310,7 +1397,7 @@ describe("memory service core", () => {
         },
       ]);
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 
@@ -1543,12 +1630,95 @@ describe("memory service core", () => {
     expect(result.items.some((item) => item.id === remembered.id)).toBe(true);
   });
 
-  it("retrieval modes change ranking between recent and profile", async () => {
+  it("clears stale LanceDB rows when reindexing from an empty canonical log", async () => {
     const fixture = await createFixture();
     const embeddingVersion = fixture.embeddingProvider.version;
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-05T00:00:00.000Z"));
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        {
+          id: "mem-stale",
+          kind: "fact",
+          scope: "project",
+          projectId: "mahiro-mcp-memory-layer",
+          containerId: "workspace:mahiro-mcp-memory-layer",
+          source: { type: "manual" },
+          content: "Stale row that should vanish after empty reindex.",
+          tags: [],
+          importance: 0.5,
+          createdAt: "2026-04-05T00:00:00.000Z",
+        },
+        await fixture.embeddingProvider.embedText("Stale row that should vanish after empty reindex."),
+        embeddingVersion,
+      ),
+    ]);
+
+    await reindexMemoryRecords({
+      logStore: fixture.logStore,
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+    });
+
+    const result = await searchMemories({
+      payload: {
+        query: "stale row vanish",
+        mode: "full",
+        scope: "project",
+        projectId: "mahiro-mcp-memory-layer",
+        containerId: "workspace:mahiro-mcp-memory-layer",
+      },
+      table: fixture.table,
+      embeddingProvider: fixture.embeddingProvider,
+      traceStore: fixture.traceStore,
+    });
+
+    expect(result.items).toHaveLength(0);
+  });
+
+  it("keeps one active LanceDB row per memory id when upserting updates", async () => {
+    const fixture = await createFixture();
+    const embeddingVersion = fixture.embeddingProvider.version;
+    const baseRecord = {
+      id: "mem-repeat",
+      kind: "fact" as const,
+      scope: "project" as const,
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+      source: { type: "manual" as const },
+      tags: [],
+      importance: 0.5,
+      createdAt: "2026-04-05T00:00:00.000Z",
+    };
+
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        { ...baseRecord, content: "Original retrieval row content." },
+        await fixture.embeddingProvider.embedText("Original retrieval row content."),
+        embeddingVersion,
+      ),
+    ]);
+    await fixture.table.upsertRows([
+      toRetrievalRow(
+        { ...baseRecord, content: "Updated retrieval row content.", updatedAt: "2026-04-06T00:00:00.000Z" },
+        await fixture.embeddingProvider.embedText("Updated retrieval row content."),
+        embeddingVersion,
+      ),
+    ]);
+
+    const rows = await fixture.table.queryScopedRows({
+      scope: "project",
+      projectId: "mahiro-mcp-memory-layer",
+      containerId: "workspace:mahiro-mcp-memory-layer",
+    });
+
+    expect(rows.filter((row) => row.id === "mem-repeat")).toHaveLength(1);
+    expect(rows.find((row) => row.id === "mem-repeat")?.content).toBe("Updated retrieval row content.");
+  });
+
+  it("retrieval modes change ranking between recent and profile", async () => {
+    const fixture = await createFixture();
+    const embeddingVersion = fixture.embeddingProvider.version;
+    setTestSystemTime(new Date("2026-04-05T00:00:00.000Z"));
 
     try {
       await fixture.table.upsertRows([
@@ -1621,7 +1791,7 @@ describe("memory service core", () => {
       expect(recentResult.items[0]?.id).toBe("mem-recent");
       expect(profileResult.items[0]?.id).toBe("mem-important");
     } finally {
-      vi.useRealTimers();
+      useRealTestTimers();
     }
   });
 

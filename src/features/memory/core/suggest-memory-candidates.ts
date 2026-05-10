@@ -18,6 +18,10 @@ const MAX_CANDIDATES_CAP = 10;
 const LINE_MIN_LEN = 12;
 const MAX_DRAFT_LEN = 800;
 
+const TOOL_ECHO_LABEL_PATTERN =
+  /^(?:[-*+]\s*)?(?:content|draft\s*content|recommendation|reason|signals?|candidates?|review\s*only\s*suggestions|auto\s*saved|returned\s*memory\s*ids|retrieval|wiki|tool(?:\s+output)?)\s*:/i;
+const DIAGRAM_FRAGMENT_PATTERN = /^(?:[-*+]\s*)?(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|participant)\b/i;
+
 const EPHEMERAL_RULES: readonly { readonly id: string; readonly test: (text: string) => boolean }[] = [
   { id: "greeting", test: (t) => /^(?:hi|hello|hey)\b/i.test(t.trim()) },
   { id: "thanks_only", test: (t) => /^(?:thanks|thank you|thx)\b/i.test(t.trim()) && t.length < 80 },
@@ -81,11 +85,22 @@ function normalizeConversation(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }
 
+function isRecursiveNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+
+  return (
+    TOOL_ECHO_LABEL_PATTERN.test(trimmed) ||
+    DIAGRAM_FRAGMENT_PATTERN.test(trimmed) ||
+    /^[-*+]\s*(?:strong_candidate|consider_saving|likely_skip)\b/i.test(trimmed) ||
+    /^\|.*\b(?:content|recommendation|candidate|retrieval|wiki|tool)\b.*\|$/i.test(trimmed)
+  );
+}
+
 function splitLines(text: string): readonly string[] {
   return text
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter((line) => line.length >= LINE_MIN_LEN);
+    .filter((line) => line.length >= LINE_MIN_LEN && !isRecursiveNoiseLine(line));
 }
 
 function suggestScope(input: SuggestMemoryCandidatesInput): MemorySuggestionCandidate["scope"] {

@@ -46,6 +46,7 @@ export function toSearchMemoryItem(
   return {
     id: row.id,
     kind: row.kind,
+    scope: row.scope,
     content: row.content,
     summary: row.summary || undefined,
     score,

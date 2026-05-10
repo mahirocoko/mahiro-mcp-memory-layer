@@ -20,33 +20,104 @@ export async function buildContextForTask(input: {
   const basePayload = {
     query: payload.task,
     mode: payload.mode,
-    projectId: payload.projectId,
-    containerId: payload.containerId,
   };
 
-  const scope = payload.projectId || payload.containerId ? "project" : "global";
-  const result = await searchMemories({
-    payload: {
-      ...basePayload,
-      scope,
-      limit: maxItems,
-    },
+  const scopedResults = await searchContextScopes({
+    basePayload,
+    projectId: payload.projectId,
+    containerId: payload.containerId,
+    maxItems,
     table: input.table,
     embeddingProvider: input.embeddingProvider,
     traceStore: input.traceStore,
     traceProvenance: input.traceProvenance,
   });
+  const items = mergeContextItems(scopedResults.flatMap((result) => result.items), maxItems);
+  const degraded = scopedResults.some((result) => result.degraded);
 
   const base = buildContextFromItems({
     task: payload.task,
     mode: payload.mode,
-    items: result.items,
+    items,
     maxItems,
     maxChars: payload.maxChars ?? defaultContextMaxChars,
-    degraded: result.degraded,
+    degraded,
   });
 
   return attachMemorySuggestionsIfRequested(payload, base);
+}
+
+async function searchContextScopes(input: {
+  readonly basePayload: { readonly query: string; readonly mode: BuildContextForTaskInput["mode"] };
+  readonly projectId?: string;
+  readonly containerId?: string;
+  readonly maxItems: number;
+  readonly table: MemoryRecordsTable;
+  readonly embeddingProvider: EmbeddingProvider;
+  readonly traceStore: RetrievalTraceStore;
+  readonly traceProvenance?: Omit<RetrievalTraceProvenance, "searchScope">;
+}) {
+  if (input.projectId || input.containerId) {
+    const globalResult = await searchMemories({
+      payload: {
+        ...input.basePayload,
+        scope: "global",
+        limit: input.maxItems,
+      },
+      table: input.table,
+      embeddingProvider: input.embeddingProvider,
+      traceStore: input.traceStore,
+      traceProvenance: input.traceProvenance,
+    });
+    const projectResult = await searchMemories({
+      payload: {
+        ...input.basePayload,
+        scope: "project",
+        projectId: input.projectId,
+        containerId: input.containerId,
+        limit: input.maxItems,
+      },
+      table: input.table,
+      embeddingProvider: input.embeddingProvider,
+      traceStore: input.traceStore,
+      traceProvenance: input.traceProvenance,
+    });
+
+    return [
+      projectResult,
+      { ...globalResult, items: globalResult.items.filter((item) => item.verificationStatus === "verified") },
+    ];
+  }
+
+  return [await searchMemories({
+    payload: {
+      ...input.basePayload,
+      scope: "global",
+      limit: input.maxItems,
+    },
+    table: input.table,
+    embeddingProvider: input.embeddingProvider,
+    traceStore: input.traceStore,
+    traceProvenance: input.traceProvenance,
+  })];
+}
+
+function mergeContextItems<T extends { readonly id: string }>(items: readonly T[], maxItems: number): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.id)) {
+      continue;
+    }
+    seen.add(item.id);
+    merged.push(item);
+    if (merged.length >= maxItems) {
+      break;
+    }
+  }
+
+  return merged;
 }
 
 function attachMemorySuggestionsIfRequested(

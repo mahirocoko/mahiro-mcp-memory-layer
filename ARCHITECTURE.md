@@ -7,6 +7,8 @@
 ## สภาพปัจจุบัน
 
 - แพ็กเกจนี้เป็น memory-only.
+- cocoindex-code owns source, docs, and code corpus indexing; `mahiro-mcp-memory-layer` owns curated memory only.
+- Do not use this package as a source, docs, or code corpus indexer.
 - เส้นทาง published plugin ได้ stable memory tool surface พร้อม `memory_context` และ `runtime_capabilities`.
 - เส้นทาง source-checkout และ standalone MCP เปิด tool ชุดเดียวกันที่โฟกัส memory แต่ไม่ได้ทำให้ repo นี้กลายเป็น hook runtime.
 - Host lifecycle events ถูกใช้เป็น input ที่หันเข้าหา memory เท่านั้น เพื่อรองรับ continuity.
@@ -104,6 +106,14 @@ Generated wiki files are derived artifacts, not canonical source data. They exis
 Wiki materialization does not bidirectionally sync with wiki editors, and it does not import wiki output back into memory in the MVP.
 
 The projection excludes `memory_context` continuity cache data and retrieval traces. Those belong to runtime diagnostics and continuity, not to wiki materialization.
+
+## Authority and evidence policy
+
+- Ownership, truth status, freshness, and retrieval eligibility are separate axes.
+- Human and agent factual claims are hypotheses until promoted with evidence.
+- Preferences may be authoritative as user intent, but they are not empirical verification for code, API, product, or external-world facts.
+- Retrieval traces are diagnostics unless a specific review or promotion flow cites them as evidence; they are not canonical memory truth.
+- Rejected records stay out of normal retrieval/context, but remain available for review hygiene, audit, quarantine, and duplicate suppression surfaces.
 
 ## โมเดล lifecycle
 

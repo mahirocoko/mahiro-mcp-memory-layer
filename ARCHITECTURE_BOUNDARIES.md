@@ -4,6 +4,8 @@ This document defines the intended package boundary for `mahiro-mcp-memory-layer
 
 The package should be understood as local-first memory and retrieval infrastructure for agents.
 
+cocoindex-code owns source, docs, and code corpus indexing. `mahiro-mcp-memory-layer` owns curated memory only. Do not use this package as a source, docs, or code corpus indexer.
+
 Host lifecycle events may be consumed for memory continuity, but only as memory-facing inputs. The package does not execute hooks or own host runtime behavior.
 
 `memory-console` is a local memory management UI inside this package boundary. It stays local-only, memory-only, and read-only for graph inspection.
@@ -67,6 +69,8 @@ Both are memory diagnostics only. They report tool names, the memory protocol, l
 Memory owns memory truth.
 
 Hosts may compose memory with their own runtime behavior, but the memory package should not become the source of truth for worker execution, workflow state, or hook dispatch.
+
+Lifecycle signals are allowed only as memory continuity and persistence inputs. They are not workflow-control, executor, routing, or supervision ownership.
 
 ## Verification and drift checks
 

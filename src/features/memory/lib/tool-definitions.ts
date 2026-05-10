@@ -98,7 +98,7 @@ const memoryToolDefinitions: readonly MemoryToolDefinition[] = [
   {
     name: "upsert_document",
     description:
-      "Store or refresh a document-shaped memory source. Idempotency matches scope plus source.uri and source.title; at least one of uri or title is required. Prefer a stable source.uri (e.g. file path or canonical URL); title-only identity can collide across different documents that share a title.",
+      "Store or refresh a curated document-shaped memory source. This is not a source/docs/code corpus indexing, crawling, chunking, or batch import API. Idempotency matches scope plus source.uri and source.title; at least one of uri or title is required. Prefer a stable source.uri (e.g. file path or canonical URL); title-only identity can collide across different documents that share a title.",
     inputSchema: upsertDocumentInputSchema.shape,
     execute: (backend, input) => backend.upsertDocument(input as never),
   },

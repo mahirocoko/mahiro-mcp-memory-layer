@@ -6,6 +6,11 @@ import type { SearchMemoryItem } from "../src/features/memory/types.js";
 const baseItem: SearchMemoryItem = {
   id: "mem-1",
   kind: "fact",
+  scope: "project",
+  verificationStatus: "verified",
+  reviewStatus: "pending",
+  reviewDecisions: [],
+  verificationEvidence: [],
   content: "Detailed content body.",
   summary: "Short summary.",
   score: 0.9,
@@ -632,7 +637,7 @@ describe("buildContextFromItems", () => {
     });
 
     expect(result.context).toContain("Relevant memories:");
-    expect(result.context).toContain("[fact] Detailed content body.");
+    expect(result.context).toContain("[fact · project · verified · pending · manual] Detailed content body.");
   });
 
   it("still truncates across modes", () => {

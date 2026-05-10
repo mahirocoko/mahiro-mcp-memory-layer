@@ -18,6 +18,8 @@ Directionally:
 - continuity-cache helpers may stay if they remain memory-facing
 - `memory-console` stays local-only and memory-management focused
 - host-specific workflow control should stay outside this package
+- cocoindex-code owns source, docs, and code corpus indexing; `mahiro-mcp-memory-layer` owns curated memory only
+- Do not use this package as a source, docs, or code corpus indexer
 - lifecycle docs should keep the memory vocabulary only: `session-start-wake-up`, `turn-preflight`, `idle-persistence`, and `compaction-continuity`
 
 ## Deferred raw plus derived memory direction

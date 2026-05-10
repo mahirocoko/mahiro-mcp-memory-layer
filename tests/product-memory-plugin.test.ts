@@ -93,6 +93,15 @@ async function flushRuntimePromises(): Promise<void> {
   await Promise.resolve();
 }
 
+async function flushDebounce(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await flushRuntimePromises();
+}
+
+function mocked<T>(value: T): T {
+  return value;
+}
+
 const forbiddenHookRuntimeSurfacePattern =
   /dispatchHook|PreToolUse|PostToolUse|PreCompact|command hook|http hook|claudeHooks|hookDispatch/i;
 
@@ -341,7 +350,7 @@ describe("product memory plugin", () => {
     expect(sharedMemoryToolNames).toEqual([...expectedMemoryToolNames]);
     expect(pluginToolNames).toEqual([...expectedMemoryToolNames, "memory_context", "runtime_capabilities"].sort());
     expectNoForbiddenPublicRuntimeSurfaceNames(pluginToolNames);
-    expect(vi.mocked(childProcess.spawn)).not.toHaveBeenCalled();
+    expect(mocked(childProcess.spawn)).not.toHaveBeenCalled();
   });
 
   it("returns a memory-only runtime capability contract", async () => {
@@ -408,7 +417,6 @@ describe("product memory plugin", () => {
   });
 
   it("routes OpenCode lifecycle events as memory signals", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
@@ -469,7 +477,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "Continue the memory lifecycle baseline."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
       expect(parsePluginToolResult(await harness.hooks.tool?.memory_context.execute({}, { sessionID: sessionId }))).toMatchObject({
         status: "ready",
@@ -510,7 +518,7 @@ describe("product memory plugin", () => {
       await harness.hooks.event?.({
         event: createMessagePartUpdatedEvent(sessionId, "Continue with message part memory context."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
       expect(parsePluginToolResult(await harness.hooks.tool?.memory_context.execute({}, { sessionID: sessionId }))).toMatchObject({
         status: "ready",
@@ -597,19 +605,17 @@ describe("product memory plugin", () => {
       });
       expect(JSON.stringify(contextResult)).not.toMatch(forbiddenHookRuntimeSurfacePattern);
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records skipped lifecycle diagnostics without changing continuity cache semantics", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
       const sessionId = "skipped-diagnostics-session";
 
       await harness.hooks["message.updated"]?.({ event: createMessageUpdatedEvent(sessionId, "hi") });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
 
       const result = parsePluginToolResult(
@@ -643,12 +649,10 @@ describe("product memory plugin", () => {
       });
       expect(harness.backend.prepareTurnMemory).not.toHaveBeenCalled();
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("prepares a compaction checkpoint before appending continuity without overwriting prompt", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 1_000 });
@@ -693,12 +697,10 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("keeps compaction fail-open when checkpoint preparation fails and cached continuity exists", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 1_000 });
@@ -709,7 +711,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "Continue with fail-open compaction checkpoint memory."),
       });
-      vi.mocked(harness.backend.prepareHostTurnMemory).mockRejectedValueOnce(new Error("checkpoint unavailable"));
+      mocked(harness.backend.prepareHostTurnMemory).mockRejectedValueOnce(new Error("checkpoint unavailable"));
 
       const compactionOutput: { context: string[]; prompt?: string } = { context: [] };
       await expect(
@@ -732,12 +734,10 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("shares idle and compaction idempotency for the same turn", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
@@ -746,7 +746,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "Continue the idle and compaction idempotency lifecycle."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
 
       await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent(sessionId) });
@@ -762,12 +762,10 @@ describe("product memory plugin", () => {
         }),
       );
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records missing-scope compaction degradation without backend writes", async () => {
-    vi.useFakeTimers();
 
     try {
       const incompleteScopeInput = {
@@ -803,12 +801,10 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records duplicate idle persistence as a deduped turn without duplicating backend writes", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
@@ -817,7 +813,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "Continue the duplicate idle lifecycle diagnostic."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
 
       await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent(sessionId) });
@@ -853,18 +849,16 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("drops stale idle persistence results after a newer turn update", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 1_000 });
       const sessionId = "stale-idle-result-session";
       const deferredPrepareHostTurn = createDeferred<PrepareHostTurnMemoryResult>();
-      vi.mocked(harness.backend.prepareHostTurnMemory).mockReturnValueOnce(deferredPrepareHostTurn.promise);
+      mocked(harness.backend.prepareHostTurnMemory).mockReturnValueOnce(deferredPrepareHostTurn.promise);
 
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEventWithMessageId(
@@ -908,17 +902,15 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records likely-skip idle persistence without writing while preserving detailed policy output", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
       const sessionId = "likely-skip-idle-diagnostics-session";
-      vi.mocked(harness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
+      mocked(harness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
         createPrepareHostTurnResult({
           memorySuggestions: {
             recommendation: "likely_skip",
@@ -939,7 +931,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "Continue the likely skip idle persistence diagnostic."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
 
       await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent(sessionId) });
@@ -979,17 +971,15 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records strong-candidate idle auto-save as auto_saved while preserving detailed policy output", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
       const sessionId = "auto-saved-idle-diagnostics-session";
-      vi.mocked(harness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
+      mocked(harness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
         createPrepareHostTurnResult({
           memorySuggestions: {
             recommendation: "strong_candidate",
@@ -1010,7 +1000,7 @@ describe("product memory plugin", () => {
       await harness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent(sessionId, "We decided to keep idle persistence conservative."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
 
       await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent(sessionId) });
@@ -1048,16 +1038,14 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records review-only and incomplete-scope policy skips as deterministic idle diagnostics", async () => {
-    vi.useFakeTimers();
 
     try {
       const reviewHarness = await createHarness({ messageDebounceMs: 5 });
-      vi.mocked(reviewHarness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
+      mocked(reviewHarness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
         createPrepareHostTurnResult({
           memorySuggestions: {
             recommendation: "consider_saving",
@@ -1078,7 +1066,7 @@ describe("product memory plugin", () => {
       await reviewHarness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent("review-only-idle-session", "Continue the review-only persistence diagnostic."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
       await reviewHarness.hooks["session.idle"]?.({ event: createSessionIdleEvent("review-only-idle-session") });
       await flushRuntimePromises();
@@ -1101,7 +1089,7 @@ describe("product memory plugin", () => {
 
       resetOpenCodePluginMemoryBackendSingletonForTests();
       const skippedHarness = await createHarness({ messageDebounceMs: 5 });
-      vi.mocked(skippedHarness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
+      mocked(skippedHarness.backend.prepareHostTurnMemory).mockResolvedValueOnce(
         createPrepareHostTurnResult({
           memorySuggestions: {
             recommendation: "strong_candidate",
@@ -1122,7 +1110,7 @@ describe("product memory plugin", () => {
       await skippedHarness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent("auto-save-skipped-idle-session", "We decided to keep scope validation strict."),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
       await skippedHarness.hooks["session.idle"]?.({ event: createSessionIdleEvent("auto-save-skipped-idle-session") });
       await flushRuntimePromises();
@@ -1143,19 +1131,17 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records idle persistence pre-backend skip reasons for small talk and missing turn keys", async () => {
-    vi.useFakeTimers();
 
     try {
       const smallTalkHarness = await createHarness({ messageDebounceMs: 5 });
       await smallTalkHarness.hooks["message.updated"]?.({
         event: createMessageUpdatedEvent("small-talk-idle-session", "hi"),
       });
-      await vi.advanceTimersByTimeAsync(5);
+      await flushDebounce();
       await flushRuntimePromises();
       await smallTalkHarness.hooks["session.idle"]?.({ event: createSessionIdleEvent("small-talk-idle-session") });
       await flushRuntimePromises();
@@ -1201,12 +1187,10 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records idle persistence with a turn key but no recent conversation as skipped", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
@@ -1243,14 +1227,13 @@ describe("product memory plugin", () => {
         },
       });
     } finally {
-      vi.useRealTimers();
     }
   });
 
   it("records failed-open lifecycle diagnostics without throwing", async () => {
     const harness = await createHarness();
     const sessionId = "failed-open-diagnostics-session";
-    vi.mocked(harness.backend.wakeUpMemory).mockRejectedValueOnce(new Error("wake-up unavailable"));
+    mocked(harness.backend.wakeUpMemory).mockRejectedValueOnce(new Error("wake-up unavailable"));
 
     await expect(
       harness.hooks["session.created"]?.({ event: createSessionCreatedEvent(sessionId) }),
@@ -1283,15 +1266,13 @@ describe("product memory plugin", () => {
   });
 
   it("serves memory_context from cached singleton runtime state", async () => {
-    vi.useFakeTimers();
 
     try {
       const harness = await createHarness({ messageDebounceMs: 5 });
 
       await harness.hooks["session.created"]?.({ event: createSessionCreatedEvent() });
       await harness.hooks["message.updated"]?.({ event: createMessageUpdatedEvent() });
-      vi.advanceTimersByTime(5);
-      await Promise.resolve();
+      await flushDebounce();
       await harness.hooks["session.idle"]?.({ event: createSessionIdleEvent() });
       await Promise.resolve();
 
@@ -1337,7 +1318,6 @@ describe("product memory plugin", () => {
         }),
       );
     } finally {
-      vi.useRealTimers();
     }
   });
 

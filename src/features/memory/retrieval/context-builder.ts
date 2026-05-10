@@ -372,13 +372,20 @@ function preambleForMode(mode: RetrievalMode): string {
 }
 
 function formatItemForMode(mode: Exclude<RetrievalMode, "profile">, item: SearchMemoryItem): string {
+  const label = formatAuthorityLabel(item);
   switch (mode) {
     case "recent":
-      return `- [${item.kind} · ${formatShortDate(item.createdAt)}] ${item.content}`;
+      return `- [${item.kind} · ${label} · ${formatShortDate(item.createdAt)}] ${item.content}`;
     case "query":
     case "full":
-      return `- [${item.kind}] ${item.content}`;
+      return `- [${item.kind} · ${label}] ${item.content}`;
   }
+}
+
+function formatAuthorityLabel(item: SearchMemoryItem): string {
+  const review = item.reviewStatus ? ` · ${item.reviewStatus}` : "";
+  const source = item.source.title ?? item.source.uri ?? item.source.type;
+  return `${item.scope} · ${item.verificationStatus}${review} · ${source}`;
 }
 
 function formatShortDate(input: string): string {

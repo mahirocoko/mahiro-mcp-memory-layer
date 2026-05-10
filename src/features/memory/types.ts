@@ -75,6 +75,7 @@ export interface SearchMemoriesInput {
 export interface SearchMemoryItem {
   readonly id: string;
   readonly kind: MemoryKind;
+  readonly scope: MemoryScope;
   readonly content: string;
   readonly summary?: string;
   readonly score: number;

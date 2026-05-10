@@ -4,6 +4,8 @@ Local-first agent memory and retrieval infrastructure for OpenCode.
 
 This package is memory-only. It provides durable memory writes, retrieval, context assembly, retrieval inspection, memory review flows, and plugin-native continuity helpers such as `memory_context` and `runtime_capabilities`.
 
+cocoindex-code owns source, docs, and code corpus indexing. `mahiro-mcp-memory-layer` owns curated memory only. Do not use this package as a source, docs, or code corpus indexer.
+
 Host lifecycle events are consumed for memory continuity only. This package does not execute hooks, own workflow control, or dispatch runtime actions.
 
 ## What ships today

@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { access as accessPackagedInstructionPath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import type { Config } from "@opencode-ai/plugin";
@@ -12,8 +12,17 @@ const packagedInstructionPaths = [
   packagedContinuityDebuggingInstructionPath,
 ];
 
+type InstructionPathAccess = (instructionPath: string) => Promise<void>;
+
 export async function applyOpenCodePluginInstructionsConfig(config: Config): Promise<void> {
-  const availablePackagedInstructionPaths = await getAvailablePackagedInstructionPaths();
+  await applyOpenCodePluginInstructionsConfigWithAccess(config, accessPackagedInstructionPath);
+}
+
+export async function applyOpenCodePluginInstructionsConfigWithAccess(
+  config: Config,
+  accessInstructionPath: InstructionPathAccess,
+): Promise<void> {
+  const availablePackagedInstructionPaths = await getAvailablePackagedInstructionPaths(accessInstructionPath);
 
   if (availablePackagedInstructionPaths.length === 0) {
     return;
@@ -33,9 +42,12 @@ export async function applyOpenCodePluginInstructionsConfig(config: Config): Pro
   config.instructions = [...currentInstructions, ...appendedInstructionPaths];
 }
 
-async function getAvailablePackagedInstructionPaths(): Promise<string[]> {
+async function getAvailablePackagedInstructionPaths(accessInstructionPath: InstructionPathAccess): Promise<string[]> {
   const availableInstructionPathEntries = await Promise.all(
-    packagedInstructionPaths.map(async (instructionPath) => [instructionPath, await instructionExists(instructionPath)] as const),
+    packagedInstructionPaths.map(async (instructionPath) => [
+      instructionPath,
+      await instructionExists(instructionPath, accessInstructionPath),
+    ] as const),
   );
   const hasCompleteInstructionPair = availableInstructionPathEntries.every(([, exists]) => exists);
 
@@ -54,9 +66,12 @@ async function getAvailablePackagedInstructionPaths(): Promise<string[]> {
     .map(([instructionPath]) => instructionPath);
 }
 
-async function instructionExists(instructionPath: string): Promise<boolean> {
+async function instructionExists(
+  instructionPath: string,
+  accessInstructionPath: InstructionPathAccess,
+): Promise<boolean> {
   try {
-    await access(instructionPath);
+    await accessInstructionPath(instructionPath);
     return true;
   } catch {
     return false;

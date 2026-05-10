@@ -17,6 +17,7 @@ import { reindexMemoryRecords } from "./index/reindex.js";
 import { createMemoryFacade, type MemoryFacade } from "./memory-facade.js";
 import { applyConservativeMemoryPolicyInputSchema, enqueueMemoryProposalInputSchema, getReviewAssistInputSchema, listReviewQueueInputSchema, listReviewQueueOverviewInputSchema, promoteMemoryInputSchema, purgeRejectedMemoriesInputSchema, reviewMemoryInputSchema } from "./schemas.js";
 import { toRetrievalRow } from "./retrieval/rank.js";
+import { nowIso } from "./lib/time.js";
 import type {
   ApplyConservativeMemoryPolicyInput,
   ApplyConservativeMemoryPolicyResult,
@@ -147,9 +148,9 @@ export class MemoryService {
     const nextRecord: MemoryRecord = {
       ...existing,
       verificationStatus: parsed.verificationStatus ?? "verified",
-      verifiedAt: new Date().toISOString(),
+      verifiedAt: nowIso(),
       verificationEvidence: parsed.evidence,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso(),
     };
 
     await this.logStore.replaceRecordById(parsed.id, nextRecord);
@@ -180,7 +181,7 @@ export class MemoryService {
       throw new Error(`No memory record found for id ${parsed.id}`);
     }
 
-    const now = new Date().toISOString();
+    const now = nowIso();
     const nextDecisions = [
       ...(existing.reviewDecisions ?? []),
       {

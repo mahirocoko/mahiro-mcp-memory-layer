@@ -292,7 +292,7 @@ describe("memory console integration", () => {
       mode: "full",
       ...otherProjectScope,
     });
-    expect(wrongScopeSearch.items.map((item) => item.id)).toContain(seeded.wrongScopeRejected.id);
+    expect(wrongScopeSearch.items.map((item) => item.id)).not.toContain(seeded.wrongScopeRejected.id);
   });
 
   it("returns deterministic statuses for unknown routes and unsupported methods without reading or mutating", async () => {

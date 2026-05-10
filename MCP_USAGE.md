@@ -4,6 +4,8 @@ Use this file for the practical runtime surface of this repo.
 
 `README.md` is the human-facing package reference. This file is the runtime/tool contract guide for the memory-only package surface.
 
+cocoindex-code owns source, docs, and code corpus indexing. `mahiro-mcp-memory-layer` owns curated memory only. Do not use this package as a source, docs, or code corpus indexer.
+
 ## Runtime modes
 
 ### Plugin-native path
@@ -74,6 +76,10 @@ MVP scope is one way only. There is no bidirectional sync and no import path fro
 
 Generated wiki files are derived artifacts. Do not edit them as source data. Regenerate the projection instead.
 
+## `upsert_document`
+
+`upsert_document` stores curated document-shaped memory only. It is not a source, docs, or code corpus indexing API, and it must not be used for crawling, chunking, or batch importing project files. Use `cocoindex-code` for project source/docs/code indexing.
+
 ## `runtime_capabilities`
 
 Use this to read the current plugin-native memory capability contract.
@@ -111,6 +117,8 @@ Look for:
 `memory_context` should stay memory-facing. It is useful for continuity debugging, cache inspection, and understanding what memory preparation already happened for the active session.
 
 The continuity cache can surface `wakeUp`, `prepareTurn`, `prepareHostTurn`, and lifecycle diagnostics for the memory stages above.
+
+Lifecycle helpers are trusted memory persistence and continuity triggers only. They must not expose task execution, worker routing, supervision, executor ownership, or workflow-control state as this package's contract.
 
 ## Practical safety reminders
 

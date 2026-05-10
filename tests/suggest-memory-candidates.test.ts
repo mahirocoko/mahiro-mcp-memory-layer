@@ -46,6 +46,31 @@ describe("suggestMemoryCandidates", () => {
     expect(result.recommendation).toBe("strong_candidate");
   });
 
+  it("preserves explicit user-confirmed important claims", () => {
+    const result = suggestMemoryCandidates({
+      conversation: "User confirmed: Important: production deploys must go through the staging branch first.",
+    });
+
+    const fact = result.candidates.find((c) => c.kind === "fact");
+    expect(fact).toBeDefined();
+    expect(fact?.draftContent).toContain("Important:");
+    expect(result.recommendation).toBe("strong_candidate");
+  });
+
+  it("skips wrapped memory-review content rows even when they quote important claims", () => {
+    const result = suggestMemoryCandidates({
+      conversation: [
+        "Review report:",
+        "- Recommendation: strong_candidate",
+        "- Content: `IMPORTANT: production deploys must go through the staging branch first.`",
+        "- Reason: Explicit remember/important marker.",
+      ].join("\n"),
+    });
+
+    expect(result.recommendation).toBe("likely_skip");
+    expect(result.candidates).toHaveLength(0);
+  });
+
   it("surfaces a medium-confidence task follow-up", () => {
     const result = suggestMemoryCandidates({
       conversation: "Next step: migrate the legacy auth module to the new API.",
