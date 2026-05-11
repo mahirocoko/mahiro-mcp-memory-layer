@@ -1,0 +1,28 @@
+2026-05-11 task 4 app shell QA
+
+Screenshot automation was unavailable: chrome-devtools MCP could not attach because an existing Chrome profile process was already running. Text equivalent recorded instead.
+
+Live server note:
+- bun run memory-console -- --port 4317 could not start a second server because 127.0.0.1:4317 was already in use.
+- The route checks below used the already-running local memory console on 127.0.0.1:4317 after `bun run build` refreshed the static assets on disk.
+
+Live route checks:
+- / -> 200, React shell present, asset link present
+- /review -> 200, React shell present, asset link present
+- /rejected -> 200, React shell present, asset link present
+- /graph -> 200, React shell present, asset link present
+
+Live API checks:
+- /api/memories -> 200, keys filters,memories,projectScopes,selectedMemory,fetchedCount,fetchMode,degraded,refreshedAt
+- /api/review -> 200, keys filters,reviewItems,selectedReviewItem,reviewAssist,refreshedAt
+- /api/graph -> 200, keys filters,memories,projectScopes,selectedMemory,fetchedCount,fetchMode,degraded,refreshedAt,graph
+
+Component test coverage used as the active-nav/deep-link evidence:
+- /review?id=mem-pending&scope=project marks Review with aria-current="page"
+- navigation hrefs preserve id and scope query params
+- the Selected ID filter field renders value="mem-pending"
+- /rejected keeps id in route links while adding API defaults view=firehose, verificationStatus=all, reviewStatus=rejected
+
+Build verification:
+- bun run typecheck passed
+- bun run build passed and wrote Vite assets under src/features/memory-console/static

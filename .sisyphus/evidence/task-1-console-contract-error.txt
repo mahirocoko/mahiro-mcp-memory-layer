@@ -1,0 +1,22 @@
+# Task 1 Console Error Contract Characterization
+
+## Current Reality
+
+- Unknown non-action, non-page paths return `404`, `content-type: text/plain; charset=utf-8`, and body `Not found`.
+- Unsupported methods on page routes return `405`, `content-type: text/plain; charset=utf-8`, `Allow: GET, HEAD`, and body `Method {METHOD} is not allowed for {PATH}. Allowed methods: GET, HEAD.`
+- Unsupported methods on action routes return `405`, `content-type: text/plain; charset=utf-8`, `Allow: POST`, and body `Method {METHOD} is not allowed for {PATH}. Allowed methods: POST.`
+- The unsupported page route matrix is `/`, `/review`, `/rejected`, and `/graph`.
+- The unsupported action route matrix is `/actions/review`, `/actions/promote`, and `/actions/purge-rejected`.
+- Unknown and unsupported route handling occurs before page loading, review assistance loading, action validation, action execution, or canonical storage mutation.
+
+## Non-goals
+
+- This characterization does not introduce new error routes or alter status/body/header semantics.
+- This characterization does not change validation error semantics for malformed POST bodies.
+- This characterization does not change the server's catch-all `500 text/html` behavior for unexpected handler exceptions.
+
+## Coverage Added
+
+- The existing integration test now covers unsupported methods on all current page routes, not only `/`.
+- The existing integration test now covers unsupported methods on all current action routes, not only `/actions/review`.
+- The existing integration test still asserts no reader calls, review-assist calls, action writer calls, canonical log writes, or index deletes/upserts for unknown/unsupported routing.

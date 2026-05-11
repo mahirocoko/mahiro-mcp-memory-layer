@@ -1,0 +1,21 @@
+Task 5 unsafe content escaping evidence
+
+Focused test: rtk bun run test -- tests/memory-console-web.test.tsx
+Result: 9 tests passed.
+
+Unsafe fixture used in tests/memory-console-web.test.tsx:
+- content: <script>alert(1)</script>
+- source.title: <script>alert(1)</script>
+
+Assertion evidence:
+- Rendered static markup contains escaped text: &lt;script&gt;alert(1)&lt;/script&gt;
+- Rendered static markup does not contain executable raw script markup.
+- Implementation renders memory content/source/evidence through React text nodes and does not use dangerouslySetInnerHTML or innerHTML.
+
+Manual browser QA:
+- Opened http://127.0.0.1:4317/
+- Applied q=memory filter and observed URL query update.
+- Opened a memory row and observed selected id in URL plus selected detail pane.
+- Opened Projects view and verified project/container Browse scope links.
+- Opened Firehose view and verified raw/not-approved labeling.
+- Browser console warnings/errors: none.

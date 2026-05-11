@@ -1,0 +1,28 @@
+Task 10 verification - 2026-05-11T07:35:00Z
+
+Coverage/package updates:
+- Replaced stale server-template page assertions in tests/memory-console-render.test.ts with coverage for the still-used legacy purge action result page only.
+- Extended tests/memory-console-web.test.tsx escaping coverage for React-rendered memory content, source fields, verification evidence, review decision notes/evidence, tags, and search reasons.
+- Verified package.json includes src/features/memory-console, so Vite output under src/features/memory-console/static is inside the published files surface.
+
+Static build output:
+- rtk bun run build exited 0.
+- Vite wrote src/features/memory-console/static/index.html.
+- Vite wrote src/features/memory-console/static/assets/index-BgdnFTCd.css.
+- Vite wrote src/features/memory-console/static/assets/index-CKNtY2eI.js.
+
+Automated verification:
+- lsp_diagnostics found no diagnostics in tests/memory-console-render.test.ts.
+- lsp_diagnostics found no diagnostics in tests/memory-console-web.test.tsx.
+- rtk bun run test tests/memory-console-render.test.ts tests/memory-console-web.test.tsx passed: 2 files, 21 tests.
+- rtk bun run typecheck exited 0.
+- rtk bun run test exited 0 for the full suite.
+- rtk bun run build exited 0 and included the Vite build output listed above.
+
+Local console QA:
+- Started rtk bun run memory-console -- --port 4317 in tmux.
+- Server logged: Memory console listening on http://127.0.0.1:4317/ and Local only: bound to 127.0.0.1.
+- Playwright opened http://127.0.0.1:4317/ and observed title "Local memory console", #root child count 1, Browse route text, and built JS/CSS asset URLs under /assets/.
+- Playwright opened http://127.0.0.1:4317/review and observed title "Local memory console", #root child count 1, active Review navigation, review route text, and the same built JS/CSS assets.
+- Playwright console check reported 0 errors and 0 warnings.
+- Screenshot saved to .sisyphus/evidence/task-10-local-console.png.

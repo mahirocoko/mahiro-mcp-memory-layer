@@ -138,6 +138,27 @@ export interface MemoryConsoleActionWriter {
 
 export type MemoryConsoleBackend = ReadOnlyMemoryReader & Partial<MemoryConsoleReviewReader> & Partial<MemoryConsoleActionWriter>;
 
+
+
+export type ConsoleApiAction = ConsoleActionResult["action"];
+export type ConsoleApiErrorCode = "invalid_payload" | "unavailable";
+export type ConsoleApiMutationResult = ReviewMemoryResult | PromoteMemoryResult | PurgeRejectedMemoriesResult;
+
+export interface ConsoleApiSuccessResponse {
+  readonly status: "ok";
+  readonly action: ConsoleApiAction;
+  readonly result: ConsoleApiMutationResult;
+}
+
+export interface ConsoleApiErrorResponse {
+  readonly status: "error";
+  readonly action: ConsoleApiAction;
+  readonly error: {
+    readonly code: ConsoleApiErrorCode;
+    readonly message: string;
+  };
+}
+
 export type MemoryGraphNodeType = "memory" | "source" | "tag" | "evidence";
 export type MemoryGraphEdgeType = "has_source" | "tagged_with" | "has_evidence" | "reviewed_as" | "related_memory";
 export type MemoryGraphWarningType = "missing_related_memory";

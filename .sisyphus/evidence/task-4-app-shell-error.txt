@@ -1,0 +1,15 @@
+2026-05-11 task 4 app shell error-state QA
+
+Screenshot automation was unavailable: chrome-devtools MCP could not attach because an existing Chrome profile process was already running. Text equivalent recorded instead.
+
+Component test coverage for the error state:
+- route /graph?edgeType=related_memory renders heading "Could not load Graph"
+- API error message "Memory console request failed." is rendered in the alert panel
+- Retry affordance is rendered as a button labelled "Retry"
+
+Focused verification command:
+- bun run test -- tests/memory-console-web.test.tsx tests/memory-console-server.test.ts
+
+Result:
+- 2 test files passed
+- 28 tests passed

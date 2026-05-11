@@ -191,7 +191,7 @@ describe("memory console server", () => {
     expect(result.memories.map((memory) => memory.id)).toEqual(["mem-verified"]);
   });
 
-  it("serves GET / as browse mode", async () => {
+  it("serves GET / as the React shell and exposes browse data through JSON API", async () => {
     const reviewMemory = vi.fn(async () => createReviewAcceptedResult("mem-verified", "reject"));
     const promoteMemory = vi.fn(async () => createPromoteAcceptedResult("mem-verified"));
     const reader = createReader({
@@ -213,20 +213,23 @@ describe("memory console server", () => {
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("text/html");
       expect(response.headers.get("cache-control")).toBe("no-store");
-      expect(body).toContain("Local memory console");
-      expect(body).toContain("Browseable memory.");
-      expect(body).toContain('<span class="nav-label">Browse</span>');
-      expect(body).toContain("Read verified and active records");
-      expect(body).toContain('method="post" action="/actions/review"');
-      expect(body).toContain('name="redirectTo" value="/"');
-      expect(body).toContain("Reject verified memory");
-      expect(body).not.toContain('action="/actions/promote"');
+      expectShellHtml(body);
+      expect(body).not.toContain("Browseable memory.");
+      expect(body).not.toContain('method="post" action="/actions/review"');
+      expect(reader.readAll).not.toHaveBeenCalled();
+
+      const apiResponse = await fetch(new URL("/api/memories", baseUrl));
+      const apiBody = await apiResponse.json() as { readonly memories: readonly { readonly id: string; readonly content: string }[] };
+
+      expect(apiResponse.status).toBe(200);
+      expect(apiResponse.headers.get("content-type")).toContain("application/json");
+      expect(apiBody.memories).toMatchObject([{ id: "mem-verified", content: "Browseable memory." }]);
       expect(reviewMemory).not.toHaveBeenCalled();
       expect(promoteMemory).not.toHaveBeenCalled();
     });
   });
 
-  it("serves GET /review as review queue overview with selected assist", async () => {
+  it("serves GET /review as the React shell and exposes review queue data through JSON API", async () => {
     const reviewItem = createReviewOverviewItem("mem-pending", "Needs review.");
     const assist = createReviewAssist(reviewItem.id);
     const reader = createReader({
@@ -246,19 +249,33 @@ describe("memory console server", () => {
       const body = await response.text();
 
       expect(response.status).toBe(200);
-      expect(body).toContain("Needs review.");
-      expect(body).toContain("priority 9.25");
-      expect(body).toContain("possible_contradiction");
-      expect(body).toContain("Review Queue");
-      expect(body).toContain('method="post" action="/actions/review"');
-      expect(body).toContain('method="post" action="/actions/promote"');
-      expect(body).toContain("Assist rationale");
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expectShellHtml(body);
+      expect(body).not.toContain("Needs review.");
+      expect(body).not.toContain('method="post" action="/actions/review"');
+      expect(reader.listReviewQueueOverview).not.toHaveBeenCalled();
+      expect(reader.getReviewAssist).not.toHaveBeenCalled();
+
+      const apiResponse = await fetch(new URL("/api/review", baseUrl));
+      const apiBody = await apiResponse.json() as {
+        readonly reviewItems: readonly { readonly id: string; readonly content: string; readonly priorityScore: number; readonly hints: readonly { readonly type: string }[] }[];
+        readonly selectedReviewItem?: { readonly id: string; readonly content: string };
+        readonly reviewAssist?: { readonly suggestions: readonly { readonly rationale: string }[] };
+      };
+
+      expect(apiResponse.status).toBe(200);
+      expect(apiResponse.headers.get("content-type")).toContain("application/json");
+      expect(apiBody.reviewItems).toHaveLength(1);
+      expect(apiBody.reviewItems[0]).toMatchObject({ id: "mem-pending", content: "Needs review.", priorityScore: 9.25 });
+      expect(apiBody.reviewItems[0]?.hints.map((hint) => hint.type)).toContain("possible_contradiction");
+      expect(apiBody.selectedReviewItem).toMatchObject({ id: reviewItem.id, content: "Needs review." });
+      expect(apiBody.reviewAssist?.suggestions.map((suggestion) => suggestion.rationale)).toContain("Assist rationale");
       expect(reader.listReviewQueueOverview).toHaveBeenCalledWith({ projectId: undefined, containerId: undefined, limit: 50 });
       expect(reader.getReviewAssist).toHaveBeenCalledWith({ id: reviewItem.id });
     });
   });
 
-  it("serves GET /rejected as rejected list mode", async () => {
+  it("serves GET /rejected as the React shell and exposes rejected list data through JSON API filters", async () => {
     const reader = createReader({
       records: [
         {
@@ -286,15 +303,24 @@ describe("memory console server", () => {
       const body = await response.text();
 
       expect(response.status).toBe(200);
-      expect(body).toContain("Rejected memory quarantine");
-      expect(body).toContain("Rejected memory.");
-      expect(body).toContain("rejected");
-      expect(body).toContain('method="post" action="/actions/purge-rejected"');
-      expect(body).not.toContain("Verified active memory.");
-      expect(body).not.toContain("Pending memory.");
-      expect(body).not.toContain("Deferred memory.");
-      expect(body).not.toContain('action="/actions/review"');
-      expect(body).not.toContain('action="/actions/promote"');
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expectShellHtml(body);
+      expect(body).not.toContain("Rejected memory.");
+      expect(body).not.toContain('method="post" action="/actions/purge-rejected"');
+      expect(reader.readAll).not.toHaveBeenCalled();
+
+      const apiUrl = new URL("/api/memories", baseUrl);
+      apiUrl.searchParams.set("view", "firehose");
+      apiUrl.searchParams.set("verificationStatus", "all");
+      apiUrl.searchParams.set("reviewStatus", "rejected");
+      const apiResponse = await fetch(apiUrl);
+      const apiBody = await apiResponse.json() as { readonly memories: readonly { readonly id: string; readonly content: string; readonly reviewStatus?: string }[] };
+
+      expect(apiResponse.status).toBe(200);
+      expect(apiBody.memories).toMatchObject([{ id: "mem-rejected", content: "Rejected memory.", reviewStatus: "rejected" }]);
+      expect(apiBody.memories.map((memory) => memory.content)).not.toContain("Verified active memory.");
+      expect(apiBody.memories.map((memory) => memory.content)).not.toContain("Pending memory.");
+      expect(apiBody.memories.map((memory) => memory.content)).not.toContain("Deferred memory.");
     });
   });
 
@@ -393,7 +419,7 @@ describe("memory console server", () => {
     });
   });
 
-  it("serves GET /graph as a read-only graph projection with summary counts", async () => {
+  it("serves GET /graph as the React shell and exposes a read-only graph projection through JSON API", async () => {
     const reviewMemory = vi.fn(async () => createReviewAcceptedResult("mem-graph", "reject"));
     const promoteMemory = vi.fn(async () => createPromoteAcceptedResult("mem-graph"));
     const purgeRejectedMemories = vi.fn(async () => createPurgeResult(false, [{ id: "mem-graph", status: "deleted" }]));
@@ -415,23 +441,32 @@ describe("memory console server", () => {
     });
 
     await withConsoleServer(reader, async (baseUrl) => {
-      const response = await fetch(new URL("/graph?scope=project&projectId=project-a&containerId=container-a&edgeType=related_memory&id=tag%3Agraph", baseUrl));
+      const pageUrl = "/graph?scope=project&projectId=project-a&containerId=container-a&edgeType=related_memory&id=tag%3Agraph";
+      const response = await fetch(new URL(pageUrl, baseUrl));
       const body = await response.text();
 
       expect(response.status).toBe(200);
-      expect(body).toContain("Memory graph");
-      expect(body).toContain("Read-only projection of canonical memory metadata");
-      expect(body).toContain("<strong>5</strong> nodes");
-      expect(body).toContain("<strong>2</strong> edges shown from 6 total");
-      expect(body).toContain("Edges: related_memory 2");
-      expect(body).toContain("memory (2)");
-      expect(body).toContain("tag details");
-      expect(body).toContain("related memory (2)");
-      expect(body).toContain('method="get" action="/graph"');
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expectShellHtml(body);
+      expect(body).not.toContain("Memory graph");
+      expect(body).not.toContain('method="get" action="/graph"');
       expect(body).not.toContain('method="post"');
-      expect(body).not.toContain('action="/actions/review"');
-      expect(body).not.toContain('action="/actions/promote"');
-      expect(body).not.toContain('action="/actions/purge-rejected"');
+      expect(reader.readAll).not.toHaveBeenCalled();
+      expect(reader.listReviewQueueOverview).not.toHaveBeenCalled();
+      expect(reader.getReviewAssist).not.toHaveBeenCalled();
+
+      const apiResponse = await fetch(new URL(pageUrl.replace("/graph", "/api/graph"), baseUrl));
+      const apiBody = await apiResponse.json() as {
+        readonly graph: { readonly nodes: readonly { readonly id: string; readonly type: string; readonly label: string }[]; readonly edges: readonly { readonly type: string }[] };
+        readonly selectedGraphNode?: { readonly id: string; readonly label: string };
+      };
+
+      expect(apiResponse.status).toBe(200);
+      expect(apiResponse.headers.get("content-type")).toContain("application/json");
+      expect(apiBody.graph.nodes).toHaveLength(5);
+      expect(apiBody.graph.edges.filter((edge) => edge.type === "related_memory")).toHaveLength(2);
+      expect(apiBody.graph.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(["memory", "source", "tag", "evidence"]));
+      expect(apiBody.selectedGraphNode).toMatchObject({ id: "tag:graph", label: "graph" });
       expect(reviewMemory).not.toHaveBeenCalled();
       expect(promoteMemory).not.toHaveBeenCalled();
       expect(purgeRejectedMemories).not.toHaveBeenCalled();
@@ -477,6 +512,56 @@ describe("memory console server", () => {
       expect(response.status).toBe(400);
       expect(response.headers.get("content-type")).toContain("text/plain");
       expect(body).toBe("Invalid review action: memoryId is required.");
+    });
+  });
+
+  it("returns JSON errors and Allow headers for unsupported or invalid API requests", async () => {
+    const purgeRejectedMemories = vi.fn(async () => createPurgeResult(false, [{ id: "mem-ok", status: "deleted" }]));
+    const reader = createReader({ records: [], searchResult: { items: [], degraded: false }, purgeRejectedMemories });
+
+    await withConsoleServer(reader, async (baseUrl) => {
+      const unsupportedGetResponse = await fetch(new URL("/api/promote", baseUrl));
+      expect(unsupportedGetResponse.status).toBe(405);
+      expect(unsupportedGetResponse.headers.get("allow")).toBe("POST");
+      expect(await unsupportedGetResponse.text()).toBe("Method GET is not allowed for /api/promote. Allowed methods: POST.");
+
+      const unsupportedPostResponse = await fetch(new URL("/api/memories", baseUrl), { method: "POST" });
+      expect(unsupportedPostResponse.status).toBe(405);
+      expect(unsupportedPostResponse.headers.get("allow")).toBe("GET, HEAD");
+      expect(await unsupportedPostResponse.text()).toBe("Method POST is not allowed for /api/memories. Allowed methods: GET, HEAD.");
+
+      const invalidResponse = await fetch(new URL("/api/review", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reject" }),
+      });
+      const invalidBody = await invalidResponse.json() as { readonly status: string; readonly action: string; readonly error: { readonly code: string; readonly message: string } };
+
+      expect(invalidResponse.status).toBe(400);
+      expect(invalidResponse.headers.get("content-type")).toContain("application/json");
+      expect(invalidBody).toEqual({
+        status: "error",
+        action: "review",
+        error: { code: "invalid_payload", message: "Invalid review action: memoryId is required." },
+      });
+
+      const invalidPurgeResponse = await fetch(new URL("/api/purge-rejected", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: ["mem-ok", 123], scope: "global", confirmation: "DELETE REJECTED" }),
+      });
+      const invalidPurgeBody = await invalidPurgeResponse.json() as { readonly status: string; readonly action: string; readonly error: { readonly code: string; readonly message: string } };
+
+      expect(invalidPurgeResponse.status).toBe(400);
+      expect(invalidPurgeBody).toEqual({
+        status: "error",
+        action: "purge-rejected",
+        error: { code: "invalid_payload", message: "Invalid purge-rejected action: ids must be an array of non-empty strings." },
+      });
+      expect(purgeRejectedMemories).not.toHaveBeenCalled();
+      expect(reader.readAll).not.toHaveBeenCalled();
+      expect(reader.list).not.toHaveBeenCalled();
+      expect(reader.search).not.toHaveBeenCalled();
     });
   });
 
@@ -586,7 +671,7 @@ describe("memory console server", () => {
 
       expect(response.status).toBe(200);
       expect(body).toBe("");
-      expect(reader.readAll).toHaveBeenCalledTimes(1);
+      expect(reader.readAll).not.toHaveBeenCalled();
       expect(reader.list).not.toHaveBeenCalled();
       expect(reader.search).not.toHaveBeenCalled();
     });
@@ -648,6 +733,12 @@ describe("memory console server", () => {
     expect(source).not.toMatch(/\.(remember|promoteMemory|reviewMemory|resetStorage|upsertDocument|enqueueMemoryProposal|resetMemoryStorage)\(/);
   });
 });
+
+function expectShellHtml(body: string): void {
+  expect(body).toContain("Local memory console");
+  expect(body).toContain('<div id="root"></div>');
+  expect(body).toContain('/assets/');
+}
 
 function createReader(input: {
   readonly records: readonly MemoryRecord[];

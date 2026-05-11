@@ -1,0 +1,6 @@
+Manual QA at http://127.0.0.1:4617/review?id=mem_c1e07ef0542c47e4846615925973c098
+Selected a pending review item and verified selected detail, hints, assist suggestions, and action controls were visible.
+Clicked Reject without reviewer note to avoid mutating local memory.
+Observed route-visible alert: Action failed - review returned 400 (invalid_payload): Reject and defer require a reviewer note.
+Console errors: 0.
+Unsupported 501/unavailable state covered by tests/memory-console-web.test.tsx via ReviewMutationAlert and ConsoleApiRequestError.

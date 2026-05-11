@@ -1,0 +1,37 @@
+# Task 1 Console Contract Characterization
+
+## Current Reality
+
+- Page routes are exactly `/`, `/review`, `/rejected`, and `/graph` in `src/features/memory-console/server.ts`.
+- Action routes are exactly `/actions/review`, `/actions/promote`, and `/actions/purge-rejected` in `src/features/memory-console/server.ts`.
+- Page routes accept `GET` and `HEAD`. The server renders the same page result for both methods, then suppresses the response body for `HEAD` before ending the HTTP response.
+- `/` loads filtered canonical memories through `loadConsoleMemories()` and renders `renderMemoryConsolePage()`.
+- `/review` forces inbox-oriented filters (`view=inbox`, `verificationStatus=hypothesis`, `reviewStatus=pending`), loads review queue data through `loadConsoleReview()`, and renders `renderReviewConsolePage()`.
+- `/rejected` forces rejected-quarantine filters (`view=firehose`, `verificationStatus=all`, `reviewStatus=rejected`), loads filtered canonical memories through `loadConsoleMemories()`, and renders `renderRejectedConsolePage()` through `renderRoutePage()`.
+- `/graph` forces project-oriented filters (`view=projects`), loads graph data through `loadConsoleGraph()`, and renders `renderGraphConsolePage()`.
+- `/actions/review` accepts only `POST`, validates review form input, runs `reviewMemory`, and returns `303` with `Location` defaulting to `/review` unless the form supplies the supported redirect.
+- `/actions/promote` accepts only `POST`, validates promote form input, runs `promoteMemory`, and returns `303` with `Location: /review`.
+- `/actions/purge-rejected` accepts only `POST`, validates purge form input, runs `purgeRejectedMemories`, and returns `200 text/html` with the purge result page instead of redirecting.
+- Page loads are read/list/search oriented. `createLocalMemoryConsoleBackend()` wires local `JsonlLogStore`, `LanceDB`, `RetrievalTraceStore`, and `MemoryService`, while read paths expose `readAll`, `list`, and `search` for console page loading.
+- Mutation-capable behavior stays behind action writers (`reviewMemory`, `promoteMemory`, `purgeRejectedMemories`) and is exercised only by POST action routes.
+
+## Non-goals
+
+- No React/Vite setup was started.
+- No renderer, production server behavior, storage behavior, endpoint inventory, dependency, or UI code was changed.
+- No broad documentation was generated; this file is task-local evidence only.
+
+## Coverage Added
+
+- `tests/memory-console-integration.test.ts` now locks unsupported page-method behavior for `/`, `/review`, `/rejected`, and `/graph` using the same `405` and `Allow: GET, HEAD` contract.
+- `tests/memory-console-integration.test.ts` now locks unsupported action-method behavior for `/actions/review`, `/actions/promote`, and `/actions/purge-rejected` using the same `405` and `Allow: POST` contract.
+- The existing no-read/no-write assertions remain attached to the unknown/unsupported route test, so these error-path requests are characterized as routing-only and non-mutating.
+
+## Evidence Sources
+
+- `src/features/memory-console/server.ts:36` defines page routes.
+- `src/features/memory-console/server.ts:37` defines action routes.
+- `src/features/memory-console/server.ts:116` through `src/features/memory-console/server.ts:164` define page routing, unknown route, method gate, route-specific loading, and page rendering.
+- `src/features/memory-console/server.ts:167` through `src/features/memory-console/server.ts:235` define action method gating, validation failures, action execution, redirect responses, purge result responses, and unavailable action behavior.
+- `src/features/memory-console/reader.ts:12` through `src/features/memory-console/reader.ts:50` define the local storage boundary and backend composition.
+- `tests/memory-console-integration.test.ts:40` through `tests/memory-console-integration.test.ts:57` characterize initial page rendering and non-mutation behavior for fixture-backed page loads.

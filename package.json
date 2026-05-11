@@ -41,8 +41,8 @@
     "reindex": "tsx src/index.ts --reindex",
     "rewrite-scope-identity": "tsx src/index.ts --rewrite-scope-identity",
     "wiki:materialize": "tsx src/wiki-materializer.ts",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json && vite build --config src/features/memory-console/web/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/features/memory-console/web/tsconfig.app.json --noEmit && tsc -p src/features/memory-console/web/tsconfig.node.json --noEmit",
     "test": "vitest run",
     "memory-console": "tsx src/memory-console.ts"
   },
@@ -51,13 +51,23 @@
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@opencode-ai/plugin": "^1.4.3",
     "apache-arrow": "^18.1.0",
+    "clsx": "^2.1.1",
     "jsonc-parser": "^3.3.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.3.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.3",
+    "vite": "^8.0.11",
     "vitest": "^3.2.4"
   }
 }

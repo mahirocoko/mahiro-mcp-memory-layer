@@ -38,72 +38,103 @@ afterEach(async () => {
 });
 
 describe("memory console integration", () => {
-  it("serves browse, review, rejected, and graph GET routes from fixture storage without mutations", async () => {
+  it("serves page routes as the built React shell and constrains built asset serving", async () => {
     const fixture = await createConsoleFixture();
-    const seeded = await seedConsoleMemories(fixture.service);
+    await seedConsoleMemories(fixture.service);
     clearCanonicalWriteSpies(fixture);
     const backend = createInstrumentedBackend(fixture);
 
     await withConsoleServer(backend.backend, async (baseUrl) => {
-      const browseResponse = await fetch(new URL("/", baseUrl));
-      const browseHtml = await browseResponse.text();
+      for (const path of ["/", "/review", "/rejected", "/graph"] as const) {
+        const response = await fetch(new URL(path, baseUrl));
+        const html = await response.text();
 
-      expect(browseResponse.status).toBe(200);
-      expect(browseResponse.headers.get("content-type")).toContain("text/html");
-      expect(browseHtml).toContain("Local memory console");
-      expect(browseHtml).toContain("Browse integration verified memory.");
-      expect(browseHtml).toContain('method="post" action="/actions/review"');
-      expect(browseHtml).toContain("Reject verified memory");
-      expect(browseHtml).not.toContain('action="/actions/promote"');
-      expect(browseHtml).not.toContain('action="/actions/purge-rejected"');
+        expect(response.status).toBe(200);
+        expect(response.headers.get("content-type")).toContain("text/html");
+        expect(html).toContain("Local memory console");
+        expect(html).toContain('<div id="root"></div>');
+        expect(html).toContain('/assets/');
+        expect(html).not.toContain("Browse integration verified memory.");
+        expect(html).not.toContain('method="post" action="/actions/review"');
+      }
 
-      const reviewUrl = new URL("/review", baseUrl);
+      const shellResponse = await fetch(new URL("/", baseUrl));
+      const shellHtml = await shellResponse.text();
+      const scriptAsset = shellHtml.match(/src="\.\/(assets\/[^"]+\.js)"/)?.[1];
+      const cssAsset = shellHtml.match(/href="\.\/(assets\/[^"]+\.css)"/)?.[1];
+      expect(scriptAsset).toBeDefined();
+      expect(cssAsset).toBeDefined();
+
+      const scriptResponse = await fetch(new URL(`/${scriptAsset}`, baseUrl));
+      expect(scriptResponse.status).toBe(200);
+      expect(scriptResponse.headers.get("content-type")).toContain("application/javascript");
+      expect(await scriptResponse.text()).toContain("createRoot");
+
+      const cssResponse = await fetch(new URL(`/${cssAsset}`, baseUrl));
+      expect(cssResponse.status).toBe(200);
+      expect(cssResponse.headers.get("content-type")).toContain("text/css");
+      expect(await cssResponse.text()).toContain("tailwindcss");
+
+      const traversalResponse = await fetch(new URL("/assets/..%2Fserver.ts", baseUrl));
+      expect(traversalResponse.status).toBe(404);
+      expect(traversalResponse.headers.get("content-type")).toContain("text/plain");
+      expect(await traversalResponse.text()).toBe("Not found");
+
+      const unknownAssetResponse = await fetch(new URL("/assets/missing.js", baseUrl));
+      expect(unknownAssetResponse.status).toBe(404);
+      expect(await unknownAssetResponse.text()).toBe("Not found");
+    });
+
+    expect(backend.reader.readAll).not.toHaveBeenCalled();
+    expect(backend.reader.list).not.toHaveBeenCalled();
+    expect(backend.reader.search).not.toHaveBeenCalled();
+    expect(backend.writer.listReviewQueueOverview).not.toHaveBeenCalled();
+    expect(backend.writer.getReviewAssist).not.toHaveBeenCalled();
+    expectNoWriteMethods(backend);
+    expectNoCanonicalWriteMethods(fixture);
+  });
+
+  it("serves JSON API GET routes from fixture storage without mutations", async () => {
+    const fixture = await createConsoleFixture();
+    await seedConsoleMemories(fixture.service);
+    clearCanonicalWriteSpies(fixture);
+    const backend = createInstrumentedBackend(fixture);
+
+    await withConsoleServer(backend.backend, async (baseUrl) => {
+      const memoriesUrl = new URL("/api/memories", baseUrl);
+      memoriesUrl.searchParams.set("scope", "project");
+      memoriesUrl.searchParams.set("projectId", projectScope.projectId);
+      memoriesUrl.searchParams.set("containerId", projectScope.containerId);
+      const memoriesResponse = await fetch(memoriesUrl);
+      const memoriesBody = await memoriesResponse.json() as { readonly memories: readonly { readonly content: string }[] };
+
+      expect(memoriesResponse.status).toBe(200);
+      expect(memoriesResponse.headers.get("content-type")).toContain("application/json");
+      expect(memoriesBody.memories.map((memory) => memory.content)).toContain("Browse integration verified memory.");
+
+      const reviewUrl = new URL("/api/review", baseUrl);
       reviewUrl.searchParams.set("scope", "project");
       reviewUrl.searchParams.set("projectId", projectScope.projectId);
       reviewUrl.searchParams.set("containerId", projectScope.containerId);
       const reviewResponse = await fetch(reviewUrl);
-      const reviewHtml = await reviewResponse.text();
+      const reviewBody = await reviewResponse.json() as { readonly reviewItems: readonly { readonly content: string; readonly hints: readonly { readonly type: string }[] }[] };
 
       expect(reviewResponse.status).toBe(200);
-      expect(reviewHtml).toContain("Review Queue");
-      expect(reviewHtml).toContain("Console duplicate review memory.");
-      expect(reviewHtml).toContain("likely_duplicate");
-      expect(reviewHtml).toContain("Matches the content of existing verified memory.");
-      expect(reviewHtml).toContain('method="post" action="/actions/review"');
-      expect(reviewHtml).toContain('method="post" action="/actions/promote"');
+      expect(reviewBody.reviewItems.map((item) => item.content)).toContain("Console duplicate review memory.");
+      expect(reviewBody.reviewItems.flatMap((item) => item.hints.map((hint) => hint.type))).toContain("likely_duplicate");
 
-      const rejectedUrl = new URL("/rejected", baseUrl);
-      rejectedUrl.searchParams.set("scope", "project");
-      rejectedUrl.searchParams.set("projectId", projectScope.projectId);
-      rejectedUrl.searchParams.set("containerId", projectScope.containerId);
-      const rejectedResponse = await fetch(rejectedUrl);
-      const rejectedHtml = await rejectedResponse.text();
-
-      expect(rejectedResponse.status).toBe(200);
-      expect(rejectedHtml).toContain("Rejected memory quarantine");
-      expect(rejectedHtml).toContain("Rejected integration purge target.");
-      expect(rejectedHtml).not.toContain("Promote POST target.");
-      expect(rejectedHtml).not.toContain("Deferred integration memory.");
-      expect(rejectedHtml).not.toContain("Wrong scope rejected skip.");
-      expect(rejectedHtml).not.toContain('action="/actions/review"');
-      expect(rejectedHtml).not.toContain('action="/actions/promote"');
-
-      const graphUrl = new URL("/graph", baseUrl);
+      const graphUrl = new URL("/api/graph", baseUrl);
       graphUrl.searchParams.set("scope", "project");
       graphUrl.searchParams.set("projectId", projectScope.projectId);
       graphUrl.searchParams.set("containerId", projectScope.containerId);
-      graphUrl.searchParams.set("edgeType", "related_memory");
-      graphUrl.searchParams.set("id", `memory:${seeded.reviewTarget.id}`);
       const recordsBeforeGraph = await fixture.logStore.readAll();
       const graphResponse = await fetch(graphUrl);
-      const graphHtml = await graphResponse.text();
+      const graphBody = await graphResponse.json() as { readonly graph: { readonly nodes: readonly { readonly type: string }[]; readonly edges: readonly { readonly type: string }[] } };
       const recordsAfterGraph = await fixture.logStore.readAll();
 
       expect(graphResponse.status).toBe(200);
-      expect(graphHtml).toContain("Memory graph");
-      expect(graphHtml).toContain("Read-only projection of canonical memory metadata");
-      expect(graphHtml).toContain("related memory");
-      expect(graphHtml).not.toContain('method="post"');
+      expect(graphBody.graph.nodes.map((node) => node.type)).toContain("memory");
+      expect(graphBody.graph.edges.map((edge) => edge.type)).toContain("related_memory");
       expect(recordsAfterGraph).toEqual(recordsBeforeGraph);
     });
 
@@ -174,6 +205,182 @@ describe("memory console integration", () => {
       expect(backend.writer.purgeRejectedMemories).not.toHaveBeenCalled();
       expect(await expectMemory(fixture.logStore, seeded.promoteTarget.id)).toMatchObject({ verificationStatus: "verified" });
     });
+  });
+
+  it("routes JSON API mutations to storage with structured success bodies", async () => {
+    const fixture = await createConsoleFixture();
+    const seeded = await seedConsoleMemories(fixture.service);
+    const backend = createInstrumentedBackend(fixture);
+
+    await withConsoleServer(backend.backend, async (baseUrl) => {
+      clearBackendActionSpies(backend);
+      const reviewResponse = await fetch(new URL("/api/review", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: seeded.reviewPostTarget.id,
+          action: "defer",
+          note: "JSON integration route deferred this memory.",
+        }),
+      });
+      const reviewBody = await reviewResponse.json() as { readonly status: string; readonly action: string; readonly result: { readonly id: string; readonly action: string; readonly reviewStatus?: string } };
+
+      expect(reviewResponse.status).toBe(200);
+      expect(reviewResponse.headers.get("content-type")).toContain("application/json");
+      expect(reviewBody).toMatchObject({
+        status: "ok",
+        action: "review",
+        result: { id: seeded.reviewPostTarget.id, action: "defer", reviewStatus: "deferred" },
+      });
+      expect(backend.writer.reviewMemory).toHaveBeenCalledTimes(1);
+      expect(backend.writer.reviewMemory).toHaveBeenCalledWith({
+        id: seeded.reviewPostTarget.id,
+        action: "defer",
+        note: "JSON integration route deferred this memory.",
+      });
+      expect(backend.writer.promoteMemory).not.toHaveBeenCalled();
+      expect(backend.writer.purgeRejectedMemories).not.toHaveBeenCalled();
+
+      clearBackendActionSpies(backend);
+      const promoteResponse = await fetch(new URL("/api/promote", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: seeded.promoteTarget.id,
+          evidence: [{
+            type: "test",
+            value: "memory-console-integration JSON promote POST",
+            note: "Fixture-backed JSON API verification.",
+          }],
+        }),
+      });
+      const promoteBody = await promoteResponse.json() as { readonly status: string; readonly action: string; readonly result: { readonly id: string; readonly verificationStatus: string } };
+
+      expect(promoteResponse.status).toBe(200);
+      expect(promoteBody).toMatchObject({
+        status: "ok",
+        action: "promote",
+        result: { id: seeded.promoteTarget.id, verificationStatus: "verified" },
+      });
+      expect(backend.writer.promoteMemory).toHaveBeenCalledTimes(1);
+      expect(backend.writer.promoteMemory).toHaveBeenCalledWith({
+        id: seeded.promoteTarget.id,
+        evidence: [{
+          type: "test",
+          value: "memory-console-integration JSON promote POST",
+          note: "Fixture-backed JSON API verification.",
+        }],
+      });
+      expect(backend.writer.reviewMemory).not.toHaveBeenCalled();
+      expect(backend.writer.purgeRejectedMemories).not.toHaveBeenCalled();
+
+      clearBackendActionSpies(backend);
+      const purgeResponse = await fetch(new URL("/api/purge-rejected", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ids: [seeded.rejectedTarget.id, seeded.pendingPurgeSkip.id],
+          scope: "project",
+          projectId: projectScope.projectId,
+          containerId: projectScope.containerId,
+          confirmation: "DELETE REJECTED",
+        }),
+      });
+      const purgeBody = await purgeResponse.json() as { readonly status: string; readonly action: string; readonly result: { readonly outcomes: readonly { readonly id: string; readonly status: string }[] } };
+
+      expect(purgeResponse.status).toBe(200);
+      expect(purgeBody.status).toBe("ok");
+      expect(purgeBody.action).toBe("purge-rejected");
+      expect(purgeBody.result.outcomes).toEqual(expect.arrayContaining([
+        { id: seeded.rejectedTarget.id, status: "deleted" },
+        { id: seeded.pendingPurgeSkip.id, status: "skipped_not_rejected" },
+      ]));
+      expect(backend.writer.purgeRejectedMemories).toHaveBeenCalledTimes(1);
+      expect(backend.writer.purgeRejectedMemories).toHaveBeenCalledWith({
+        ids: [seeded.rejectedTarget.id, seeded.pendingPurgeSkip.id],
+        scope: "project",
+        projectId: projectScope.projectId,
+        containerId: projectScope.containerId,
+        confirmation: "DELETE REJECTED",
+      });
+      expect(backend.writer.reviewMemory).not.toHaveBeenCalled();
+      expect(backend.writer.promoteMemory).not.toHaveBeenCalled();
+    });
+
+    const remainingRecords = await fixture.logStore.readAll();
+    expect(remainingRecords.map((record) => record.id)).not.toContain(seeded.rejectedTarget.id);
+  });
+
+  it("returns 400 JSON for invalid API mutation payloads without mutating storage", async () => {
+    const fixture = await createConsoleFixture();
+    const seeded = await seedConsoleMemories(fixture.service);
+    clearCanonicalWriteSpies(fixture);
+    const backend = createInstrumentedBackend(fixture);
+
+    await withConsoleServer(backend.backend, async (baseUrl) => {
+      const invalidCases = [
+        {
+          path: "/api/review",
+          body: { id: seeded.reviewPostTarget.id, action: "edit_then_promote" },
+          message: "Invalid review action: edit_then_promote requires evidence.",
+        },
+        {
+          path: "/api/promote",
+          body: { id: seeded.promoteTarget.id },
+          message: "Invalid promote action: evidence is required.",
+        },
+        {
+          path: "/api/purge-rejected",
+          body: {
+            ids: [seeded.rejectedTarget.id],
+            scope: "project",
+            projectId: projectScope.projectId,
+            containerId: projectScope.containerId,
+          },
+          message: "Invalid purge-rejected action: confirmation must be DELETE REJECTED.",
+        },
+        {
+          path: "/api/purge-rejected",
+          body: {
+            ids: [seeded.rejectedTarget.id, 123],
+            scope: "project",
+            projectId: projectScope.projectId,
+            containerId: projectScope.containerId,
+            confirmation: "DELETE REJECTED",
+          },
+          message: "Invalid purge-rejected action: ids must be an array of non-empty strings.",
+        },
+      ] as const;
+
+      for (const invalidCase of invalidCases) {
+        const response = await fetch(new URL(invalidCase.path, baseUrl), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(invalidCase.body),
+        });
+        const body = await response.json() as { readonly status: string; readonly error: { readonly code: string; readonly message: string } };
+
+        expect(response.status).toBe(400);
+        expect(response.headers.get("content-type")).toContain("application/json");
+        expect(body.status).toBe("error");
+        expect(body.error).toEqual({ code: "invalid_payload", message: invalidCase.message });
+      }
+
+      const malformedResponse = await fetch(new URL("/api/review", baseUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "not json",
+      });
+      const malformedBody = await malformedResponse.json() as { readonly status: string; readonly error: { readonly code: string; readonly message: string } };
+      expect(malformedResponse.status).toBe(400);
+      expect(malformedBody).toMatchObject({
+        status: "error",
+        error: { code: "invalid_payload", message: "Invalid JSON payload: request body must be valid JSON." },
+      });
+    });
+
+    expectNoWriteMethods(backend);
+    expectNoCanonicalWriteMethods(fixture);
   });
 
   it("purges rejected memories through fixture storage while preserving wrong-scope and non-rejected records", async () => {
@@ -305,15 +512,37 @@ describe("memory console integration", () => {
       expect(unknownResponse.headers.get("content-type")).toContain("text/plain");
       expect(await unknownResponse.text()).toBe("Not found");
 
-      const pageMethodResponse = await fetch(new URL("/", baseUrl), { method: "PUT" });
-      expect(pageMethodResponse.status).toBe(405);
-      expect(pageMethodResponse.headers.get("allow")).toBe("GET, HEAD");
-      expect(await pageMethodResponse.text()).toBe("Method PUT is not allowed for /. Allowed methods: GET, HEAD.");
+      const pageMethodCases = ["/", "/review", "/rejected", "/graph"] as const;
+      for (const path of pageMethodCases) {
+        const pageMethodResponse = await fetch(new URL(path, baseUrl), { method: "PUT" });
+        expect(pageMethodResponse.status).toBe(405);
+        expect(pageMethodResponse.headers.get("allow")).toBe("GET, HEAD");
+        expect(await pageMethodResponse.text()).toBe(`Method PUT is not allowed for ${path}. Allowed methods: GET, HEAD.`);
+      }
 
-      const actionMethodResponse = await fetch(new URL("/actions/review", baseUrl));
-      expect(actionMethodResponse.status).toBe(405);
-      expect(actionMethodResponse.headers.get("allow")).toBe("POST");
-      expect(await actionMethodResponse.text()).toBe("Method GET is not allowed for /actions/review. Allowed methods: POST.");
+      const actionMethodCases = ["/actions/review", "/actions/promote", "/actions/purge-rejected"] as const;
+      for (const path of actionMethodCases) {
+        const actionMethodResponse = await fetch(new URL(path, baseUrl));
+        expect(actionMethodResponse.status).toBe(405);
+        expect(actionMethodResponse.headers.get("allow")).toBe("POST");
+        expect(await actionMethodResponse.text()).toBe(`Method GET is not allowed for ${path}. Allowed methods: POST.`);
+      }
+
+      const apiGetMethodCases = ["/api/memories", "/api/graph"] as const;
+      for (const path of apiGetMethodCases) {
+        const apiGetMethodResponse = await fetch(new URL(path, baseUrl), { method: "POST" });
+        expect(apiGetMethodResponse.status).toBe(405);
+        expect(apiGetMethodResponse.headers.get("allow")).toBe("GET, HEAD");
+        expect(await apiGetMethodResponse.text()).toBe(`Method POST is not allowed for ${path}. Allowed methods: GET, HEAD.`);
+      }
+
+      const apiPostMethodCases = ["/api/promote", "/api/purge-rejected"] as const;
+      for (const path of apiPostMethodCases) {
+        const apiPostMethodResponse = await fetch(new URL(path, baseUrl));
+        expect(apiPostMethodResponse.status).toBe(405);
+        expect(apiPostMethodResponse.headers.get("allow")).toBe("POST");
+        expect(await apiPostMethodResponse.text()).toBe(`Method GET is not allowed for ${path}. Allowed methods: POST.`);
+      }
     });
 
     expect(backend.reader.readAll).not.toHaveBeenCalled();

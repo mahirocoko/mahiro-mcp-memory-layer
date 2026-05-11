@@ -1,5 +1,4 @@
 $ tsx src/memory-console.ts "--port=49217"
 Memory console listening on http://127.0.0.1:49217/
 Local only: bound to 127.0.0.1. Press Ctrl+C to stop.
-
-terminated after startup capture
+error: script "memory-console" exited with code 137

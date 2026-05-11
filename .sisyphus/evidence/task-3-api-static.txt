@@ -1,0 +1,13 @@
+Task 3 API/static evidence - 2026-05-11T03:48:56Z
+
+Static/page coverage:
+- GET /, /review, /rejected, and /graph now return the built Vite React app shell with content-type text/html; charset=utf-8.
+- Manual HTTP QA confirmed GET /graph returned 200 text/html and contained <div id="root"></div>.
+- Built assets are served only under /assets/<filename> from src/features/memory-console/static/assets.
+- Manual HTTP QA confirmed the shell script asset returned 200 with content-type application/javascript; charset=utf-8.
+- Manual HTTP QA confirmed /assets/..%2Fserver.ts returned 404 Not found.
+
+Focused verification:
+- rtk was not installed in this environment (`rtk rg ...` failed with no such file), so repo-native commands were run directly.
+- bun run test -- tests/memory-console-integration.test.ts: PASS, 7 tests.
+- bun run typecheck: PASS.

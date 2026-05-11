@@ -1,0 +1,18 @@
+Task 3 API/error evidence - 2026-05-11T03:48:56Z
+
+JSON API coverage:
+- GET /api/memories returns ConsoleLoadResult JSON from the server-side memory backend.
+- GET /api/review returns review queue JSON from the server-side backend.
+- GET /api/graph returns graph JSON from the server-side backend.
+- POST /api/review, /api/promote, and /api/purge-rejected return structured JSON success bodies with stable 200 status on accepted mutations.
+- Invalid JSON mutation payloads return 400 application/json without calling mutation writers.
+- Unsupported backend mutation capability returns the preserved 501 unavailable concept as structured JSON.
+- Legacy /actions/review, /actions/promote, and /actions/purge-rejected remain form-compatible with their existing text/html, text/plain, redirect, status, and Allow-header semantics.
+
+Manual HTTP QA observed:
+- POST /api/review with valid JSON returned 200 and { status: "ok", action: "review", result: ... }.
+- POST /api/promote without evidence returned 400 and { status: "error", action: "promote", error: { code: "invalid_payload", message: "Invalid promote action: evidence is required." } }.
+
+Focused verification:
+- bun run test -- tests/memory-console-integration.test.ts: PASS, 7 tests.
+- bun run typecheck: PASS.
